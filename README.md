@@ -80,7 +80,12 @@ The build produces a binary named `loxicmd`.
 | `--port` | `-p` | gateway API server port (default `11111`) |
 | `--protocol` | | `http` or `https` |
 | `--output` | `-o` | output format (`json`, `wide`, or table) |
-| `--token` | | bearer token for authenticated endpoints |
+| `--token` | | token for authenticated endpoints |
+| `--bearer` | | send the token as `Authorization: Bearer <token>` (default `true`; disable for classic loxilb raw-token targets) |
+| `--insecure` | `-k` | skip TLS certificate verification (https only) |
+| `--cacert` | | CA certificate (PEM) to verify the server (https only) |
+| `--cert` | | client certificate (PEM) for mutual TLS (https only) |
+| `--key` | | client private key (PEM) for mutual TLS (https only) |
 | `--timeout` | `-t` | request timeout in seconds |
 
 Run `./loxicmd help` or `./loxicmd <command> --help` for full details.

@@ -19,5 +19,7 @@ jobs:
       run: make
     - name: Vet
       run: go vet ./...
+    - name: Test
+      run: go test ./...
     - name: gofmt
       run: test -z "$(gofmt -l .)" || (echo 'gofmt needed on:'; gofmt -l .; exit 1)

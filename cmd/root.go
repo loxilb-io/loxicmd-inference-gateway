@@ -86,6 +86,11 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	rootCmd.PersistentFlags().StringVarP(&restOptions.ServerIP, "apiserver", "s", "127.0.0.1", "Set API server IP address")
 	rootCmd.PersistentFlags().Int16VarP(&restOptions.ServerPort, "port", "p", 11111, "Set API server port number")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.Token, "token", "", "", "Set Token for the API server")
+	rootCmd.PersistentFlags().BoolVarP(&restOptions.BearerAuth, "bearer", "", true, "Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets)")
+	rootCmd.PersistentFlags().BoolVarP(&restOptions.Insecure, "insecure", "k", false, "Skip TLS certificate verification (https only)")
+	rootCmd.PersistentFlags().StringVarP(&restOptions.CACertFile, "cacert", "", "", "CA certificate (PEM) to verify the server (https only)")
+	rootCmd.PersistentFlags().StringVarP(&restOptions.ClientCertFile, "cert", "", "", "Client certificate (PEM) for mutual TLS (https only)")
+	rootCmd.PersistentFlags().StringVarP(&restOptions.ClientKeyFile, "key", "", "", "Client private key (PEM) for mutual TLS (https only)")
 
 	rootCmd.AddCommand(get.GetCmd(restOptions))
 	rootCmd.AddCommand(create.CreateCmd(restOptions))

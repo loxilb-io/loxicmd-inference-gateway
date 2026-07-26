@@ -16,7 +16,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -52,12 +54,23 @@ type LoxiClient struct {
 }
 
 func NewLoxiClient(o *RESTOptions) *LoxiClient {
+	httpClient := &http.Client{
+		Timeout: time.Second * time.Duration(o.Timeout),
+	}
+	if needsTLSConfig(o) {
+		tlsConfig, err := buildTLSConfig(o)
+		if err != nil {
+			// Surface the misconfiguration rather than silently falling back
+			// to system defaults; the request will then fail clearly too.
+			fmt.Fprintf(os.Stderr, "Error: TLS configuration: %s\n", err.Error())
+		} else {
+			httpClient.Transport = &http.Transport{TLSClientConfig: tlsConfig}
+		}
+	}
 	return &LoxiClient{
 		restClient: RESTClient{
 			Options: *o,
-			Client: &http.Client{
-				Timeout: time.Second * time.Duration(o.Timeout),
-			},
+			Client:  httpClient,
 		},
 	}
 }

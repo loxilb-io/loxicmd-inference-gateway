@@ -23,6 +23,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"strings"
 )
 
 const (
@@ -68,6 +69,15 @@ type RESTOptions struct {
 	Timeout     int16
 	ServiceName string
 	Token       string
+	// BearerAuth, when true, prefixes the Authorization header value with
+	// "Bearer ". The loxilb-inference-gateway JWT middleware expects this
+	// form; classic loxilb targets that accept a raw token can disable it.
+	BearerAuth bool
+	// TLS options (used when Protocol == "https").
+	Insecure       bool   // skip server certificate verification
+	CACertFile     string // PEM CA bundle to verify the server certificate
+	ClientCertFile string // client certificate for mTLS
+	ClientKeyFile  string // client private key for mTLS
 }
 
 type RESTClient struct {
@@ -89,9 +99,8 @@ func (r *RESTClient) GET(ctx context.Context, getURL string) (*http.Response, er
 		return nil, err
 	}
 	r.getTokens()
-	// move RESTOptions
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", r.Options.Token)
+	r.setAuthHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -101,9 +110,8 @@ func (r *RESTClient) POST(ctx context.Context, postURL string, body []byte) (*ht
 		return nil, err
 	}
 	r.getTokens()
-	// move RESTOptions
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", r.Options.Token)
+	r.setAuthHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -113,10 +121,25 @@ func (r *RESTClient) DELETE(ctx context.Context, deleteURL string) (*http.Respon
 		return nil, err
 	}
 	r.getTokens()
-	// move RESTOptions
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", r.Options.Token)
+	r.setAuthHeader(req)
 	return r.Client.Do(req)
+}
+
+// setAuthHeader sets the Authorization header from the configured token.
+// When BearerAuth is enabled the value is prefixed with "Bearer " (unless it
+// already carries that prefix), matching what the inference gateway expects.
+// No header is set when there is no token, so unauthenticated targets are
+// unaffected.
+func (r *RESTClient) setAuthHeader(req *http.Request) {
+	token := strings.TrimSpace(r.Options.Token)
+	if token == "" {
+		return
+	}
+	if r.Options.BearerAuth && !strings.HasPrefix(token, "Bearer ") {
+		token = "Bearer " + token
+	}
+	req.Header.Set("Authorization", token)
 }
 
 func (r *RESTClient) getTokens() {
@@ -125,6 +148,6 @@ func (r *RESTClient) getTokens() {
 		if err != nil {
 			return
 		}
-		r.Options.Token = string(token)
+		r.Options.Token = strings.TrimSpace(string(token))
 	}
 }
