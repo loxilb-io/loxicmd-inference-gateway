@@ -1,0 +1,15 @@
+name: leak-scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+
+jobs:
+  leak-scan:
+    name: leak-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run leak scan
+        run: bash hack/leak-scan.sh
