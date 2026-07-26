@@ -64,3 +64,6 @@ dkms.conf
 CLAUDE.md
 # Built binary
 /loxicmd
+
+# Do not ignore Go module files (the *.mod* kernel rule above would catch go.mod)
+!go.mod
