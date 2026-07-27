@@ -51,6 +51,9 @@ const (
 	loxiAITenantRateLimit       = "config/ai/tenant/ratelimit"
 	loxiAIKvInventoryResource   = "config/ai/kv/inventory"
 	loxiUserResource            = "auth/users"
+	loxiCertResource            = "config/cert"
+	loxiSNIResource             = "sni/certificates"
+	loxiMetricsResource         = "config/metrics"
 )
 
 type LoxiClient struct {
@@ -410,6 +413,45 @@ func (l *LoxiClient) User() *User {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiUserResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Cert() *Cert {
+	return &Cert{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiCertResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) SNICertificate() *SNICertificate {
+	return &SNICertificate{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiSNIResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Metrics() *Metrics {
+	return &Metrics{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiMetricsResource,
 			},
 		},
 	}

@@ -51,6 +51,7 @@ func SetParamCmd(restOptions *api.RESTOptions) *cobra.Command {
 	SetParamCmd.AddCommand(NewSetRefreshTokenCmd(restOptions))
 	SetParamCmd.AddCommand(NewSetAPIKeyCmd(restOptions))
 	SetParamCmd.AddCommand(NewSetRateLimitCmd(restOptions))
+	SetParamCmd.AddCommand(NewSetMetricsCmd(restOptions))
 
 	return SetParamCmd
 }

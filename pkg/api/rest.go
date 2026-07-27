@@ -126,6 +126,19 @@ func (r *RESTClient) DELETE(ctx context.Context, deleteURL string) (*http.Respon
 	return r.Client.Do(req)
 }
 
+// DELETEWithBody issues a DELETE carrying a JSON request body (used by
+// endpoints such as /sni/certificates that identify the target in the body).
+func (r *RESTClient) DELETEWithBody(ctx context.Context, deleteURL string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, deleteURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	r.getTokens()
+	req.Header.Set("Content-Type", "application/json")
+	r.setAuthHeader(req)
+	return r.Client.Do(req)
+}
+
 func (r *RESTClient) PATCH(ctx context.Context, patchURL string, body []byte) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, patchURL, bytes.NewBuffer(body))
 	if err != nil {

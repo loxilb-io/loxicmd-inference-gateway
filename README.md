@@ -125,6 +125,25 @@ These endpoints require an authenticated session (gateway started with
 ./loxicmd get kvinventory --service-id=3 --ep-idx=0
 ```
 
+### TLS Certificates & Operations
+
+```bash
+# TLS certificate store
+./loxicmd create cert --cert-id=web --cert-file=server.crt --key-file=server.key --chain-file=chain.pem
+./loxicmd get cert web            # private key is never returned
+./loxicmd delete cert web
+
+# SNI certificate mappings (hostname -> cert directory)
+./loxicmd create sni --hostname=api.example.com --cert-path=/opt/loxilb/cert
+./loxicmd get sni
+./loxicmd delete sni --hostname=api.example.com
+
+# Prometheus metrics toggle + HA state
+./loxicmd set metrics --enable
+./loxicmd get metrics
+./loxicmd get hastate
+```
+
 ## Command Reference
 
 ### Global Flags
