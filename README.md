@@ -17,19 +17,27 @@ It is derived from [loxicmd](https://github.com/loxilb-io/loxicmd) and speaks th
 
 ## Status
 
-AI command coverage is being built out in phases (see the project roadmap). Today the CLI provides the full
-classic loxilb surface; AI-specific commands and load-balancer flags are landing incrementally. Where the
-gateway's control plane accepts configuration that its data plane does not yet enforce (e.g. API-key /
-rate-limit enforcement), the affected commands say so in their help text.
+The CLI covers the full classic loxilb surface plus the inference gateway's AI-native features. Every
+command and flag traces to the gateway's `api/swagger.yml` / `api/swagger-extras.yml` and its `cicd/`
+scenarios. Where the gateway's control plane accepts configuration that its data plane does not yet enforce
+(e.g. API-key / rate-limit enforcement), the affected commands say so in their help text.
+
+See the [Command Reference](docs/COMMANDS.md) for every command, and the
+[Quickstart](docs/QUICKSTART.md) for a model-routing walkthrough.
 
 ## Features
 
 **Load Balancer Management** — create, delete, and inspect service-type load balancers across multiple
 algorithms, protocols, and NAT modes (including `fullproxy`, required for AI features).
 
-**Inference Gateway (in progress)** — model-name routing, SSE streaming controls, CHWBL prefix hashing,
-prefill/decode disaggregation, KV-cache-aware routing, per-tenant API keys and rate limits, KV inventory
-inspection.
+**Inference Gateway** — model-name routing, SSE streaming controls, CHWBL prefix hashing, prefill/decode
+disaggregation, KV-cache-aware routing (vLLM & SGLang), per-tenant API keys and rate limits, KV inventory
+inspection, and TLS/mTLS.
+
+**Guardrails & Telemetry** — GPU-aware load balancing, PII detection (Presidio), LlamaFirewall AI-security
+scanning, HTTP/L4 request tracing with OTLP export, OPA policy watcher, and DPU offload debug.
+
+**Operations** — Prometheus metrics, HA state, and configuration lifecycle (snapshot / restore / persist).
 
 **Networking & Monitoring** — port/interface dumps, connection tracking, neighbors and routes, QoS policy,
 VLAN/VXLAN, firewall, BGP, BFD, mirroring, sessions, endpoints, and IP address management.
@@ -144,7 +152,32 @@ These endpoints require an authenticated session (gateway started with
 ./loxicmd get hastate
 ```
 
+### Guardrails, Tracing & Config Lifecycle
+
+```bash
+# GPU-aware LB, PII detection, LlamaFirewall (enable → inspect → configure)
+./loxicmd set gpu --enable                 && ./loxicmd get gpu
+./loxicmd set pii --enable                 && ./loxicmd get pii --stats
+./loxicmd set llamafirewall --scanners --prompt-guard --code-shield
+./loxicmd get llamafirewall
+
+# Request tracing (HTTP + L4) with OTLP export
+./loxicmd set trace --otlp --otlp-endpoint=jaeger.example.com:4317 --otlp-protocol=grpc
+./loxicmd set l4trace --enable --sampling-rate=100 && ./loxicmd get l4trace
+
+# OPA policy watcher (raw middleware) and DPU offload debug
+./loxicmd set opa --opa-url=http://opa.example.com:8181 && ./loxicmd get opa
+./loxicmd get dpu --hwcounters
+
+# Configuration lifecycle: snapshot → dry-run restore → persist
+./loxicmd get snapshot -f snapshot.json
+./loxicmd create restore -f snapshot.json           # dry-run plan (add --commit to apply)
+./loxicmd create persist
+```
+
 ## Command Reference
+
+The full, swagger-traceable reference lives in **[docs/COMMANDS.md](docs/COMMANDS.md)**.
 
 ### Global Flags
 
