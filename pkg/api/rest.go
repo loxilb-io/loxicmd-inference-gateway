@@ -126,6 +126,17 @@ func (r *RESTClient) DELETE(ctx context.Context, deleteURL string) (*http.Respon
 	return r.Client.Do(req)
 }
 
+func (r *RESTClient) PATCH(ctx context.Context, patchURL string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPatch, patchURL, bytes.NewBuffer(body))
+	if err != nil {
+		return nil, err
+	}
+	r.getTokens()
+	req.Header.Set("Content-Type", "application/json")
+	r.setAuthHeader(req)
+	return r.Client.Do(req)
+}
+
 // setAuthHeader sets the Authorization header from the configured token.
 // When BearerAuth is enabled the value is prefixed with "Bearer " (unless it
 // already carries that prefix), matching what the inference gateway expects.

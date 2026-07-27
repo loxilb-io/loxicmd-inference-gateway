@@ -18,6 +18,10 @@ package get
 var (
 	CONNTRACK_TITLE         = []string{"destIP", "srcIP", "dPort", "sPort", "proto", "state", "act", "packets", "bytes"}
 	LOADBALANCER_TITLE      = []string{"Ext IP", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "# of Endpoints", "Timeout", "Monitor"}
+	APIKEY_TITLE            = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled"}
+	APIKEY_WIDE_TITLE       = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled", "Created", "Expires"}
+	RATELIMIT_TITLE         = []string{"Tenant", "RPS", "Tokens/Min", "Updated"}
+	KVINVENTORY_TITLE       = []string{"Block Idx", "Hash (uint64)"}
 	LOADBALANCER_WIDE_TITLE = []string{"Ext IP", "Sec IPs", "Sources", "Host", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "Endpoint", "EPort", "Weight", "State", "Counters"}
 	SESSION_TITLE           = []string{"ident", "session IP"}
 	SESSION_WIDE_TITLE      = []string{"ident", "session IP", "access Network Tunnel", "core Network Tunnel"}

@@ -59,6 +59,15 @@ func (l *CommonAPI) Delete(ctx context.Context) (*http.Response, error) {
 	return l.restClient.DELETE(ctx, deleteURL)
 }
 
+func (l *CommonAPI) Update(ctx context.Context, modelbody interface{}) (*http.Response, error) {
+	body, err := json.Marshal(modelbody)
+	if err != nil {
+		return nil, err
+	}
+	updateURL := l.GetUrlString()
+	return l.restClient.PATCH(ctx, updateURL, body)
+}
+
 func (l *CommonAPI) Get(ctx context.Context) (*http.Response, error) {
 	getURL := l.GetUrlString()
 	return l.restClient.GET(ctx, getURL)

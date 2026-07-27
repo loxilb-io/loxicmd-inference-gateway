@@ -70,6 +70,9 @@ func GetCmd(restOptions *api.RESTOptions) *cobra.Command {
 	GetCmd.AddCommand(NewGetHaStateCmd(restOptions))
 	GetCmd.AddCommand(NewGetBFDCmd(restOptions))
 	GetCmd.AddCommand(NewGetVersionCmd(restOptions))
+	GetCmd.AddCommand(NewGetAPIKeyCmd(restOptions))
+	GetCmd.AddCommand(NewGetRateLimitCmd(restOptions))
+	GetCmd.AddCommand(NewGetKvInventoryCmd(restOptions))
 
 	return GetCmd
 }

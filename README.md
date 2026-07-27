@@ -96,6 +96,35 @@ All AI features require `--mode fullproxy`.
   --chwbl-hash-level=2 --chwbl-load-factor=125 --endpoints=203.0.113.1:1,203.0.113.2:1
 ```
 
+### API Keys, Rate Limits & KV Inventory
+
+These endpoints require an authenticated session (gateway started with
+`--userservice`). Obtain a token first, then manage AI resources.
+
+> API keys and tenant rate limits are **control-plane CRUD** today; data-plane
+> enforcement (401/403/429) is on the roadmap.
+
+```bash
+# Authenticate (stores the bearer token)
+./loxicmd create user --username=admin --password='Admin123!' --role=admin
+./loxicmd set login
+
+# Per-tenant API keys (raw key is shown only once, at creation)
+./loxicmd create apikey --tenant-id=tenant-a --name=key-1 \
+  --allowed-models=llama-70b,mistral-7b --rps=5 --burst=10 --tokens-per-min=1000
+./loxicmd get apikey --tenant-id=tenant-a
+./loxicmd set apikey <key-id> --allowed-models=mistral-7b     # PATCH
+./loxicmd set apikey <key-id> --enabled=false
+./loxicmd delete apikey <key-id>
+
+# Per-tenant rate limit
+./loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000
+./loxicmd get ratelimit tenant-a
+
+# KV-cache block-hash inventory (read-only)
+./loxicmd get kvinventory --service-id=3 --ep-idx=0
+```
+
 ## Command Reference
 
 ### Global Flags

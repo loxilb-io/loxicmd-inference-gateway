@@ -47,6 +47,10 @@ const (
 	loxiBFDSessionResource      = "config/bfd"
 	loxiVersionResource         = "version"
 	loxiLoginResource           = "auth/login"
+	loxiAIApiKeyResource        = "config/ai/apikey"
+	loxiAITenantRateLimit       = "config/ai/tenant/ratelimit"
+	loxiAIKvInventoryResource   = "config/ai/kv/inventory"
+	loxiUserResource            = "auth/users"
 )
 
 type LoxiClient struct {
@@ -354,6 +358,58 @@ func (l *LoxiClient) Login() *Login {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiLoginResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AIApiKey() *AIApiKey {
+	return &AIApiKey{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAIApiKeyResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AITenantRatelimit() *AITenantRatelimit {
+	return &AITenantRatelimit{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAITenantRateLimit,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AIKvInventory() *AIKvInventory {
+	return &AIKvInventory{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAIKvInventoryResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) User() *User {
+	return &User{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiUserResource,
 			},
 		},
 	}
