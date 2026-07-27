@@ -52,6 +52,13 @@ func SetParamCmd(restOptions *api.RESTOptions) *cobra.Command {
 	SetParamCmd.AddCommand(NewSetAPIKeyCmd(restOptions))
 	SetParamCmd.AddCommand(NewSetRateLimitCmd(restOptions))
 	SetParamCmd.AddCommand(NewSetMetricsCmd(restOptions))
+	SetParamCmd.AddCommand(NewSetGPUCmd(restOptions))
+	SetParamCmd.AddCommand(NewSetPIICmd(restOptions))
+	SetParamCmd.AddCommand(NewSetLlamaFirewallCmd(restOptions))
+	SetParamCmd.AddCommand(NewSetTraceCmd(restOptions))
+	SetParamCmd.AddCommand(NewSetL4TraceCmd(restOptions))
+	SetParamCmd.AddCommand(NewSetOPACmd(restOptions))
+	SetParamCmd.AddCommand(NewSetDPUCmd(restOptions))
 
 	return SetParamCmd
 }

@@ -76,6 +76,14 @@ func GetCmd(restOptions *api.RESTOptions) *cobra.Command {
 	GetCmd.AddCommand(NewGetCertCmd(restOptions))
 	GetCmd.AddCommand(NewGetSNICmd(restOptions))
 	GetCmd.AddCommand(NewGetMetricsCmd(restOptions))
+	GetCmd.AddCommand(NewGetGPUCmd(restOptions))
+	GetCmd.AddCommand(NewGetPIICmd(restOptions))
+	GetCmd.AddCommand(NewGetLlamaFirewallCmd(restOptions))
+	GetCmd.AddCommand(NewGetTraceCmd(restOptions))
+	GetCmd.AddCommand(NewGetL4TraceCmd(restOptions))
+	GetCmd.AddCommand(NewGetOPACmd(restOptions))
+	GetCmd.AddCommand(NewGetDPUCmd(restOptions))
+	GetCmd.AddCommand(NewGetSnapshotCmd(restOptions))
 
 	return GetCmd
 }

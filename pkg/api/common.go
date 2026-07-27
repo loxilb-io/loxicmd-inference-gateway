@@ -68,6 +68,15 @@ func (l *CommonAPI) Update(ctx context.Context, modelbody interface{}) (*http.Re
 	return l.restClient.PATCH(ctx, updateURL, body)
 }
 
+func (l *CommonAPI) Put(ctx context.Context, modelbody interface{}) (*http.Response, error) {
+	body, err := json.Marshal(modelbody)
+	if err != nil {
+		return nil, err
+	}
+	putURL := l.GetUrlString()
+	return l.restClient.PUT(ctx, putURL, body)
+}
+
 func (l *CommonAPI) DeleteWithBody(ctx context.Context, modelbody interface{}) (*http.Response, error) {
 	body, err := json.Marshal(modelbody)
 	if err != nil {

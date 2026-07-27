@@ -54,6 +54,17 @@ const (
 	loxiCertResource            = "config/cert"
 	loxiSNIResource             = "sni/certificates"
 	loxiMetricsResource         = "config/metrics"
+	loxiGPUResource             = "config/gpu"
+	loxiWorkerMetricsResource   = "config/worker/metrics"
+	loxiPIIResource             = "config/pii"
+	loxiLlamaFirewallResource   = "config/llamafirewall"
+	loxiTraceResource           = "config/trace"
+	loxiL4TraceResource         = "config/l4trace"
+	loxiOPAResource             = "config/opa/watcher"
+	loxiDPUResource             = "config/dpu"
+	loxiSnapshotResource        = "config/snapshot"
+	loxiRestoreResource         = "config/restore"
+	loxiPersistResource         = "config/persist"
 )
 
 type LoxiClient struct {
@@ -452,6 +463,149 @@ func (l *LoxiClient) Metrics() *Metrics {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiMetricsResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) GPU() *GPU {
+	return &GPU{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiGPUResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) WorkerMetrics() *WorkerMetrics {
+	return &WorkerMetrics{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiWorkerMetricsResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) PII() *PII {
+	return &PII{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiPIIResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) LlamaFirewall() *LlamaFirewall {
+	return &LlamaFirewall{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiLlamaFirewallResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Trace() *Trace {
+	return &Trace{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiTraceResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) L4Trace() *L4Trace {
+	return &L4Trace{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiL4TraceResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) OPA() *OPA {
+	return &OPA{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiOPAResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) DPU() *DPU {
+	return &DPU{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiDPUResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Snapshot() *Snapshot {
+	return &Snapshot{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiSnapshotResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Restore() *Restore {
+	return &Restore{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiRestoreResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Persist() *Persist {
+	return &Persist{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiPersistResource,
 			},
 		},
 	}

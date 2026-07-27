@@ -72,6 +72,7 @@ Delete - Service type external load-balancer, Vlan, Vxlan, Qos Policies,
 	deleteCmd.AddCommand(NewDeleteAPIKeyCmd(restOptions))
 	deleteCmd.AddCommand(NewDeleteCertCmd(restOptions))
 	deleteCmd.AddCommand(NewDeleteSNICmd(restOptions))
+	deleteCmd.AddCommand(NewDeleteOPACmd(restOptions))
 
 	deleteCmd.Flags().StringVarP(&NormalConfigFile, "file", "f", "", "Config file to apply as like K8s")
 	return deleteCmd
