@@ -61,7 +61,10 @@ func NewDeleteLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var deleteLbCmd = &cobra.Command{
 		Use:   "lb <EXTERNAL-IP> [--tcp portNumber] [--udp portNumber] [--sctp portNumber] [--icmp portNumber] [--bgp] [--mark=<val>] [--name=<service-name>] [--host=<url>]",
 		Short: "Delete a LoadBalancer",
-		Long:  `Delete a LoadBalancer.`,
+		Long: `Delete a LoadBalancer.
+
+Tip: L7/fullproxy rules (AI rules) are most reliably deleted by --name; create
+them with --name so they can be removed with 'loxicmd delete lb --name=<name>'.`,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			//if len(args) == 0 {
 			//	cmd.Help()
@@ -88,10 +91,12 @@ func NewDeleteLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 					return
 				}
 				defer resp.Body.Close()
-				fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 				if resp.StatusCode == http.StatusOK {
 					PrintDeleteResult(resp, *restOptions)
+					return
 				}
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
 				return
 			}
 
@@ -124,7 +129,6 @@ func NewDeleteLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 			if icmpPortNumberList {
 				PortNumberList["icmp"] = []string{"0", "0"}
 			}
-			fmt.Printf("PortNumberList: %v\n", PortNumberList)
 			if Host == "" {
 				Host = "any"
 			}
@@ -154,18 +158,19 @@ func NewDeleteLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 				qmap := map[string]string{}
 				qmap["bgp"] = fmt.Sprintf("%v", BGP)
 				qmap["block"] = fmt.Sprintf("%v", Mark)
-				fmt.Printf("subResources: %v\n", subResources)
 				resp, err := client.LoadBalancer().SubResources(subResources).Query(qmap).Delete(ctx)
 				if err != nil {
 					fmt.Printf("Error: Failed to delete LoadBalancer(ExternalIP: %s, Protocol:%s, Port:%v)\n", externalIP, proto, portNum)
 					return
 				}
 				defer resp.Body.Close()
-				fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 				if resp.StatusCode == http.StatusOK {
 					PrintDeleteResult(resp, *restOptions)
 					return
 				}
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
+				return
 			}
 		},
 	}
