@@ -80,6 +80,12 @@ func NumToSelect(sel int) string {
 		ret = "n2"
 	case 6:
 		ret = "n3"
+	case 8:
+		ret = "chwbl"
+	case 9:
+		ret = "gpuaware"
+	case 10:
+		ret = "wrr-hash"
 	default:
 		ret = "rr"
 	}

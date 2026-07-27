@@ -70,6 +70,32 @@ The build produces a binary named `loxicmd`.
 ./loxicmd get lb -o wide
 ```
 
+### Inference Gateway Examples
+
+All AI features require `--mode fullproxy`.
+
+```bash
+# Model-name routing
+./loxicmd create lb 192.0.2.10 --tcp=2020:8000 --mode=fullproxy \
+  --model-name=llama-70b --path-prefix=/ --path-match-mode=prefix \
+  --endpoints=203.0.113.1:1,203.0.113.2:1
+
+# SSE streaming with a wall-clock cap
+./loxicmd create lb 192.0.2.11 --tcp=2020:8000 --mode=fullproxy \
+  --sse-mode --max-stream-duration=120 --backend-keepalive-interval=30 \
+  --endpoints=203.0.113.1:1
+
+# KV-cache-aware routing (vLLM) with prefill/decode endpoints
+./loxicmd create lb 192.0.2.12 --tcp=2020:80 --mode=fullproxy \
+  --pd-disagg --kv-exact-mode=1 --kv-zmq-port=5557 --kv-hash-algo=sha256_cbor \
+  --kv-warmup=20 --kv-block-size=16 \
+  --endpoints=203.0.113.1:1,203.0.113.2:1 --ep-role=prefill,decode --nixl-port=9001,9002
+
+# CHWBL prefix-hash routing
+./loxicmd create lb 192.0.2.13 --tcp=2020:8000 --mode=fullproxy --select=chwbl \
+  --chwbl-hash-level=2 --chwbl-load-factor=125 --endpoints=203.0.113.1:1,203.0.113.2:1
+```
+
 ## Command Reference
 
 ### Global Flags
