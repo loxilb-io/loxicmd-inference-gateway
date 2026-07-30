@@ -55,16 +55,26 @@ func NewDeleteLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var Name string
 	var Host string
 
+	var PathPrefix string
+	var PathMatchMode string
+	var ModelName string
+
 	var externalIP string
 	//var endpointList []string
 
 	var deleteLbCmd = &cobra.Command{
-		Use:   "lb <EXTERNAL-IP> [--tcp portNumber] [--udp portNumber] [--sctp portNumber] [--icmp portNumber] [--bgp] [--mark=<val>] [--name=<service-name>] [--host=<url>]",
+		Use:   "lb <EXTERNAL-IP> [--tcp portNumber] [--udp portNumber] [--sctp portNumber] [--icmp portNumber] [--bgp] [--mark=<val>] [--name=<service-name>] [--host=<url>] [--path-prefix=<prefix>] [--path-match-mode=<disabled|prefix|exact>] [--model-name=<model>]",
 		Short: "Delete a LoadBalancer",
 		Long: `Delete a LoadBalancer.
 
-Tip: L7/fullproxy rules (AI rules) are most reliably deleted by --name; create
-them with --name so they can be removed with 'loxicmd delete lb --name=<name>'.`,
+L7/AI rules are keyed by host + path-prefix + path-match-mode + model-name, so a
+rule created with those attributes must be deleted with the matching flags (or,
+most reliably, by --name). Example:
+  loxicmd delete lb 20.20.20.1 --tcp=2020 --host=api.example.com \
+    --path-prefix=/v1 --path-match-mode=prefix --model-name=llama3
+
+Tip: creating AI rules with --name lets them be removed with
+'loxicmd delete lb --name=<name>' without repeating the key attributes.`,
 		PreRun: func(cmd *cobra.Command, args []string) {
 			//if len(args) == 0 {
 			//	cmd.Help()
@@ -158,6 +168,19 @@ them with --name so they can be removed with 'loxicmd delete lb --name=<name>'.`
 				qmap := map[string]string{}
 				qmap["bgp"] = fmt.Sprintf("%v", BGP)
 				qmap["block"] = fmt.Sprintf("%v", Mark)
+				// L7/AI rule key components. The REST delete handler reads these
+				// from the query string (path_prefix/path_match_mode as swagger
+				// params, model_name from the raw query) to target the exact rule;
+				// omitting them makes an AI rule undeletable by external IP/port.
+				if PathPrefix != "" {
+					qmap["path_prefix"] = PathPrefix
+				}
+				if PathMatchMode != "" {
+					qmap["path_match_mode"] = PathMatchMode
+				}
+				if ModelName != "" {
+					qmap["model_name"] = ModelName
+				}
 				resp, err := client.LoadBalancer().SubResources(subResources).Query(qmap).Delete(ctx)
 				if err != nil {
 					fmt.Printf("Error: Failed to delete LoadBalancer(ExternalIP: %s, Protocol:%s, Port:%v)\n", externalIP, proto, portNum)
@@ -183,6 +206,9 @@ them with --name so they can be removed with 'loxicmd delete lb --name=<name>'.`
 	deleteLbCmd.Flags().Uint16VarP(&Mark, "mark", "", 0, "Specify the mark num to segregate a load-balancer VIP service")
 	deleteLbCmd.Flags().StringVarP(&Name, "name", "", Name, "Name for load balancer rule")
 	deleteLbCmd.Flags().StringVarP(&Host, "host", "", Host, "Ingress Host URL Path")
+	deleteLbCmd.Flags().StringVar(&PathPrefix, "path-prefix", PathPrefix, "L7/AI rule key: path prefix to match (ex) /v1")
+	deleteLbCmd.Flags().StringVar(&PathMatchMode, "path-match-mode", PathMatchMode, "L7/AI rule key: path match mode disabled|prefix|exact")
+	deleteLbCmd.Flags().StringVar(&ModelName, "model-name", ModelName, "L7/AI rule key: LLM model name")
 
 	return deleteLbCmd
 }
