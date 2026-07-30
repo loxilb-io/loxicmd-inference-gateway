@@ -30,8 +30,12 @@ import (
 func NewDeleteAPIKeyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var deleteAPIKeyCmd = &cobra.Command{
 		Use:   "apikey <KEY-ID>",
-		Short: "Delete (revoke) an inference-gateway API key",
-		Long: `Delete a per-tenant inference-gateway API key by its key ID.
+		Short: "Permanently delete an inference-gateway API key",
+		Long: `Permanently delete a per-tenant inference-gateway API key by its key ID.
+
+This is a hard delete: the key is removed and a subsequent lookup returns
+not-found. To disable a key reversibly while keeping it visible, use
+'loxicmd set apikey <KEY-ID> --enabled=false' instead.
 
 ex)
 	loxicmd delete apikey lxb_abc123`,
