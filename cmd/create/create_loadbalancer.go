@@ -415,6 +415,12 @@ ex)
 					PrintCreateResult(resp, *restOptions)
 					return
 				}
+				// Surface a non-2xx server rejection instead of silently
+				// no-op'ing (e.g. an invalid --kv-hash-algo enum). Without this the
+				// command exits 0 with no rule created and no diagnostic.
+				body, _ := io.ReadAll(resp.Body)
+				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
+				return
 			}
 		},
 	}
@@ -657,11 +663,18 @@ func lbMtlsBackendRequested(o *CreateLoadBalancerOptions) bool {
 		o.MtlsBackendClientCertPath != "" || o.MtlsBackendClientKeyPath != ""
 }
 
-// lbAIRequested reports whether any inference-gateway option is set.
+// lbAIRequested reports whether any inference-gateway option that requires L7
+// fullproxy termination is set.
+//
+// NOTE: --backend-protocol is deliberately excluded. The backend transport
+// (http1|http2|both) is a per-endpoint capability the datapath honors on plain
+// L4 rules too (e.g. the http2ep scenario: an h2c backend behind a default-mode
+// TCP VIP). The REST API applies backend_protocol in any mode, so forcing
+// --mode fullproxy here would make the CLI stricter than the API it drives.
 func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 	sel := SelectToNum(o.Select)
 	return o.ModelName != "" || o.PathPrefix != "" || o.PathMatchMode != "" ||
-		o.SessionHeaderName != "" || o.TraceType != "" || o.BackendProtocol != "" ||
+		o.SessionHeaderName != "" || o.TraceType != "" ||
 		o.SseMode || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 ||
 		o.ChwblPrefixHashLevel != 0 || o.ChwblPrefixHashFlags != 0 || o.ChwblMeanLoadFactor != 0 ||
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
