@@ -1,0 +1,17 @@
+# Dependabot: weekly dependency update PRs for Go modules and GitHub Actions.
+# PRs only — nothing merges without review and green CI.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5

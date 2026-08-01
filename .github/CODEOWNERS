@@ -1,0 +1,17 @@
+# Code owners for loxicmd-inference-gateway. Handles are taken from MAINTAINERS.md.
+#
+# Every pull request requires an approving review from these maintainers before it can be
+# merged. This is enforced by the branch-protection rule on `main`
+# ("Require review from Code Owners" + at least 1 approval).
+#
+# Every listed owner must have write access to the repository, otherwise GitHub ignores
+# them and warns. A team may be used instead of individual handles so membership can
+# change without editing this file.
+
+*       @TrekkieCoder @UltraInstinct14 @backguynn @inhogog2 @NLX-SeokHwanKong
+
+# CI/CD, release automation, and repo governance are the highest-value tamper
+# targets (a malicious workflow change can exfiltrate secrets or ship a
+# poisoned release). Call them out explicitly so a review is always required
+# on these paths even if the glob above is ever narrowed.
+/.github/        @TrekkieCoder @UltraInstinct14 @backguynn @inhogog2 @NLX-SeokHwanKong
