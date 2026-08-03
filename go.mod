@@ -5,13 +5,13 @@ go 1.25.0
 require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/spf13/cobra v1.10.2
-	github.com/vishvananda/netlink v1.1.0
+	github.com/vishvananda/netlink v1.3.1
 	golang.org/x/sys v0.47.0
 	golang.org/x/term v0.45.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
-require github.com/vishvananda/netns v0.0.0-20191106174202-0a2b9b5464df // indirect
+require github.com/vishvananda/netns v0.0.5 // indirect
 
 require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
