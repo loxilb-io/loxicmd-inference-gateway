@@ -1,0 +1,39 @@
+name: Secret Scan
+
+# Blocking: scans the full git history for secrets with a pinned gitleaks binary.
+# We install the CLI directly instead of gitleaks/gitleaks-action@v2, which now
+# requires a paid GITLEAKS_LICENSE for organization-owned repositories.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'  # weekly, Monday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GITLEAKS_VERSION: 8.24.3
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          sudo install /tmp/gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Run gitleaks (full history)
+        run: gitleaks detect --source . --config .gitleaks.toml --log-opts=--all --redact --verbose

@@ -1,0 +1,20 @@
+# Gitleaks configuration for loxicmd-inference-gateway.
+# Extends the default gitleaks ruleset and allowlists paths that are never part
+# of a published release (internal-only docs, local AI-tooling data, example values).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Paths and values that are not shipped or are documentation placeholders"
+paths = [
+  '''docs/internal/.*''',   # internal design/plan notes — gitignored, not shipped
+  '''\.codegraph/.*''',     # local AI-tooling index — gitignored, not shipped
+  '''\.serena/.*''',        # local AI-tooling cache — gitignored, not shipped
+  '''\.claude/.*''',        # local AI-tooling data — gitignored, not shipped
+  '''go\.sum$''',           # module checksums are not secrets
+]
+regexes = [
+  '''<[A-Za-z0-9_-]+>''',   # angle-bracket placeholders like <your-password>, <key-id>
+  '''CHANGE_ME''',
+  '''jwt123''',             # literal stub token used in unit tests
+]

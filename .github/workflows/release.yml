@@ -1,0 +1,92 @@
+name: Release
+
+# Tag-triggered release. Versions follow loxilb-io/loxilb-inference-gateway —
+# vMAJOR.MINOR.PATCH with an optional build component (v0.9.8.6), or a
+# -rc./-alpha./-beta. suffix for a prerelease; the tag is validated below and
+# stamped into the binary. Produces a linux/amd64 + linux/arm64 binary tarball
+# and SHA256SUMS attached to a GitHub Release.
+#
+# AUTHORIZATION: this job targets the `release` Environment, which should be
+# configured with required reviewers and a deployment branch policy allowing
+# only `v*` tags — so a tag alone cannot ship a release.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: release
+    permissions:
+      contents: write # create the GitHub Release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Resolve version
+        id: ver
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          # Lockstep with loxilb-inference-gateway: vMAJOR.MINOR.PATCH with an
+          # optional fourth build component, plus an optional -rc/-alpha/-beta
+          # prerelease suffix. Reject anything else so a stray tag cannot
+          # publish a release.
+          if ! echo "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?(-(rc|alpha|beta)[.-]?[0-9]+)?$'; then
+            echo "::error::'${VERSION}' is not a valid version: expected vMAJOR.MINOR.PATCH[.BUILD][-rc.N] (e.g. v0.9.8.6)"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          if echo "$VERSION" | grep -Eq -- '-(rc|alpha|beta)'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Build binaries
+        env:
+          CGO_ENABLED: 0
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          BUILDINFO="$(date '+%Y_%m_%d')-release-$(git rev-parse --short HEAD)"
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH="$arch" go build \
+              -ldflags "-X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.Version=${VERSION}' -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=${BUILDINFO}'" \
+              -o "loxicmd_${arch}"
+          done
+
+      - name: Package tarballs + checksums
+        run: |
+          VERSION="${{ steps.ver.outputs.version }}"
+          mkdir -p dist
+          for arch in amd64 arm64; do
+            DIST="loxicmd-inference-gateway_${VERSION}_linux_${arch}"
+            mkdir -p "dist/${DIST}"
+            cp "loxicmd_${arch}" "dist/${DIST}/loxicmd"
+            cp LICENSE NOTICE README.md "dist/${DIST}/"
+            tar -C dist -czf "dist/${DIST}.tar.gz" "${DIST}"
+          done
+          ( cd dist && sha256sum ./*.tar.gz > SHA256SUMS )
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          prerelease: ${{ steps.ver.outputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS

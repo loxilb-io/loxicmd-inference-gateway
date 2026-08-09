@@ -1,0 +1,86 @@
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Temporary files
+*.tmp
+*.back
+*.bck
+
+# Local IDE files
+.vscode/
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+.tmp_versions/
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+.DS_Store
+
+# AI-assistant tooling artifacts (must never be published)
+CLAUDE.md
+**/CLAUDE.md
+AGENTS.md
+**/AGENTS.md
+GEMINI.md
+**/GEMINI.md
+.claude/
+.serena/
+.mcp.json
+.codegraph/
+.planning/
+claudedocs/
+claude-agents/
+
+# Internal-only docs (design trackers, go-public plan, maintainer runbooks) —
+# never published to the public OSS repo.
+/docs/internal/
+
+# Built binary
+/loxicmd
+
+# Do not ignore Go module files (the *.mod* kernel rule above would catch go.mod)
+!go.mod

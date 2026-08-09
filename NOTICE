@@ -1,0 +1,27 @@
+loxicmd-inference-gateway
+Copyright (c) 2022-2026 NetLOX Inc. and the LoxiLB Authors
+
+This product is licensed under the Apache License, Version 2.0 (the "License");
+you may not use this product except in compliance with the License. A copy of
+the License is provided in the LICENSE file in this repository, and is also
+available at http://www.apache.org/licenses/LICENSE-2.0.
+
+--------------------------------------------------------------------------------
+
+loxicmd-inference-gateway is derived from the loxicmd project. It retargets the
+CLI at loxilb-inference-gateway, adding management commands for its
+inference-aware L4/L7 load-balancing features. With no AI feature flags used it
+behaves as an unmodified loxicmd client for classic loxilb.
+
+This product includes and derives from software developed by the LoxiLB project:
+
+  * loxicmd — the LoxiLB command-line interface
+    https://github.com/loxilb-io/loxicmd
+    Copyright (c) 2022 NetLOX Inc.
+    Licensed under the Apache License, Version 2.0.
+
+--------------------------------------------------------------------------------
+
+This product bundles third-party components under their own licenses. See the
+individual source files and the vendored Go module dependencies (go.mod / the
+respective module LICENSE files) for the applicable terms and attributions.

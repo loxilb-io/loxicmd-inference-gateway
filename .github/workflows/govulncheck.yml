@@ -1,0 +1,55 @@
+name: Govulncheck
+
+# Go vulnerability scan over the project packages. Blocking: fails only when a
+# known vulnerability is BOTH reachable from our code AND has an available
+# upstream fix (see .github/scripts/govulncheck-gate.py). Advisories with no
+# fix yet — typically standard-library ones awaiting a Go patch — are reported
+# but do not block, so the gate never goes falsely red on un-actionable CVEs.
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * 1'  # weekly, Monday 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 'stable'
+          cache: true
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck (fixable-gate)
+        # JSON mode never sets a non-zero "vuln found" exit itself, so any
+        # non-zero here means govulncheck failed to run — surface that. The
+        # gate script then decides pass/fail on reachable+fixable findings.
+        run: |
+          set +e
+          "$(go env GOPATH)/bin/govulncheck" -format json ./... > govulncheck.json 2> govulncheck.err
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo "govulncheck failed to run (exit $rc):"; cat govulncheck.err; exit 1
+          fi
+          python3 .github/scripts/govulncheck-gate.py govulncheck.json
+
+      - name: Upload govulncheck report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: govulncheck-json
+          path: govulncheck.json
+          if-no-files-found: ignore

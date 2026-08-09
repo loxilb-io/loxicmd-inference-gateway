@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/loxilb-io/loxicmd-inference-gateway/security/policy
+    about: Please report security issues privately per our Security Policy, not as public issues.
+  - name: Community Slack
+    url: https://www.loxilb.io/members
+    about: Join the loxilb community Slack for questions and discussion.
+  - name: Documentation
+    url: https://github.com/loxilb-io/loxicmd-inference-gateway/tree/main/docs
+    about: Command reference and quickstart for this CLI.
+  - name: loxilb-inference-gateway (the gateway this CLI drives)
+    url: https://github.com/loxilb-io/loxilb-inference-gateway/issues
+    about: Issues about gateway/data-plane behavior itself belong upstream.
