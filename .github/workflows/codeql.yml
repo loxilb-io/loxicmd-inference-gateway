@@ -47,6 +47,6 @@ jobs:
         # Swallow the expected upload failure while private (needs GHAS); the
         # analysis itself still runs. Green once public + GHAS, upload works.
         continue-on-error: true
-        uses: github/codeql-action/analyze@a2983b8bed1923f44751c5c43237f479442827b3 # v3
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v3
         with:
           category: '/language:go'
