@@ -141,7 +141,7 @@ func readImportedAPIKey(o *CreateAPIKeyOptions, stdin io.Reader) (string, bool, 
 		return "", false, nil
 	}
 
-	var reader io.Reader = stdin
+	reader := stdin
 	var file *os.File
 	if o.APIKeyFile != "" {
 		var err error
