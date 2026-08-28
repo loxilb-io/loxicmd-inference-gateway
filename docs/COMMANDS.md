@@ -20,10 +20,6 @@ addresses use the documentation ranges `192.0.2.0/24` (VIPs) and
 - [Metrics, HA & classic networking](#metrics-ha--classic-networking)
 - [Shell completion](#shell-completion)
 
-Where the gateway's *control plane* accepts configuration its *data plane* does
-not yet enforce, the affected commands say so in their `--help` and it is noted
-below.
-
 ---
 
 ## Global flags
@@ -65,7 +61,7 @@ loxicmd create lb 192.0.2.10 --tcp=2020:8000 --mode=fullproxy \
 
 # SSE streaming + quota  (cicd: ai-sse-quota)
 loxicmd create lb 192.0.2.11 --tcp=2020:8000 --mode=fullproxy \
-  --sse-mode --max-stream-duration=120 --backend-keepalive-interval=30 \
+  --sse-mode --max-stream-duration=120 --backend-keepalive-interval=30 --cb-enable \
   --endpoints=203.0.113.1:1
 
 # CHWBL prefix-hash routing  (cicd: vllm-fullproxy)
@@ -89,6 +85,20 @@ loxicmd create lb 192.0.2.15 --tcp=2020:80 --mode=fullproxy \
   --kv-exact-mode=3 --kv-engine-type=sglang --kv-dp-ranks=2 \
   --endpoints=203.0.113.1:1
 
+# SGLang prefill/decode bootstrap
+loxicmd create lb 192.0.2.16 --tcp=2020:80 --mode=fullproxy \
+  --pd-disagg --kv-engine-type=sglang --pd-bootstrap-port=8998 \
+  --endpoints=203.0.113.1:1,203.0.113.2:1 --ep-role=prefill,decode
+
+# TensorRT-LLM block-hash routing
+loxicmd create lb 192.0.2.17 --tcp=2020:80 --mode=fullproxy \
+  --kv-exact-mode=3 --kv-engine-type=trtllm --kv-hash-algo=blockhash_trtllm \
+  --endpoints=203.0.113.1:1
+
+# llama.cpp uses the plain/CHWBL path (no exact KV or P/D mode)
+loxicmd create lb 192.0.2.18 --tcp=2020:8000 --mode=fullproxy \
+  --select=chwbl --kv-engine-type=llamacpp --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
@@ -100,31 +110,36 @@ loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
 |-------|-------|
 | Mode / algo | `--mode fullproxy`, `--select chwbl\|chwbl-wrr\|gpuaware\|persist`, `--security plain\|https\|e2ehttps` |
 | Model routing | `--model-name`, `--path-prefix`, `--path-match-mode disabled\|prefix\|exact`, `--backend-protocol http1\|http2\|both`, `--session-header-name`, `--trace-type` |
+| Access / resilience | `--api-key-auth disabled\|required`, `--cb-enable` |
 | SSE | `--sse-mode`, `--max-stream-duration`, `--backend-keepalive-interval` |
 | CHWBL | `--chwbl-hash-level 1\|2\|3`, `--chwbl-load-factor`, `--chwbl-replication` |
-| P/D disagg | `--pd-disagg`, `--pd-cache-aware`, `--pd-session-ttl`, `--pd-cache-threshold`, `--pd-balance-abs-threshold`; per-endpoint `--ep-role prefill\|decode\|normal`, `--nixl-port` |
-| KV-cache | `--kv-exact-mode 0\|1\|3`, `--kv-zmq-port`, `--kv-hash-algo sha256_cbor\|xxhash_cbor\|sha256_sglang`, `--kv-engine-type vllm\|sglang`, `--kv-dp-ranks`, `--kv-warmup`, `--kv-block-size` |
+| P/D disagg | `--pd-disagg`, `--pd-cache-aware`, `--pd-session-ttl`, `--pd-cache-threshold`, `--pd-balance-abs-threshold`, `--pd-bootstrap-port`; per-endpoint `--ep-role prefill\|decode\|normal`, `--nixl-port` |
+| KV-cache | `--kv-exact-mode 0\|1\|3`, `--kv-zmq-port`, `--kv-hash-algo sha256_cbor\|xxhash_cbor\|sha256_sglang\|blockhash_trtllm`, `--kv-engine-type vllm\|sglang\|trtllm\|llamacpp`, `--kv-dp-ranks`, `--kv-warmup`, `--kv-block-size` |
 | mTLS | `--mtls-frontend`, `--mtls-backend` (bundle: client-cert-mode, ca-path, cert/key, verify-server-cert, require-client-cn/cn-pattern) |
 | HSTS | `--hsts-max-age`, `--hsts-include-subdomains` |
 
-Validation: AI flags ⇒ `--mode fullproxy`; `--pd-cache-aware` ⇒ `--pd-disagg`;
-`--kv-engine-type` is immutable per VIP on the server.
+Validation: AI flags require `--mode fullproxy`; `--pd-cache-aware` requires
+`--pd-disagg`; P/D requires both prefill and decode roles;
+`--pd-bootstrap-port` is SGLang P/D-only; `--kv-engine-type` is immutable per
+VIP on the server. llama.cpp does not support exact KV or P/D mode.
 
 ---
 
 ## AI-native resources (API keys, rate limits, KV inventory)
 
 Require the gateway started with `--userservice` + a DB backend and an
-authenticated session (see [Authentication](#authentication)).
-
-> **Control-plane only today:** API keys and tenant rate limits store
-> configuration; data-plane enforcement (401/403/429) is on the gateway
-> roadmap. SSE stream lifecycle & token bookkeeping *are* wired.
+authenticated management session (see [Authentication](#authentication)).
+Data-plane API-key and quota enforcement is independently enabled on each
+fullproxy service with `--api-key-auth=required`; the default is `disabled`.
 
 ```bash
 # API keys — swagger /config/ai/apikey (+ PATCH via extras)   (cicd: ai-apikey)
 loxicmd create apikey --tenant-id=tenant-a --name=key-1 \
   --allowed-models=llama-70b,mistral-7b --rps=5 --burst=10 --tokens-per-min=1000
+printf '%s' "$EXISTING_API_KEY" | loxicmd create apikey \
+  --tenant-id=tenant-a --name=imported --api-key-stdin
+loxicmd create apikey --tenant-id=tenant-a --name=imported \
+  --api-key-file=/secure/path/to/key
 loxicmd get apikey --tenant-id=tenant-a          # list; raw_key/hash never shown
 loxicmd get apikey <key-id>                       # one
 loxicmd set apikey <key-id> --allowed-models=mistral-7b   # PATCH
@@ -132,25 +147,39 @@ loxicmd set apikey <key-id> --enabled=false
 loxicmd delete apikey <key-id>
 
 # Tenant rate limit — swagger /config/ai/tenant/ratelimit   (cicd: ai-apikey)
-loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000
+loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000 \
+  --burst-pct=125 --model-limit=llama-70b=1200 --model-limit=mistral-7b=800
+# A zero model quota is a deletion tombstone for that model-specific limit
+loxicmd set ratelimit --tenant-id=tenant-a --model-limit=mistral-7b=0
 loxicmd get ratelimit tenant-a
+
+# The service must explicitly require X-Api-Key for enforcement
+loxicmd create lb 192.0.2.20 --tcp=2020:8000 --mode=fullproxy \
+  --model-name=llama-70b --api-key-auth=required --endpoints=203.0.113.1:1
 
 # KV-cache block-hash inventory (read-only) — extras /config/ai/kv/inventory
 loxicmd get kvinventory --service-id=3 --ep-idx=0
 ```
 
-The `raw_key` is printed **once**, at creation — store it immediately.
+Generated `raw_key` material is printed **once**, at creation — store it
+immediately. Imported material is never echoed. `--api-key-file` and
+`--api-key-stdin` are mutually exclusive and avoid plaintext command arguments.
 
 ---
 
 ## Authentication
 
 ```bash
-loxicmd create user --username=admin --password='<your-password>' --role=admin  # /auth/users
+# Bootstrap only: allowed without a token when the user store is empty
+loxicmd create user --username=admin --password='<your-password>' --role=admin
 loxicmd set login          # POST /auth/login; stores a Bearer token
+# Subsequent user creation requires an admin Bearer token
 loxicmd set refreshtoken
 loxicmd set logout
 ```
+
+Management bearer JWTs and data-plane `X-Api-Key` credentials are separate
+identities. A viewer token cannot create users.
 
 ---
 
@@ -314,6 +343,22 @@ The inherited classic loxilb surface — `port`, `conntrack`, `session`,
 `sessionulcl`, `policy`, `route`, `ipaddress`, `neighbor`, `fdb`, `vlan`,
 `vxlan`, `firewall`, `mirror`, `bgp`, `bfd`, `endpoint`, `status` — is available
 under the same verbs. Run `loxicmd <verb> --help` for the full list.
+
+QoS policy attachment accepts symbolic or numeric forms. Rule targets are
+`VIP:PORT:PROTO`; bracket IPv6 so the final attachment delimiter stays
+unambiguous.
+
+```bash
+loxicmd create policy model-qos --rate=100:100 \
+  --target=192.0.2.10:2020:tcp:rule
+loxicmd create policy model-qos-v6 --rate=100:100 \
+  --target='[2001:db8::10]:2020:tcp:rule'
+loxicmd create policy uplink-qos --rate=100:100 --target=eth0:egress-port
+```
+
+Attachment values are `rule|port|egress-port`; numeric `0|1|2` remains
+accepted for compatibility. Other attachment values and bare IPv6 rule keys
+are rejected locally.
 
 ---
 

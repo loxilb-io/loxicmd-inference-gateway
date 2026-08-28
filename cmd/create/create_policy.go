@@ -166,11 +166,16 @@ func NewCreatePolicyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var createPolCmd = &cobra.Command{
 		Use:   "policy IDENT --rate=<Peak>:<Committed> --target=<ObjectName>:<rule|port|egress-port> [--block-size=<Excess>:<Committed>] [--color] [--pol-type=<policy type>]",
 		Short: "Create a Policy",
-		Long: `Create a Policy 
-Ex) loxicmd create policy pol-hs0 --rate=100:100 --target=hs0:1
-    loxicmd create policy pol-hs1 --rate=100:100 --target=hs0:1 --block-size=12000:6000
-    loxicmd create policy pol-hs1 --rate=100:100 --target=hs0:1 --color
-    loxicmd create policy pol-hs1 --rate=100:100 --target=hs0:1 --color --pol-type 0
+		Long: `Create a Policy.
+
+Rule targets use VIP:PORT:PROTO:rule. IPv6 VIPs must be bracketed. Port
+attachments use INTERFACE:port or INTERFACE:egress-port. Numeric attachment
+values 0, 1, and 2 remain accepted for compatibility.
+
+Ex) loxicmd create policy pol-rule --rate=100:100 --target=192.0.2.10:443:tcp:rule
+    loxicmd create policy pol-v6 --rate=100:100 --target='[2001:db8::10]:443:tcp:rule'
+    loxicmd create policy pol-port --rate=100:100 --target=eth0:port --block-size=12000:6000
+    loxicmd create policy pol-egress --rate=100:100 --target=eth0:egress-port --color --pol-type=0
 
 rate unit : Mbps
 block-size unit : bps

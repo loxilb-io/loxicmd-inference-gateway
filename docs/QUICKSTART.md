@@ -51,6 +51,19 @@ loxicmd get lb -o json      # AI attributes (model_name, mode=4, path_*) appear 
 You should see three services, with `model_name` set to `llama-70b`,
 `mistral-7b`, and empty (wildcard) respectively, each with `mode: 4`.
 
+To require a tenant API key on a model pool, create that service with
+`--api-key-auth=required`. The policy is disabled by default and is independent
+of management-plane bearer login:
+
+```bash
+loxicmd create lb 192.0.2.11 --tcp=2020:8080 --mode=fullproxy \
+  --model-name=protected-model --path-prefix=/ --path-match-mode=prefix \
+  --api-key-auth=required --endpoints=203.0.113.1:1
+```
+
+Create/import tenant keys and quotas as described in the
+[AI-native resource reference](COMMANDS.md#ai-native-resources-api-keys-rate-limits-kv-inventory).
+
 ## 3. Exercise the routing
 
 ```bash

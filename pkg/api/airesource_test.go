@@ -94,6 +94,21 @@ func TestAIApiKeyPatchBody(t *testing.T) {
 	}
 }
 
+func TestDisabledAPIKeySummaryRemainsVisible(t *testing.T) {
+	b, err := json.Marshal(AIApiKeySummary{KeyID: "example-key-id", Enabled: false})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var summary map[string]any
+	if err := json.Unmarshal(b, &summary); err != nil {
+		t.Fatal(err)
+	}
+	enabled, exists := summary["enabled"]
+	if !exists || enabled != false {
+		t.Fatalf("disabled key summary dropped enabled=false: %s", b)
+	}
+}
+
 func TestAIRatelimitBody(t *testing.T) {
 	b, _ := json.Marshal(AITenantRateLimitMod{TenantID: "cicd-tenant", Rps: 50, TokensPerMin: 2000})
 	if string(b) != `{"tenant_id":"cicd-tenant","rps":50,"tokens_per_min":2000}` {

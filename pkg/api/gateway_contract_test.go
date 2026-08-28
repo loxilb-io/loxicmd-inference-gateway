@@ -36,6 +36,7 @@ type gatewayContractField struct {
 	PropertyPath []string `json:"property_path"`
 	Type         string   `json:"type"`
 	Enum         []string `json:"enum,omitempty"`
+	Required     bool     `json:"required,omitempty"`
 }
 
 func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
@@ -131,7 +132,27 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 					strings.Join(field.PropertyPath, "."), got, want)
 			}
 		}
+		if field.Required {
+			if len(field.PropertyPath) != 1 {
+				t.Fatalf("required contract check only supports top-level properties: %s.%s",
+					field.Definition, strings.Join(field.PropertyPath, "."))
+			}
+			definition := contractMapAt(t, spec, "definitions", field.Definition)
+			required := contractEnum(definition["required"])
+			if !containsContractValue(required, field.PropertyPath[0]) {
+				t.Errorf("%s %s.%s must be required", field.Spec, field.Definition, field.PropertyPath[0])
+			}
+		}
 	}
+}
+
+func containsContractValue(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func requireContractSpec(t *testing.T, specs map[string]map[interface{}]interface{}, name string) map[interface{}]interface{} {
