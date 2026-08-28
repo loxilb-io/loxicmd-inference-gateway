@@ -20,12 +20,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 
 	"github.com/spf13/cobra"
 )
@@ -165,22 +166,7 @@ Tip: creating AI rules with --name lets them be removed with
 					"portmax", sPortMax,
 					"protocol", proto,
 				}
-				qmap := map[string]string{}
-				qmap["bgp"] = fmt.Sprintf("%v", BGP)
-				qmap["block"] = fmt.Sprintf("%v", Mark)
-				// L7/AI rule key components. The REST delete handler reads these
-				// from the query string (path_prefix/path_match_mode as swagger
-				// params, model_name from the raw query) to target the exact rule;
-				// omitting them makes an AI rule undeletable by external IP/port.
-				if PathPrefix != "" {
-					qmap["path_prefix"] = PathPrefix
-				}
-				if PathMatchMode != "" {
-					qmap["path_match_mode"] = PathMatchMode
-				}
-				if ModelName != "" {
-					qmap["model_name"] = ModelName
-				}
+				qmap := loadBalancerDeleteQuery(BGP, Mark, PathPrefix, PathMatchMode, ModelName)
 				resp, err := client.LoadBalancer().SubResources(subResources).Query(qmap).Delete(ctx)
 				if err != nil {
 					fmt.Printf("Error: Failed to delete LoadBalancer(ExternalIP: %s, Protocol:%s, Port:%v)\n", externalIP, proto, portNum)
@@ -211,6 +197,25 @@ Tip: creating AI rules with --name lets them be removed with
 	deleteLbCmd.Flags().StringVar(&ModelName, "model-name", ModelName, "L7/AI rule key: LLM model name")
 
 	return deleteLbCmd
+}
+
+func loadBalancerDeleteQuery(bgp bool, mark uint16, pathPrefix, pathMatchMode, modelName string) map[string]string {
+	query := map[string]string{
+		"bgp":   strconv.FormatBool(bgp),
+		"block": strconv.FormatUint(uint64(mark), 10),
+	}
+	// L7/AI rule key components. The REST delete handler reads these from the
+	// query string to target the exact model-aware rule.
+	if pathPrefix != "" {
+		query["path_prefix"] = pathPrefix
+	}
+	if pathMatchMode != "" {
+		query["path_match_mode"] = pathMatchMode
+	}
+	if modelName != "" {
+		query["model_name"] = modelName
+	}
+	return query
 }
 
 func PrintDeleteResult(resp *http.Response, o api.RESTOptions) {
