@@ -22,4 +22,5 @@ type LBVersion struct {
 type LBVersionGet struct {
 	BuildInfo string `json:"buildInfo"`
 	Version   string `json:"version"`
+	Product   string `json:"product,omitempty"`
 }

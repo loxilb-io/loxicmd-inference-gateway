@@ -82,8 +82,15 @@ func PrintGetVersionResult(resp *http.Response, o api.RESTOptions) {
 	table := TableInit()
 
 	table.SetHeader(LBVERSION_TITLE)
-	data = append(data, []string{Versionresp.Version, Versionresp.BuildInfo})
+	data = append(data, []string{lbProductDisplay(Versionresp.Product), Versionresp.Version, Versionresp.BuildInfo})
 
 	// Rendering the load balance data to table
 	TableShow(data, table)
+}
+
+func lbProductDisplay(product string) string {
+	if product == "" {
+		return "loxilb"
+	}
+	return product
 }

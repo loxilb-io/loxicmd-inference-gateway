@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -100,17 +101,62 @@ func GetBlockPair(body *api.PolMod, Block string) error {
 }
 
 func GetTargetPair(body *api.PolMod, Block string) error {
-	BlockPair := strings.Split(Block, ":")
-	if len(BlockPair) != 2 {
-		return errors.New("error in target args")
+	separator := strings.LastIndex(Block, ":")
+	if separator <= 0 || separator == len(Block)-1 {
+		return errors.New("target must use '<object>:<rule|port|egress-port>' (numeric 0|1|2 is also accepted)")
 	}
-
-	AttachMent, err := strconv.Atoi(BlockPair[1])
+	objectName := Block[:separator]
+	attachment, err := policyAttachment(Block[separator+1:])
 	if err != nil {
-		return fmt.Errorf("AttachMent '%s' is not integer", BlockPair[1])
+		return err
 	}
-	body.Target.PolObjName = BlockPair[0]
-	body.Target.AttachMent = api.PolObjType(AttachMent)
+	if attachment == 0 {
+		if err := validatePolicyRuleTarget(objectName); err != nil {
+			return err
+		}
+	} else if strings.Contains(objectName, ":") {
+		return fmt.Errorf("port attachment target %q must be a port name", objectName)
+	}
+	body.Target.PolObjName = objectName
+	body.Target.AttachMent = api.PolObjType(attachment)
+	return nil
+}
+
+func policyAttachment(value string) (int, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "0", "rule":
+		return 0, nil
+	case "1", "port":
+		return 1, nil
+	case "2", "egress-port":
+		return 2, nil
+	default:
+		return 0, fmt.Errorf("attachment %q must be rule|port|egress-port or 0|1|2", value)
+	}
+}
+
+func validatePolicyRuleTarget(target string) error {
+	protocolSeparator := strings.LastIndex(target, ":")
+	if protocolSeparator <= 0 || protocolSeparator == len(target)-1 {
+		return fmt.Errorf("rule target %q must use VIP:PORT:PROTO or [IPv6]:PORT:PROTO", target)
+	}
+	hostPort := target[:protocolSeparator]
+	protocol := strings.ToLower(target[protocolSeparator+1:])
+	switch protocol {
+	case "tcp", "udp", "sctp", "icmp":
+	default:
+		return fmt.Errorf("rule target protocol %q must be tcp|udp|sctp|icmp", protocol)
+	}
+	host, rawPort, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		return fmt.Errorf("rule target %q must bracket IPv6 and use VIP:PORT:PROTO", target)
+	}
+	if net.ParseIP(host) == nil {
+		return fmt.Errorf("rule target VIP %q is not a valid IP address", host)
+	}
+	if _, err := strconv.ParseUint(rawPort, 10, 16); err != nil {
+		return fmt.Errorf("rule target port %q must be within 0..65535", rawPort)
+	}
 	return nil
 }
 
@@ -118,7 +164,7 @@ func NewCreatePolicyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	o := CreatePolicyOptions{}
 
 	var createPolCmd = &cobra.Command{
-		Use:   "policy IDENT --rate=<Peak>:<Committed> --target=<ObjectName>:<Attachment> [--block-size=<Excess>:<Committed>] [--color] [--pol-type=<policy type>]",
+		Use:   "policy IDENT --rate=<Peak>:<Committed> --target=<ObjectName>:<rule|port|egress-port> [--block-size=<Excess>:<Committed>] [--color] [--pol-type=<policy type>]",
 		Short: "Create a Policy",
 		Long: `Create a Policy 
 Ex) loxicmd create policy pol-hs0 --rate=100:100 --target=hs0:1
@@ -180,7 +226,7 @@ Policy type(pol-type) 0 : TrTCM,  1 : SrTCM
 
 	createPolCmd.Flags().StringVar(&o.Rate, "rate", o.Rate, "Rate pairs can be specified as '<Peak>:<Committed>'")
 	createPolCmd.Flags().StringVar(&o.Block, "block-size", o.Block, "Block Size pairs can be specified as '<Excess>:<Committed>'")
-	createPolCmd.Flags().StringVar(&o.Target, "target", o.Target, "Target Interface pairs can be specified as '<ObjectName>:<Attachment>'")
+	createPolCmd.Flags().StringVar(&o.Target, "target", o.Target, "Target '<ObjectName>:<rule|port|egress-port>'; numeric 0|1|2 remains accepted")
 	createPolCmd.Flags().BoolVarP(&o.Color, "color", "", false, "Policy color enbale or not")
 	createPolCmd.Flags().IntVar(&o.PolType, "pol-type", o.PolType, "Target Interface pairs can be specified as '<ObjectName>:<Attachment>'")
 
