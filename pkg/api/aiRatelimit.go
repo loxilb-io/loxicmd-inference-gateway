@@ -16,23 +16,34 @@
 package api
 
 // AITenantRatelimit is the client for per-tenant rate limits
-// (/config/ai/tenant/ratelimit). Control-plane CRUD only today; data-plane
-// enforcement (429) is on the roadmap.
+// (/config/ai/tenant/ratelimit). Quotas are enforced for traffic admitted by
+// a load-balancer service whose api_key_auth policy is required.
 type AITenantRatelimit struct {
 	CommonAPI
 }
 
 // AITenantRateLimitMod is the POST body (TenantRateLimitMod).
 type AITenantRateLimitMod struct {
-	TenantID     string `json:"tenant_id"`
-	Rps          int64  `json:"rps,omitempty"`
-	TokensPerMin int64  `json:"tokens_per_min,omitempty"`
+	TenantID     string                   `json:"tenant_id"`
+	Rps          int64                    `json:"rps,omitempty"`
+	TokensPerMin int64                    `json:"tokens_per_min,omitempty"`
+	BurstPct     int64                    `json:"burst_pct,omitempty"`
+	ModelLimits  []AITenantModelRateLimit `json:"model_limits,omitempty"`
+}
+
+// AITenantModelRateLimit is a per-model quota update. TokensPerMin
+// intentionally has no omitempty: zero is the server's deletion tombstone.
+type AITenantModelRateLimit struct {
+	Model        string `json:"model"`
+	TokensPerMin int64  `json:"tokens_per_min"`
 }
 
 // AITenantRateLimitEntry is the GET response (TenantRateLimitEntry).
 type AITenantRateLimitEntry struct {
-	TenantID     string `json:"tenant_id"`
-	Rps          int64  `json:"rps"`
-	TokensPerMin int64  `json:"tokens_per_min"`
-	UpdatedAt    string `json:"updated_at"`
+	TenantID     string                   `json:"tenant_id"`
+	Rps          int64                    `json:"rps"`
+	TokensPerMin int64                    `json:"tokens_per_min"`
+	BurstPct     int64                    `json:"burst_pct,omitempty"`
+	ModelLimits  []AITenantModelRateLimit `json:"model_limits,omitempty"`
+	UpdatedAt    string                   `json:"updated_at"`
 }

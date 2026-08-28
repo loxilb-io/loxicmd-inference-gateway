@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
@@ -35,8 +37,8 @@ func NewGetRateLimitCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Aliases: []string{"ratelimits", "quota"},
 		Long: `Get the rate limit configured for a tenant.
 
-Note: tenant rate limits are control-plane CRUD today; data-plane enforcement
-(429) is on the roadmap.
+Tenant quotas are enforced for requests admitted through a load-balancer
+service configured with --api-key-auth=required.
 
 ex)
 	loxicmd get ratelimit tenant-a`,
@@ -75,12 +77,38 @@ ex)
 				return
 			}
 			table := TableInit()
-			table.SetHeader(RATELIMIT_TITLE)
-			TableShow([][]string{{
-				entry.TenantID, fmt.Sprintf("%d", entry.Rps),
-				fmt.Sprintf("%d", entry.TokensPerMin), entry.UpdatedAt,
-			}}, table)
+			wide := restOptions.PrintOption == "wide"
+			if wide {
+				table.SetHeader(RATELIMIT_WIDE_TITLE)
+			} else {
+				table.SetHeader(RATELIMIT_TITLE)
+			}
+			TableShow([][]string{rateLimitRow(entry, wide)}, table)
 		},
 	}
 	return getRateLimitCmd
+}
+
+func rateLimitRow(entry api.AITenantRateLimitEntry, wide bool) []string {
+	models := fmt.Sprintf("%d", len(entry.ModelLimits))
+	if wide {
+		models = formatTenantModelLimits(entry.ModelLimits)
+	}
+	return []string{
+		entry.TenantID,
+		fmt.Sprintf("%d", entry.Rps),
+		fmt.Sprintf("%d", entry.TokensPerMin),
+		fmt.Sprintf("%d", entry.BurstPct),
+		models,
+		entry.UpdatedAt,
+	}
+}
+
+func formatTenantModelLimits(limits []api.AITenantModelRateLimit) string {
+	values := make([]string, 0, len(limits))
+	for _, limit := range limits {
+		values = append(values, fmt.Sprintf("%s=%d", limit.Model, limit.TokensPerMin))
+	}
+	sort.Strings(values)
+	return strings.Join(values, ",")
 }
