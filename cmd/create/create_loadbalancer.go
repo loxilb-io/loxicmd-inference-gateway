@@ -75,6 +75,7 @@ type CreateLoadBalancerOptions struct {
 	APIKeyAuth           string
 	MaxStreamDurationSec int32
 	BackendKeepaliveSec  int32
+	CbEnable             bool
 	// CHWBL / WRR-hash.
 	ChwblPrefixHashLevel int
 	ChwblPrefixHashFlags int
@@ -87,6 +88,7 @@ type CreateLoadBalancerOptions struct {
 	PdSessionTtlSec       int32
 	PdCacheThreshold      int32
 	PdBalanceAbsThreshold int32
+	PdBootstrapPort       int32
 	// KV-cache-aware routing.
 	KvExactMode   int64
 	KvBlockSize   int64
@@ -467,6 +469,7 @@ ex)
 	createLbCmd.Flags().StringVar(&o.APIKeyAuth, "api-key-auth", "", "Data-plane X-Api-Key policy: disabled|required (default: disabled)")
 	createLbCmd.Flags().Int32Var(&o.MaxStreamDurationSec, "max-stream-duration", 0, "Max SSE stream duration in seconds (0 = system cap)")
 	createLbCmd.Flags().Int32Var(&o.BackendKeepaliveSec, "backend-keepalive-interval", 0, "Backend TCP keepalive interval in seconds during stream (0 = off)")
+	createLbCmd.Flags().BoolVar(&o.CbEnable, "cb-enable", false, "Enable the per-endpoint circuit breaker")
 	// CHWBL / WRR-hash (with --select=chwbl or --select=chwbl-wrr).
 	createLbCmd.Flags().IntVar(&o.ChwblPrefixHashLevel, "chwbl-hash-level", 0, "CHWBL prefix hash level 1|2|3 (1=system+model, 2=+session, 3=+RAG)")
 	createLbCmd.Flags().IntVar(&o.ChwblPrefixHashFlags, "chwbl-hash-flags", 0, "CHWBL prefix hash flags bitmask 0-255 (0 = auto-detect)")
@@ -479,13 +482,14 @@ ex)
 	createLbCmd.Flags().Int32Var(&o.PdSessionTtlSec, "pd-session-ttl", 0, "P/D session stickiness TTL in seconds (0 = no expiry)")
 	createLbCmd.Flags().Int32Var(&o.PdCacheThreshold, "pd-cache-threshold", 0, "P/D cache-match threshold 0-100 (default 20)")
 	createLbCmd.Flags().Int32Var(&o.PdBalanceAbsThreshold, "pd-balance-abs-threshold", 0, "P/D absolute connection imbalance threshold (default 3)")
+	createLbCmd.Flags().Int32Var(&o.PdBootstrapPort, "pd-bootstrap-port", 0, "SGLang P/D bootstrap port (0 = engine default 8998)")
 	// KV-cache-aware routing.
 	createLbCmd.Flags().Int64Var(&o.KvExactMode, "kv-exact-mode", 0, "KV-cache exact routing: 0=off, 1=zmq P/D, 3=zmq single-role")
 	createLbCmd.Flags().Int64Var(&o.KvBlockSize, "kv-block-size", 0, "KV token block size (default 16; must match engine)")
-	createLbCmd.Flags().StringVar(&o.KvHashAlgo, "kv-hash-algo", "", "KV block hash algo: sha256_cbor|xxhash_cbor (omit for sglang engine default)")
+	createLbCmd.Flags().StringVar(&o.KvHashAlgo, "kv-hash-algo", "", "KV block hash algo: sha256_cbor|xxhash_cbor|sha256_sglang|blockhash_trtllm (prefer omit for engine default)")
 	createLbCmd.Flags().Int64Var(&o.KvZmqPort, "kv-zmq-port", 0, "KV ZMQ publisher port on prefill endpoints (default 5557)")
 	createLbCmd.Flags().Int64Var(&o.KvWarmupSec, "kv-warmup", 0, "KV subscriber warmup seconds before activation (default 30)")
-	createLbCmd.Flags().StringVar(&o.KvEngineType, "kv-engine-type", "", "KV engine: vllm|sglang (immutable per VIP after create)")
+	createLbCmd.Flags().StringVar(&o.KvEngineType, "kv-engine-type", "", "Inference engine: vllm|sglang|trtllm|llamacpp (immutable per rule after create)")
 	createLbCmd.Flags().Int32Var(&o.KvDpRankCount, "kv-dp-ranks", 0, "SGLang data-parallel rank count 1-8 (default 1)")
 	// Per-endpoint (aligned to --endpoints order).
 	createLbCmd.Flags().StringSliceVar(&o.EpRoles, "ep-role", o.EpRoles, "Per-endpoint role aligned to --endpoints: normal|prefill|decode")
@@ -677,11 +681,11 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 	sel := SelectToNum(o.Select)
 	return o.ModelName != "" || o.PathPrefix != "" || o.PathMatchMode != "" ||
 		o.SessionHeaderName != "" || o.TraceType != "" ||
-		o.SseMode || o.APIKeyAuth != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 ||
+		o.SseMode || o.APIKeyAuth != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 || o.CbEnable ||
 		o.ChwblPrefixHashLevel != 0 || o.ChwblPrefixHashFlags != 0 || o.ChwblMeanLoadFactor != 0 ||
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
 		o.PdDisaggMode || o.PdCacheAwareMode || o.PdSessionTtlSec != 0 ||
-		o.PdCacheThreshold != 0 || o.PdBalanceAbsThreshold != 0 ||
+		o.PdCacheThreshold != 0 || o.PdBalanceAbsThreshold != 0 || o.PdBootstrapPort != 0 ||
 		o.KvExactMode != 0 || o.KvBlockSize != 0 || o.KvHashAlgo != "" || o.KvZmqPort != 0 ||
 		o.KvWarmupSec != 0 || o.KvEngineType != "" || o.KvDpRankCount != 0 ||
 		len(o.EpRoles) > 0 || len(o.NixlPorts) > 0 ||
@@ -707,7 +711,116 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 	if o.PdCacheAwareMode && !o.PdDisaggMode {
 		return fmt.Errorf("--pd-cache-aware requires --pd-disagg")
 	}
+	return validateKVEngineOptions(o)
+}
+
+func validateKVEngineOptions(o *CreateLoadBalancerOptions) error {
+	engine := o.KvEngineType
+	if engine == "" {
+		engine = "vllm"
+	}
+	switch engine {
+	case "vllm", "sglang", "trtllm", "llamacpp":
+	default:
+		return fmt.Errorf("--kv-engine-type must be one of vllm|sglang|trtllm|llamacpp")
+	}
+	if o.KvDpRankCount < 0 || o.KvDpRankCount > 8 {
+		return fmt.Errorf("--kv-dp-ranks must be within 1..8 (0 = default 1)")
+	}
+	if o.KvZmqPort < 0 || o.KvZmqPort > 65535 {
+		return fmt.Errorf("--kv-zmq-port must be within 1..65535 (0 = server default)")
+	}
+	if o.KvBlockSize < 0 || o.KvWarmupSec < 0 {
+		return fmt.Errorf("--kv-block-size and --kv-warmup must be non-negative")
+	}
+	if o.KvExactMode != 0 && o.KvExactMode != 1 && o.KvExactMode != 3 {
+		return fmt.Errorf("--kv-exact-mode must be one of 0|1|3")
+	}
+	if o.KvExactMode == 1 && !o.PdDisaggMode {
+		return fmt.Errorf("--kv-exact-mode=1 requires --pd-disagg")
+	}
+	if o.KvExactMode == 3 && o.PdDisaggMode {
+		return fmt.Errorf("--kv-exact-mode=3 is incompatible with --pd-disagg")
+	}
+	if (o.KvExactMode == 1 || o.KvExactMode == 3) && o.KvDpRankCount > 0 {
+		base := o.KvZmqPort
+		if base == 0 {
+			base = 5557
+		}
+		if base+int64(o.KvDpRankCount)-1 > 65535 {
+			return fmt.Errorf("--kv-zmq-port + --kv-dp-ranks - 1 must be <= 65535")
+		}
+	}
+
+	if err := validateKVHashForEngine(o.KvHashAlgo, engine); err != nil {
+		return err
+	}
+	if o.PdBootstrapPort < 0 || o.PdBootstrapPort > 65535 {
+		return fmt.Errorf("--pd-bootstrap-port must be within 0..65535")
+	}
+	if o.PdBootstrapPort != 0 && !(o.PdDisaggMode && engine == "sglang") {
+		return fmt.Errorf("--pd-bootstrap-port requires --pd-disagg and --kv-engine-type=sglang")
+	}
+	if o.PdDisaggMode {
+		hasPrefill, hasDecode := false, false
+		for _, role := range o.EpRoles {
+			value, err := EpRoleToNum(role)
+			if err != nil {
+				return err
+			}
+			hasPrefill = hasPrefill || value == 1
+			hasDecode = hasDecode || value == 2
+		}
+		if !hasPrefill || !hasDecode {
+			return fmt.Errorf("--pd-disagg requires at least one prefill and one decode --ep-role")
+		}
+	}
+
+	switch engine {
+	case "trtllm":
+		if o.KvZmqPort != 0 && o.KvZmqPort != 5557 {
+			return fmt.Errorf("--kv-zmq-port is not used by trtllm; omit it")
+		}
+		if o.KvDpRankCount > 1 {
+			return fmt.Errorf("--kv-dp-ranks is not used by trtllm; omit it")
+		}
+	case "llamacpp":
+		if o.KvExactMode != 0 {
+			return fmt.Errorf("--kv-exact-mode is unsupported for llamacpp")
+		}
+		if o.PdDisaggMode {
+			return fmt.Errorf("--pd-disagg is unsupported for llamacpp")
+		}
+		if o.KvZmqPort != 0 && o.KvZmqPort != 5557 {
+			return fmt.Errorf("--kv-zmq-port is not used by llamacpp; omit it")
+		}
+		if o.KvDpRankCount > 1 {
+			return fmt.Errorf("--kv-dp-ranks is not used by llamacpp; omit it")
+		}
+		if o.KvBlockSize != 0 && o.KvBlockSize != 16 {
+			return fmt.Errorf("--kv-block-size is not used by llamacpp; omit it")
+		}
+	}
 	return nil
+}
+
+func validateKVHashForEngine(hash, engine string) error {
+	if hash == "" {
+		return nil
+	}
+	allowed := map[string]map[string]bool{
+		"vllm":     {"sha256_cbor": true, "xxhash_cbor": true},
+		"sglang":   {"sha256_sglang": true},
+		"trtllm":   {"blockhash_trtllm": true},
+		"llamacpp": {},
+	}
+	if allowed[engine][hash] {
+		return nil
+	}
+	if engine == "llamacpp" {
+		return fmt.Errorf("--kv-hash-algo is unsupported for --kv-engine-type=llamacpp; omit it")
+	}
+	return fmt.Errorf("--kv-hash-algo %q is incompatible with --kv-engine-type=%s; omit it for the engine default", hash, engine)
 }
 
 // applyAIServiceOptions copies inference-gateway options onto the service model.
@@ -730,6 +843,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.APIKeyAuth = o.APIKeyAuth
 	s.MaxStreamDurationSec = o.MaxStreamDurationSec
 	s.BackendKeepaliveSec = o.BackendKeepaliveSec
+	s.CbEnable = o.CbEnable
 	// CHWBL.
 	s.ChwblPrefixHashLevel = o.ChwblPrefixHashLevel
 	s.ChwblPrefixHashFlags = o.ChwblPrefixHashFlags
@@ -742,6 +856,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.PdSessionTtlSec = o.PdSessionTtlSec
 	s.PdCacheThreshold = o.PdCacheThreshold
 	s.PdBalanceAbsThreshold = o.PdBalanceAbsThreshold
+	s.PdBootstrapPort = o.PdBootstrapPort
 	// KV.
 	s.KvExactMode = o.KvExactMode
 	s.KvBlockSize = o.KvBlockSize

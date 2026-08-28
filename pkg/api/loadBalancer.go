@@ -85,6 +85,7 @@ type LoadBalancerService struct {
 	APIKeyAuth           string `json:"api_key_auth,omitempty"                   yaml:"api_key_auth,omitempty"`
 	MaxStreamDurationSec int32  `json:"max_stream_duration_sec,omitempty"        yaml:"max_stream_duration_sec,omitempty"`
 	BackendKeepaliveSec  int32  `json:"backend_keepalive_interval_sec,omitempty" yaml:"backend_keepalive_interval_sec,omitempty"`
+	CbEnable             bool   `json:"cb_enable,omitempty"                     yaml:"cb_enable,omitempty"`
 
 	// CHWBL / WRR-hash prefix hashing (sel=8 or sel=10).
 	ChwblPrefixHashLevel int  `json:"chwbl_prefix_hash_level,omitempty" yaml:"chwbl_prefix_hash_level,omitempty"`
@@ -99,6 +100,7 @@ type LoadBalancerService struct {
 	PdSessionTtlSec       int32 `json:"pd_session_ttl_sec,omitempty"       yaml:"pd_session_ttl_sec,omitempty"`
 	PdCacheThreshold      int32 `json:"pd_cache_threshold,omitempty"       yaml:"pd_cache_threshold,omitempty"`
 	PdBalanceAbsThreshold int32 `json:"pd_balance_abs_threshold,omitempty" yaml:"pd_balance_abs_threshold,omitempty"`
+	PdBootstrapPort       int32 `json:"pdBootstrapPort,omitempty"          yaml:"pdBootstrapPort,omitempty"`
 
 	// KV-cache-aware exact routing (camelCase keys, per swagger).
 	KvExactMode   int64  `json:"kvExactMode,omitempty"   yaml:"kvExactMode,omitempty"`
