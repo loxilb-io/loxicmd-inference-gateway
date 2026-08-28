@@ -1,0 +1,37 @@
+{
+  "source": {
+    "swagger_sha256": "b89eddbc14a4ea21774e6a609209f0f43786e52a2fe2b1ca5434dc648c39480d",
+    "swagger_extras_sha256": "d0837dd58d05007b740b61e49914831c1fd55d44826fd756a709cd8f7a1307bc"
+  },
+  "operations": [
+    {"spec": "swagger.yml", "path": "/config/loadbalancer", "methods": ["post"]},
+    {"spec": "swagger.yml", "path": "/config/loadbalancer/all", "methods": ["get"]},
+    {"spec": "swagger.yml", "path": "/config/ai/apikey", "methods": ["get", "post"]},
+    {"spec": "swagger.yml", "path": "/config/ai/apikey/{key_id}", "methods": ["delete", "get"]},
+    {"spec": "swagger.yml", "path": "/config/ai/tenant/ratelimit", "methods": ["post"]},
+    {"spec": "swagger.yml", "path": "/config/ai/tenant/ratelimit/{tenant_id}", "methods": ["get"]},
+    {"spec": "swagger.yml", "path": "/config/policy", "methods": ["post"]},
+    {"spec": "swagger.yml", "path": "/version", "methods": ["get"]},
+    {"spec": "swagger-extras.yml", "path": "/config/ai/apikey/{key_id}", "methods": ["patch"]},
+    {"spec": "swagger-extras.yml", "path": "/config/ai/kv/inventory", "methods": ["get"]},
+    {"spec": "swagger-extras.yml", "path": "/config/dpu/debug", "methods": ["get", "post"]},
+    {"spec": "swagger-extras.yml", "path": "/config/dpu/hwcounters", "methods": ["get"]},
+    {"spec": "swagger-extras.yml", "path": "/config/opa/watcher", "methods": ["delete", "get", "post"]}
+  ],
+  "fields": [
+    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "api_key_auth"], "type": "string", "enum": ["disabled", "required"]},
+    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "cb_enable"], "type": "boolean"},
+    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "pdBootstrapPort"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "kvEngineType"], "type": "string", "enum": ["vllm", "sglang", "trtllm", "llamacpp"]},
+    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "kvHashAlgo"], "type": "string", "enum": ["sha256_cbor", "xxhash_cbor", "sha256_sglang", "blockhash_trtllm"]},
+    {"spec": "swagger.yml", "definition": "ApiKeyCreateRequest", "property_path": ["api_key"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "TenantRateLimitMod", "property_path": ["burst_pct"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "TenantRateLimitMod", "property_path": ["model_limits"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "TenantModelRateLimit", "property_path": ["model"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "TenantModelRateLimit", "property_path": ["tokens_per_min"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "TenantRateLimitEntry", "property_path": ["burst_pct"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "TenantRateLimitEntry", "property_path": ["model_limits"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "PolicyEntry", "property_path": ["targetObject", "attachment"], "type": "integer", "enum": ["0", "1", "2"]},
+    {"spec": "swagger.yml", "definition": "VersionGetEntry", "property_path": ["product"], "type": "string"}
+  ]
+}
