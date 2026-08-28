@@ -77,10 +77,47 @@ func assertAbsent(t *testing.T, m map[string]any, keys ...string) {
 func TestClassicLB_NoAIKeys(t *testing.T) {
 	m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.1", Select: "rr"})
 	assertAbsent(t, m,
-		"model_name", "sse_mode", "kvExactMode", "kvBlockSize", "kvHashAlgo",
+		"model_name", "sse_mode", "api_key_auth", "kvExactMode", "kvBlockSize", "kvHashAlgo",
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
-		"max_stream_duration_sec", "kvEngineType")
+		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType")
+}
+
+func TestResilienceAndBootstrapServiceArguments(t *testing.T) {
+	m := serviceMap(t, &CreateLoadBalancerOptions{
+		ExternalIP: "192.0.2.17", Mode: "fullproxy", CbEnable: true,
+		PdDisaggMode: true, KvEngineType: "sglang", PdBootstrapPort: 8998,
+	})
+	assertKey(t, m, "cb_enable", true)
+	assertKey(t, m, "pdBootstrapPort", 8998)
+}
+
+func TestAdditionalEngineServiceArguments(t *testing.T) {
+	t.Run("trtllm", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{
+			ExternalIP: "192.0.2.18", Mode: "fullproxy", KvEngineType: "trtllm",
+			KvExactMode: 3, KvBlockSize: 32,
+		})
+		assertKey(t, m, "kvEngineType", "trtllm")
+		assertKey(t, m, "kvExactMode", 3)
+		assertKey(t, m, "kvBlockSize", 32)
+		assertAbsent(t, m, "kvHashAlgo", "kvZmqPort", "kvDpRankCount")
+	})
+	t.Run("llamacpp", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{
+			ExternalIP: "192.0.2.19", Mode: "fullproxy", Select: "chwbl", KvEngineType: "llamacpp",
+		})
+		assertKey(t, m, "kvEngineType", "llamacpp")
+		assertKey(t, m, "sel", 8)
+		assertAbsent(t, m, "kvExactMode", "kvHashAlgo", "pd_disagg_mode")
+	})
+}
+
+func TestAPIKeyAuthServiceArguments(t *testing.T) {
+	m := serviceMap(t, &CreateLoadBalancerOptions{
+		ExternalIP: "192.0.2.16", Mode: "fullproxy", APIKeyAuth: "required",
+	})
+	assertKey(t, m, "api_key_auth", "required")
 }
 
 // vllm-kvcache-routing-cpu: kvExactMode=1 P/D with camelCase kv* keys.
@@ -307,5 +344,53 @@ func TestValidateAIRequiresFullproxy(t *testing.T) {
 	// classic LB (no AI) with non-fullproxy mode -> ok.
 	if err := validateLBAIOptions(&CreateLoadBalancerOptions{Select: "rr", Mode: "onearm"}); err != nil {
 		t.Fatalf("classic LB should not be gated: %v", err)
+	}
+}
+
+func TestValidateAPIKeyAuth(t *testing.T) {
+	for _, policy := range []string{"disabled", "required"} {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: policy, Mode: "fullproxy"}); err != nil {
+			t.Fatalf("policy %q rejected: %v", policy, err)
+		}
+	}
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: "optional", Mode: "fullproxy"}); err == nil {
+		t.Fatal("expected closed-enum rejection")
+	}
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: "required", Mode: "onearm"}); err == nil {
+		t.Fatal("expected fullproxy requirement")
+	}
+}
+
+func TestValidateKVEngineOptions(t *testing.T) {
+	positive := []CreateLoadBalancerOptions{
+		{Mode: "fullproxy", KvEngineType: "vllm", PdDisaggMode: true, KvExactMode: 1, EpRoles: []string{"prefill", "decode"}},
+		{Mode: "fullproxy", KvEngineType: "sglang", PdDisaggMode: true, KvExactMode: 1, KvDpRankCount: 8, KvZmqPort: 65528, PdBootstrapPort: 8998, EpRoles: []string{"prefill", "decode"}},
+		{Mode: "fullproxy", KvEngineType: "trtllm", KvExactMode: 3, KvBlockSize: 32},
+		{Mode: "fullproxy", Select: "chwbl", KvEngineType: "llamacpp"},
+	}
+	for i := range positive {
+		if err := validateLBAIOptions(&positive[i]); err != nil {
+			t.Errorf("positive case %d rejected: %v", i, err)
+		}
+	}
+
+	negative := []CreateLoadBalancerOptions{
+		{Mode: "fullproxy", KvEngineType: "tensorrt"},
+		{Mode: "fullproxy", KvEngineType: "vllm", KvHashAlgo: "sha256_sglang"},
+		{Mode: "fullproxy", KvEngineType: "sglang", KvHashAlgo: "sha256_cbor"},
+		{Mode: "fullproxy", KvEngineType: "trtllm", KvHashAlgo: "sha256_cbor"},
+		{Mode: "fullproxy", KvEngineType: "llamacpp", KvHashAlgo: "sha256_cbor"},
+		{Mode: "fullproxy", KvEngineType: "llamacpp", KvExactMode: 3},
+		{Mode: "fullproxy", KvEngineType: "trtllm", KvZmqPort: 5561},
+		{Mode: "fullproxy", KvEngineType: "sglang", KvDpRankCount: 9},
+		{Mode: "fullproxy", KvEngineType: "sglang", KvExactMode: 3, KvDpRankCount: 8, KvZmqPort: 65529},
+		{Mode: "fullproxy", KvEngineType: "sglang", PdBootstrapPort: 8998},
+		{Mode: "fullproxy", KvEngineType: "vllm", PdDisaggMode: true, EpRoles: []string{"prefill"}},
+		{Mode: "fullproxy", KvEngineType: "vllm", KvExactMode: 2},
+	}
+	for i := range negative {
+		if err := validateLBAIOptions(&negative[i]); err == nil {
+			t.Errorf("negative case %d accepted: %+v", i, negative[i])
+		}
 	}
 }

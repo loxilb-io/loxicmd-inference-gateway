@@ -25,9 +25,12 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   (`--insecure`/`--cacert`/`--cert`/`--key`), plus a dual `Error`/`SimpleError` decoder for raw-middleware
   endpoints.
 - Inference-gateway load-balancer flags: model-name routing, SSE controls, CHWBL prefix hashing,
-  prefill/decode disaggregation, KV-cache-aware routing (vLLM & SGLang), and mTLS.
-- AI-native resources: per-tenant API keys (`apikey`, incl. PATCH), tenant rate limits (`ratelimit`),
-  KV inventory (`kvinventory`), user/auth flow (`create user`, `set login/logout/refreshtoken`).
+  prefill/decode disaggregation, circuit breaking, per-service API-key enforcement, engine-aware routing
+  for vLLM, SGLang, TensorRT-LLM, and llama.cpp, and mTLS.
+- AI-native resources: generated or securely imported per-tenant API keys (`apikey`, incl. PATCH), tenant
+  rate limits with burst and model quotas (`ratelimit`), KV inventory (`kvinventory`), and the user/auth
+  flow (`create user`, `set login/logout/refreshtoken`).
+- QoS policy targets with symbolic rule/port/egress attachments and bracketed IPv6 rule keys.
 - TLS/ops: certificate store (`cert`), SNI mappings (`sni`), Prometheus metrics toggle (`metrics`), HA state.
 - Guardrails & telemetry: GPU-aware LB (`gpu`), PII detection (`pii`), LlamaFirewall (`llamafirewall`),
   HTTP/L4 request tracing (`trace`/`l4trace`), OPA policy watcher (`opa`), DPU offload debug (`dpu`).

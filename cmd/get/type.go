@@ -20,7 +20,8 @@ var (
 	LOADBALANCER_TITLE      = []string{"Ext IP", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "# of Endpoints", "Timeout", "Monitor"}
 	APIKEY_TITLE            = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled"}
 	APIKEY_WIDE_TITLE       = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled", "Created", "Expires"}
-	RATELIMIT_TITLE         = []string{"Tenant", "RPS", "Tokens/Min", "Updated"}
+	RATELIMIT_TITLE         = []string{"Tenant", "RPS", "Tokens/Min", "Burst %", "Models", "Updated"}
+	RATELIMIT_WIDE_TITLE    = []string{"Tenant", "RPS", "Tokens/Min", "Burst %", "Model Limits", "Updated"}
 	KVINVENTORY_TITLE       = []string{"Block Idx", "Hash (uint64)"}
 	CERT_TITLE              = []string{"Cert ID", "Hostnames"}
 	SNI_TITLE               = []string{"Hostname", "Cert Path", "RefCount"}
@@ -53,5 +54,5 @@ var (
 	HASTATE_TITLE           = []string{"Instance", "HAState"}
 	BFD_TITLE               = []string{"Instance", "RemoteIP", "State"}
 	BFD_WIDE_TITLE          = []string{"Instance", "RemoteIP", "SourceIP", "Port", "Interval", "Retry Count", "State"}
-	LBVERSION_TITLE         = []string{"LoxiLB Version", "LoxiLB Build Info"}
+	LBVERSION_TITLE         = []string{"Product", "LoxiLB Version", "LoxiLB Build Info"}
 )

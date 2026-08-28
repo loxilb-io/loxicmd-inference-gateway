@@ -40,7 +40,10 @@ func NewCreateUserCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long: `Create a user account used to obtain the bearer JWT for authenticated calls.
 
 Requires the gateway started with --userservice and a database backend.
-After creating a user, run 'loxicmd set login' to obtain and store a token.
+An unauthenticated create is accepted only to bootstrap an empty user store.
+After creating the first admin, run 'loxicmd set login' to obtain and store a
+token; every subsequent user create requires an admin Bearer token. Management
+Bearer identities are separate from data-plane X-Api-Key credentials.
 
 ex)
 	loxicmd create user --username=admin --password='<your-password>' --role=admin`,

@@ -13,10 +13,10 @@ so gateway-side roadmap items generally imply CLI follow-up here.
 - **Binary releases.** Publish versioned release artifacts (tarball +
   checksums) via a tag-triggered workflow, versioned in lockstep with the
   gateway (see [CHANGELOG.md](CHANGELOG.md)).
-- **Track gateway enforcement.** API-key / rate-limit management is
-  control-plane CRUD today; when the gateway data plane starts enforcing
-  (401/403/429), update the affected commands and drop the
-  not-yet-enforced notes from their help text.
+- **Automated contract drift checks.** Keep the consumed Swagger surface and
+  engine-specific invariants synchronized as the gateway evolves, with a CI
+  job that compares this repository's contract manifest against a selected
+  gateway checkout.
 - **Safer local token storage.** Store bearer tokens under the user's home
   directory instead of `/tmp`, keeping a fallback read for compatibility with
   classic loxicmd.

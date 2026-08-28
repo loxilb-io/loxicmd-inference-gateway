@@ -16,8 +16,8 @@
 package api
 
 // AIApiKey is the client for per-tenant inference-gateway API keys
-// (/config/ai/apikey). Note: today these are control-plane CRUD only —
-// data-plane enforcement (401/403/429) is on the roadmap.
+// (/config/ai/apikey). Data-plane enforcement is selected independently on
+// each load-balancer service through serviceArguments.api_key_auth.
 type AIApiKey struct {
 	CommonAPI
 }
@@ -26,6 +26,7 @@ type AIApiKey struct {
 type AIApiKeyCreateRequest struct {
 	TenantID      string   `json:"tenant_id"`
 	Name          string   `json:"name,omitempty"`
+	APIKey        string   `json:"api_key,omitempty"`
 	AllowedModels []string `json:"allowed_models,omitempty"`
 	RateLimitRps  int64    `json:"rate_limit_rps,omitempty"`
 	BurstSize     int64    `json:"burst_size,omitempty"`
@@ -37,7 +38,7 @@ type AIApiKeyCreateRequest struct {
 // AIApiKeyCreateResponse is the 201 response. raw_key is the plaintext key and
 // is returned ONLY once, at creation.
 type AIApiKeyCreateResponse struct {
-	RawKey string `json:"raw_key"`
+	RawKey string `json:"raw_key,omitempty"`
 	KeyID  string `json:"key_id"`
 }
 

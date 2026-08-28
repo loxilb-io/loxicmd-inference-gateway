@@ -31,8 +31,7 @@ classic loxilb.
 The CLI covers the full classic loxilb surface plus the inference gateway's AI-native features. Every
 command and flag traces to the gateway's `api/swagger.yml` / `api/swagger-extras.yml` and the runnable
 scenarios in the gateway's
-[`cicd/` directory](https://github.com/loxilb-io/loxilb-inference-gateway/tree/main/cicd). Where the gateway's control plane accepts configuration that its data plane does not yet enforce
-(e.g. API-key / rate-limit enforcement), the affected commands say so in their help text.
+[`cicd/` directory](https://github.com/loxilb-io/loxilb-inference-gateway/tree/main/cicd).
 
 See the [Command Reference](docs/COMMANDS.md) for every command, and the
 [Quickstart](docs/QUICKSTART.md) for a model-routing walkthrough.
@@ -43,8 +42,8 @@ See the [Command Reference](docs/COMMANDS.md) for every command, and the
 algorithms, protocols, and NAT modes (including `fullproxy`, required for AI features).
 
 **Inference Gateway** — model-name routing, SSE streaming controls, CHWBL prefix hashing, prefill/decode
-disaggregation, KV-cache-aware routing (vLLM & SGLang), per-tenant API keys and rate limits, KV inventory
-inspection, and TLS/mTLS.
+disaggregation, engine-aware routing for vLLM, SGLang, TensorRT-LLM, and llama.cpp, per-tenant API keys
+and rate limits, KV inventory inspection, circuit breaking, and TLS/mTLS.
 
 **Guardrails & Telemetry** — GPU-aware load balancing, PII detection (Presidio), LlamaFirewall AI-security
 scanning, HTTP/L4 request tracing with OTLP export, OPA policy watcher, and DPU offload debug.
@@ -118,28 +117,35 @@ All AI features require `--mode fullproxy`.
 
 ### API Keys, Rate Limits & KV Inventory
 
-These endpoints require an authenticated session (gateway started with
-`--userservice`). Obtain a token first, then manage AI resources.
-
-> API keys and tenant rate limits are **control-plane CRUD** today; data-plane
-> enforcement (401/403/429) is on the roadmap.
+These management endpoints require an authenticated session when the gateway is
+started with `--userservice`. The first user can bootstrap an empty user store;
+subsequent user creation requires an admin bearer token.
 
 ```bash
 # Authenticate (stores the bearer token; set login prompts for the password)
 ./loxicmd create user --username=admin --password='<your-password>' --role=admin
 ./loxicmd set login
 
-# Per-tenant API keys (raw key is shown only once, at creation)
+# Per-tenant API keys (a generated raw key is shown only once)
 ./loxicmd create apikey --tenant-id=tenant-a --name=key-1 \
   --allowed-models=llama-70b,mistral-7b --rps=5 --burst=10 --tokens-per-min=1000
+# Or import an existing key without putting it in argv or shell history
+printf '%s' "$EXISTING_API_KEY" | ./loxicmd create apikey \
+  --tenant-id=tenant-a --name=imported --api-key-stdin
 ./loxicmd get apikey --tenant-id=tenant-a
 ./loxicmd set apikey <key-id> --allowed-models=mistral-7b     # PATCH
 ./loxicmd set apikey <key-id> --enabled=false
 ./loxicmd delete apikey <key-id>
 
-# Per-tenant rate limit
-./loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000
+# Per-tenant rate limit, burst capacity, and model quota
+./loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000 \
+  --burst-pct=125 --model-limit=llama-70b=1200 --model-limit=mistral-7b=800
 ./loxicmd get ratelimit tenant-a
+
+# Opt a fullproxy service into X-Api-Key enforcement (disabled by default)
+./loxicmd create lb 192.0.2.20 --tcp=2020:8000 --mode=fullproxy \
+  --model-name=llama-70b --api-key-auth=required --cb-enable \
+  --endpoints=203.0.113.1:1
 
 # KV-cache block-hash inventory (read-only)
 ./loxicmd get kvinventory --service-id=3 --ep-idx=0

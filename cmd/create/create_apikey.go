@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
@@ -37,20 +39,31 @@ type CreateAPIKeyOptions struct {
 	TokensPerMin  int64
 	ExpiresAt     string
 	Enabled       bool
+	APIKeyFile    string
+	APIKeyStdin   bool
 }
+
+const (
+	minImportedAPIKeyLength = 16
+	maxImportedAPIKeyLength = 512
+)
 
 func NewCreateAPIKeyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	o := CreateAPIKeyOptions{}
 
 	var createAPIKeyCmd = &cobra.Command{
-		Use:   "apikey --tenant-id=<tenant> [--name=<name>] [--allowed-models=<m>,] [--rps=<n>] [--burst=<n>] [--tokens-per-min=<n>] [--expires-at=<RFC3339>] [--enabled]",
+		Use:   "apikey --tenant-id=<tenant> [--name=<name>] [--api-key-file=<path>|--api-key-stdin] [--allowed-models=<m>,] [--rps=<n>] [--burst=<n>] [--tokens-per-min=<n>] [--expires-at=<RFC3339>] [--enabled]",
 		Short: "Create an inference-gateway API key",
 		Long: `Create a per-tenant inference-gateway API key.
 
-The plaintext key (raw_key) is returned ONLY once, at creation time - store it now.
+Without an import option, the plaintext key (raw_key) is returned ONLY once at
+creation time. Store it immediately. To register an existing credential without
+exposing it in process arguments or shell history, use --api-key-file or pipe it
+to --api-key-stdin.
 
-Note: API keys are control-plane CRUD today; data-plane enforcement
-(401/403 on invalid key or disallowed model) is on the roadmap.
+Data-plane enforcement is enabled per load-balancer service with
+--api-key-auth=required. Management Bearer authentication and data-plane
+X-Api-Key credentials are separate identities.
 
 ex)
 	loxicmd create apikey --tenant-id=tenant-a --name=key-1 --allowed-models=llama-70b,mistral-7b --rps=5 --burst=10 --tokens-per-min=1000`,
@@ -59,10 +72,16 @@ ex)
 				fmt.Printf("Error: --tenant-id is required\n")
 				return
 			}
+			importedKey, imported, err := readImportedAPIKey(&o, cmd.InOrStdin())
+			if err != nil {
+				fmt.Printf("Error: %s\n", err.Error())
+				return
+			}
 			enabled := o.Enabled
 			req := api.AIApiKeyCreateRequest{
 				TenantID:      o.TenantID,
 				Name:          o.Name,
+				APIKey:        importedKey,
 				AllowedModels: o.AllowedModels,
 				RateLimitRps:  o.Rps,
 				BurstSize:     o.Burst,
@@ -94,13 +113,9 @@ ex)
 				fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
 				return
 			}
-			if restOptions.PrintOption == "json" {
-				indent, _ := json.MarshalIndent(result, "", "    ")
-				fmt.Println(string(indent))
-				return
+			if err := printCreateAPIKeyResult(cmd.OutOrStdout(), result, imported, restOptions.PrintOption); err != nil {
+				fmt.Printf("Error: %s\n", err.Error())
 			}
-			fmt.Printf("API key created.\n  key_id : %s\n  raw_key: %s\n", result.KeyID, result.RawKey)
-			fmt.Printf("Store the raw_key now - it will not be shown again.\n")
 		},
 	}
 
@@ -112,8 +127,68 @@ ex)
 	createAPIKeyCmd.Flags().Int64Var(&o.TokensPerMin, "tokens-per-min", 0, "Per-key token budget per minute")
 	createAPIKeyCmd.Flags().StringVar(&o.ExpiresAt, "expires-at", "", "Expiry timestamp (RFC3339)")
 	createAPIKeyCmd.Flags().BoolVar(&o.Enabled, "enabled", true, "Whether the key is enabled")
+	createAPIKeyCmd.Flags().StringVar(&o.APIKeyFile, "api-key-file", "", "Read an existing API key from a file")
+	createAPIKeyCmd.Flags().BoolVar(&o.APIKeyStdin, "api-key-stdin", false, "Read an existing API key from stdin")
 
 	return createAPIKeyCmd
+}
+
+func readImportedAPIKey(o *CreateAPIKeyOptions, stdin io.Reader) (string, bool, error) {
+	if o.APIKeyFile != "" && o.APIKeyStdin {
+		return "", false, fmt.Errorf("--api-key-file and --api-key-stdin are mutually exclusive")
+	}
+	if o.APIKeyFile == "" && !o.APIKeyStdin {
+		return "", false, nil
+	}
+
+	reader := stdin
+	var file *os.File
+	if o.APIKeyFile != "" {
+		var err error
+		file, err = os.Open(o.APIKeyFile)
+		if err != nil {
+			return "", false, fmt.Errorf("read API key file: %w", err)
+		}
+		defer file.Close()
+		reader = file
+	}
+
+	b, err := io.ReadAll(io.LimitReader(reader, maxImportedAPIKeyLength+2))
+	if err != nil {
+		return "", false, fmt.Errorf("read imported API key: %w", err)
+	}
+	key := strings.TrimSpace(string(b))
+	if len(key) < minImportedAPIKeyLength || len(key) > maxImportedAPIKeyLength {
+		return "", false, fmt.Errorf("imported API key must be between %d and %d characters", minImportedAPIKeyLength, maxImportedAPIKeyLength)
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] < 0x21 || key[i] > 0x7e {
+			return "", false, fmt.Errorf("imported API key must contain only printable non-space ASCII characters")
+		}
+	}
+	return key, true, nil
+}
+
+func printCreateAPIKeyResult(w io.Writer, result api.AIApiKeyCreateResponse, imported bool, printOption string) error {
+	if imported {
+		// Imported material is user-supplied and must never be echoed, even if a
+		// server implementation includes it in the response.
+		result.RawKey = ""
+	}
+	if printOption == "json" {
+		indent, err := json.MarshalIndent(result, "", "    ")
+		if err != nil {
+			return fmt.Errorf("marshal API key response: %w", err)
+		}
+		_, err = fmt.Fprintln(w, string(indent))
+		return err
+	}
+	if imported {
+		_, err := fmt.Fprintf(w, "API key imported.\n  key_id : %s\n", result.KeyID)
+		return err
+	}
+	_, err := fmt.Fprintf(w, "API key created.\n  key_id : %s\n  raw_key: %s\nStore the raw_key now - it will not be shown again.\n", result.KeyID, result.RawKey)
+	return err
 }
 
 // aiContext builds a context with the standard REST timeout.
