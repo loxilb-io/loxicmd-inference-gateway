@@ -72,6 +72,7 @@ type CreateLoadBalancerOptions struct {
 	BackendProtocol   string
 	// SSE.
 	SseMode              bool
+	APIKeyAuth           string
 	MaxStreamDurationSec int32
 	BackendKeepaliveSec  int32
 	// CHWBL / WRR-hash.
@@ -463,6 +464,7 @@ ex)
 	createLbCmd.Flags().StringVar(&o.BackendProtocol, "backend-protocol", "", "Backend transport: http1|http2|both")
 	// SSE.
 	createLbCmd.Flags().BoolVar(&o.SseMode, "sse-mode", false, "Enable SSE streaming mode (suppresses idle timeout during text/event-stream)")
+	createLbCmd.Flags().StringVar(&o.APIKeyAuth, "api-key-auth", "", "Data-plane X-Api-Key policy: disabled|required (default: disabled)")
 	createLbCmd.Flags().Int32Var(&o.MaxStreamDurationSec, "max-stream-duration", 0, "Max SSE stream duration in seconds (0 = system cap)")
 	createLbCmd.Flags().Int32Var(&o.BackendKeepaliveSec, "backend-keepalive-interval", 0, "Backend TCP keepalive interval in seconds during stream (0 = off)")
 	// CHWBL / WRR-hash (with --select=chwbl or --select=chwbl-wrr).
@@ -675,7 +677,7 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 	sel := SelectToNum(o.Select)
 	return o.ModelName != "" || o.PathPrefix != "" || o.PathMatchMode != "" ||
 		o.SessionHeaderName != "" || o.TraceType != "" ||
-		o.SseMode || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 ||
+		o.SseMode || o.APIKeyAuth != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 ||
 		o.ChwblPrefixHashLevel != 0 || o.ChwblPrefixHashFlags != 0 || o.ChwblMeanLoadFactor != 0 ||
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
 		o.PdDisaggMode || o.PdCacheAwareMode || o.PdSessionTtlSec != 0 ||
@@ -691,6 +693,11 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 // validateLBAIOptions enforces the documented cross-field constraints before
 // building the request.
 func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
+	switch o.APIKeyAuth {
+	case "", "disabled", "required":
+	default:
+		return fmt.Errorf("--api-key-auth must be one of disabled|required")
+	}
 	if !lbAIRequested(o) {
 		return nil
 	}
@@ -720,6 +727,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.BackendProtocol = o.BackendProtocol
 	// SSE.
 	s.SseMode = o.SseMode
+	s.APIKeyAuth = o.APIKeyAuth
 	s.MaxStreamDurationSec = o.MaxStreamDurationSec
 	s.BackendKeepaliveSec = o.BackendKeepaliveSec
 	// CHWBL.

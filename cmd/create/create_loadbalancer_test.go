@@ -77,10 +77,17 @@ func assertAbsent(t *testing.T, m map[string]any, keys ...string) {
 func TestClassicLB_NoAIKeys(t *testing.T) {
 	m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.1", Select: "rr"})
 	assertAbsent(t, m,
-		"model_name", "sse_mode", "kvExactMode", "kvBlockSize", "kvHashAlgo",
+		"model_name", "sse_mode", "api_key_auth", "kvExactMode", "kvBlockSize", "kvHashAlgo",
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
 		"max_stream_duration_sec", "kvEngineType")
+}
+
+func TestAPIKeyAuthServiceArguments(t *testing.T) {
+	m := serviceMap(t, &CreateLoadBalancerOptions{
+		ExternalIP: "192.0.2.16", Mode: "fullproxy", APIKeyAuth: "required",
+	})
+	assertKey(t, m, "api_key_auth", "required")
 }
 
 // vllm-kvcache-routing-cpu: kvExactMode=1 P/D with camelCase kv* keys.
@@ -307,5 +314,19 @@ func TestValidateAIRequiresFullproxy(t *testing.T) {
 	// classic LB (no AI) with non-fullproxy mode -> ok.
 	if err := validateLBAIOptions(&CreateLoadBalancerOptions{Select: "rr", Mode: "onearm"}); err != nil {
 		t.Fatalf("classic LB should not be gated: %v", err)
+	}
+}
+
+func TestValidateAPIKeyAuth(t *testing.T) {
+	for _, policy := range []string{"disabled", "required"} {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: policy, Mode: "fullproxy"}); err != nil {
+			t.Fatalf("policy %q rejected: %v", policy, err)
+		}
+	}
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: "optional", Mode: "fullproxy"}); err == nil {
+		t.Fatal("expected closed-enum rejection")
+	}
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: "required", Mode: "onearm"}); err == nil {
+		t.Fatal("expected fullproxy requirement")
 	}
 }
