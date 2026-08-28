@@ -170,6 +170,11 @@ func readImportedAPIKey(o *CreateAPIKeyOptions, stdin io.Reader) (string, bool, 
 }
 
 func printCreateAPIKeyResult(w io.Writer, result api.AIApiKeyCreateResponse, imported bool, printOption string) error {
+	if imported {
+		// Imported material is user-supplied and must never be echoed, even if a
+		// server implementation includes it in the response.
+		result.RawKey = ""
+	}
 	if printOption == "json" {
 		indent, err := json.MarshalIndent(result, "", "    ")
 		if err != nil {

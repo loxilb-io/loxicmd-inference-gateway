@@ -87,7 +87,7 @@ func TestPrintCreateAPIKeyResult(t *testing.T) {
 
 	t.Run("imported json omits raw key", func(t *testing.T) {
 		var out bytes.Buffer
-		result := api.AIApiKeyCreateResponse{KeyID: "example-key-id"}
+		result := api.AIApiKeyCreateResponse{KeyID: "example-key-id", RawKey: exampleImportedAPIKey}
 		if err := printCreateAPIKeyResult(&out, result, true, "json"); err != nil {
 			t.Fatal(err)
 		}
