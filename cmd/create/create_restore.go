@@ -16,23 +16,15 @@
 package create
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-	"time"
-
+	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/lifecycle"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 
 	"github.com/spf13/cobra"
 )
 
 func NewCreateRestoreCmd(restOptions *api.RESTOptions) *cobra.Command {
-	var file string
-	var commit bool
+	var opts lifecycle.RestoreOptions
+	var strict bool
 
 	var createRestoreCmd = &cobra.Command{
 		Use:   "restore -f <snapshot-file> [--commit]",
@@ -42,57 +34,29 @@ func NewCreateRestoreCmd(restOptions *api.RESTOptions) *cobra.Command {
 validates and returns the plan without mutating anything; pass --commit to
 apply the snapshot (with automatic rollback on failure).
 
+The command exits non-zero when the pipeline reports a failure of any kind:
+an incompatible document, an unverifiable required recovery dependency, a
+rollback, and - for a committed restore - a write-through that failed, which
+means the restored configuration would not survive the next restart.
+
 ex)
 	loxicmd create restore -f snapshot.json
-	loxicmd create restore -f snapshot.json --commit`,
-		Run: func(cmd *cobra.Command, args []string) {
-			if file == "" {
-				fmt.Printf("Error: -f/--file is required (the snapshot document to restore)\n")
-				return
-			}
-			data, err := os.ReadFile(file)
-			if err != nil {
-				fmt.Printf("Error: Failed to read snapshot file: %s\n", err.Error())
-				return
-			}
-			if !json.Valid(data) {
-				fmt.Printf("Error: %s is not valid JSON\n", file)
-				return
-			}
-
-			client := api.NewLoxiClient(restOptions)
-			ctx := context.TODO()
-			var cancel context.CancelFunc
-			if restOptions.Timeout > 0 {
-				ctx, cancel = context.WithTimeout(context.TODO(), time.Duration(restOptions.Timeout)*time.Second)
-				defer cancel()
-			}
-
-			mode := "dry-run"
-			if commit {
-				mode = "commit"
-			}
-			resp, err := client.Restore().Query(map[string]string{"mode": mode}).Create(ctx, json.RawMessage(data))
-			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
-			}
-			defer resp.Body.Close()
-			body, _ := io.ReadAll(resp.Body)
-			// The restore endpoint returns RestoreResult for 200/400/500 — print
-			// the plan/result either way so dry-run and failures are legible.
-			var out bytes.Buffer
-			if json.Indent(&out, body, "", "    ") == nil {
-				fmt.Println(out.String())
-			} else {
-				fmt.Println(string(body))
-			}
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("(restore returned HTTP %d)\n", resp.StatusCode)
-			}
+	loxicmd create restore -f snapshot.json --commit
+	loxicmd create restore -f snapshot.json --components loadbalancer,endpoint
+	loxicmd create restore -f snapshot.json --commit -o json`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_ = args
+			return lifecycle.Restore(restOptions, cmd.OutOrStdout(), cmd.ErrOrStderr(),
+				lifecycle.OptionsFrom(restOptions, strict), opts)
 		},
 	}
-	createRestoreCmd.Flags().StringVarP(&file, "file", "f", "", "Snapshot document to restore (required)")
-	createRestoreCmd.Flags().BoolVar(&commit, "commit", false, "Apply the snapshot (default is dry-run)")
+	createRestoreCmd.Flags().StringVarP(&opts.File, "file", "f", "", "Snapshot document to restore (required)")
+	createRestoreCmd.Flags().BoolVar(&opts.Commit, "commit", false, "Apply the snapshot (default is dry-run)")
+	createRestoreCmd.Flags().StringVar(&opts.Components, "components", "",
+		"Comma-separated domains to restore (default: every domain the document declares)")
+	createRestoreCmd.Flags().BoolVar(&strict, "strict", false,
+		"Fail unless the gateway reports the durable-restore contract (for a commit, whether the restored configuration was persisted)")
 	return createRestoreCmd
 }
