@@ -87,8 +87,8 @@ func TestSnapshotDoesNotClobberOnBadDownload(t *testing.T) {
 	tampered := snapshotDocument(t, "1.5", 7)
 	// Flip a byte inside the document body, leaving its checksum field
 	// intact - a corrupted transfer, not a re-signed document.
-	tampered = bytes.Replace(tampered, []byte(`"kind":"loxilb-config-snapshot"`),
-		[]byte(`"kind":"loxilb-config-snapshoT"`), 1)
+	tampered = bytes.Replace(tampered, []byte(`"kind":"loxilb-snapshot"`),
+		[]byte(`"kind":"loxilb-snapshoT"`), 1)
 
 	for name, tc := range map[string]struct {
 		body   []byte
@@ -175,8 +175,8 @@ func TestSnapshotToStdout(t *testing.T) {
 
 func TestSnapshotStdoutStillRefusesACorruptDocument(t *testing.T) {
 	document := snapshotDocument(t, "1.5", 7)
-	corrupt := bytes.Replace(document, []byte(`"kind":"loxilb-config-snapshot"`),
-		[]byte(`"kind":"loxilb-config-snapshoT"`), 1)
+	corrupt := bytes.Replace(document, []byte(`"kind":"loxilb-snapshot"`),
+		[]byte(`"kind":"loxilb-snapshoT"`), 1)
 	gw := newFakeGateway(t, documentResponse(corrupt, ""))
 	var out, errOut bytes.Buffer
 

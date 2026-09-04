@@ -81,7 +81,7 @@ func TestRestoreCommitSucceedsAndReportsDurability(t *testing.T) {
 	if got := gw.requests[0].Query.Get("components"); got != "loadbalancer,endpoint" {
 		t.Fatalf("components = %q", got)
 	}
-	if !strings.Contains(gw.requests[0].Body, "loxilb-config-snapshot") {
+	if !strings.Contains(gw.requests[0].Body, "loxilb-snapshot") {
 		t.Fatalf("document was not posted: %s", gw.requests[0].Body)
 	}
 	text := out.String()

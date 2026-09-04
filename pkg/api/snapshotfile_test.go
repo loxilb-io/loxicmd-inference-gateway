@@ -36,7 +36,7 @@ func checksummedDocument(body string) []byte {
 	return []byte(strings.Replace(body, `"checksum":""`, `"checksum":"`+checksum+`"`, 1))
 }
 
-const documentBody = `{"schema_version":"1.5","kind":"loxilb-config-snapshot","generation":9,` +
+const documentBody = `{"schema_version":"1.5","kind":"loxilb-snapshot","generation":9,` +
 	`"domains":{"loadbalancer":[]},"checksum":""}`
 
 func TestVerifySnapshotChecksum(t *testing.T) {

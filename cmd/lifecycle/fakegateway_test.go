@@ -92,7 +92,7 @@ func jsonResponse(status int, body string) func(http.ResponseWriter, *http.Reque
 // checksum computed over the same bytes with the checksum value emptied.
 func snapshotDocument(t *testing.T, schemaVersion string, generation uint64) []byte {
 	t.Helper()
-	body := `{"schema_version":"` + schemaVersion + `","kind":"loxilb-config-snapshot",` +
+	body := `{"schema_version":"` + schemaVersion + `","kind":"loxilb-snapshot",` +
 		`"generation":` + strconv.FormatUint(generation, 10) + `,` +
 		`"included_domains":["loadbalancer","endpoint"],"excluded_domains":["conntrack"],` +
 		`"domains":{"loadbalancer":[]},"checksum":""}`
@@ -114,7 +114,7 @@ func documentChecksum(t *testing.T, document []byte) string {
 // uncheckedDocument builds a document with no checksum field at all, the way a
 // gateway older than the checksummed format answers.
 func uncheckedDocument() []byte {
-	return []byte(`{"schema_version":"1.0","kind":"loxilb-config-snapshot","domains":{}}`)
+	return []byte(`{"schema_version":"1.0","kind":"loxilb-snapshot","domains":{}}`)
 }
 
 // requireReason asserts that err is a lifecycle failure with the given stable
