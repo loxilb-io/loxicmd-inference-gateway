@@ -65,7 +65,10 @@ type RESTOptions struct {
 	PrintOption string
 	Protocol    string
 	ServerIP    string
-	ServerPort  int16
+	// ServerPort is a full TCP port number. It is deliberately not an
+	// int16: half the port space (32768-65535, which includes the
+	// ephemeral range a test or a port-forward lands in) does not fit one.
+	ServerPort  int
 	Timeout     int16
 	ServiceName string
 	Token       string
@@ -90,7 +93,7 @@ func (r *RESTClient) GetProcotol() string {
 }
 
 func (r *RESTClient) GetHost() string {
-	return fmt.Sprintf("%s:%d", r.Options.ServerIP, int(r.Options.ServerPort))
+	return fmt.Sprintf("%s:%d", r.Options.ServerIP, r.Options.ServerPort)
 }
 
 func (r *RESTClient) GET(ctx context.Context, getURL string) (*http.Response, error) {
