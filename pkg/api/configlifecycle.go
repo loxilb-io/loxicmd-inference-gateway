@@ -66,12 +66,16 @@ type ExternalDependencyStatus struct {
 	Status     string `json:"status,omitempty"`
 }
 
-// Dependency dispositions a restore response can report.
+// Dependency dispositions the gateway reports. The first two belong to a
+// persist response (identity read live, or the store merely wired); the rest
+// belong to a restore.
 const (
-	DependencyStatusVerified = "verified"
-	DependencyStatusWarning  = "warning"
-	DependencyStatusFailed   = "failed"
-	DependencyStatusDeclared = "declared"
+	DependencyStatusReady      = "ready"
+	DependencyStatusConfigured = "configured"
+	DependencyStatusVerified   = "verified"
+	DependencyStatusWarning    = "warning"
+	DependencyStatusFailed     = "failed"
+	DependencyStatusDeclared   = "declared"
 )
 
 // String renders one dependency entry for human output: identity first, then

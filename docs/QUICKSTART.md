@@ -92,6 +92,7 @@ Capture the working setup so it can be restored or moved to another instance:
 ```bash
 loxicmd get snapshot -f ai-routing-snapshot.json
 loxicmd create persist        # also write it to the gateway's on-disk config
+# Each command exits non-zero if it did not succeed; add -o json for automation.
 ```
 
 Restore it later (dry-run first, then commit):
