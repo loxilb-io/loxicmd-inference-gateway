@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/backend-contract.schema.json",
+  "title": "BackendContract",
+  "description": "Response of `loxilb-appliance-backend contract-version --json`. The CLI validates this before any mutating appliance subcommand. Keys follow the same stability rules as the CommandResult envelope: always present, never null, secret material prohibited.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion",
+    "kind",
+    "backendVersion",
+    "productRelease",
+    "schemaVersion",
+    "commands"
+  ],
+  "properties": {
+    "apiVersion": {
+      "type": "string",
+      "pattern": "^loxilb\\.io/appliance-backend/v[0-9]+$",
+      "description": "Backend contract version. The CLI refuses a major it does not know."
+    },
+    "kind": {
+      "const": "BackendContract"
+    },
+    "backendVersion": {
+      "type": "string",
+      "description": "The backend implementation's own version string."
+    },
+    "productRelease": {
+      "type": "string",
+      "description": "The installed product release this backend shipped with."
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Version of the per-command JSON payload schemas this backend emits."
+    },
+    "commands": {
+      "type": "array",
+      "description": "Every subcommand this backend supports. A subcommand absent from this list is unavailable regardless of what the CLI build knows about.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "readOnly", "capabilities"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$",
+            "description": "Backend subcommand, e.g. \"status\", \"backup create\"."
+          },
+          "readOnly": {
+            "type": "boolean",
+            "description": "True when the subcommand changes no host state under any input."
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "description": "Feature markers within the subcommand (e.g. \"json-output\", \"redaction\"). The CLI requires a capability before exposing the dependent flag or behavior."
+          }
+        }
+      }
+    }
+  }
+}
