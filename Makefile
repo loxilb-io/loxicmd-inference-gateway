@@ -12,8 +12,18 @@ SHELL := /bin/bash
 #   make build VERSION=v0.9.8.7
 VERSION ?= v0.9.8.6
 BUILDINFO = $(shell date '+%Y_%m_%d')-$(shell git branch --show-current)-$(shell git show --pretty=format:%h --no-patch)
+# Build identity for `loxicmd version -o json` (cmd/buildinfo.go). The full
+# source revision and the consumed gateway-contract digest come from the tree
+# itself; the workflow run identity and SOURCE_DATE_EPOCH are stamped only by
+# CI (.github/workflows/release.yml), so a local build reports them empty.
+SOURCEREV       = $(shell git rev-parse HEAD 2>/dev/null)
+GATEWAYCONTRACT = $(shell sed -n 's/.*"swagger_sha256": "\([0-9a-f]*\)".*/\1/p' testdata/contracts/gateway-api.json 2>/dev/null)
 LDFLAGS   = -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.Version=$(VERSION)' \
-            -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=$(BUILDINFO)'
+            -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=$(BUILDINFO)' \
+            -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.SourceRevision=$(SOURCEREV)' \
+            -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.GatewayContract=$(GATEWAYCONTRACT)' \
+            -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildWorkflow=$(BUILD_WORKFLOW)' \
+            -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.SourceDateEpoch=$(SOURCE_DATE_EPOCH)'
 
 loxilbid=$(shell docker ps -f name=$(dock) | grep -w $(dock) | cut  -d " "  -f 1 | grep -iv  "CONTAINER")
 
