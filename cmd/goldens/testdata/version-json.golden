@@ -1,0 +1,22 @@
+exit=0
+--- stdout ---
+{
+  "apiVersion": "loxilb.io/appliance/v1",
+  "kind": "CommandResult",
+  "command": "version",
+  "success": true,
+  "code": "OK",
+  "message": "",
+  "correlationId": "",
+  "data": {
+    "version": "v0.9.8.6",
+    "sourceRevision": "",
+    "gatewayContract": "",
+    "goVersion": "<goversion>",
+    "buildWorkflow": "",
+    "sourceDateEpoch": "",
+    "buildInfo": ""
+  },
+  "warnings": []
+}
+--- stderr ---

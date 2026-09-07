@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+|   EXT IP   | PORT | PROTO |  NAME   | MARK | SEL |  MODE   | # OF ENDPOINTS | TIMEOUT | MONITOR |
+|------------|------|-------|---------|------|-----|---------|----------------|---------|---------|
+| 20.20.20.1 | 2020 | tcp   | test-lb |    0 | rr  | default |              1 |     240 | Off     |
+--- stderr ---
