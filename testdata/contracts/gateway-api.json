@@ -1,6 +1,6 @@
 {
   "source": {
-    "swagger_sha256": "b89eddbc14a4ea21774e6a609209f0f43786e52a2fe2b1ca5434dc648c39480d",
+    "swagger_sha256": "3184bca396dbc42f99bcadc50b25e2acf855e2a0421c135003ee64425c585d48",
     "swagger_extras_sha256": "d0837dd58d05007b740b61e49914831c1fd55d44826fd756a709cd8f7a1307bc"
   },
   "operations": [
@@ -11,6 +11,9 @@
     {"spec": "swagger.yml", "path": "/config/ai/tenant/ratelimit", "methods": ["post"]},
     {"spec": "swagger.yml", "path": "/config/ai/tenant/ratelimit/{tenant_id}", "methods": ["get"]},
     {"spec": "swagger.yml", "path": "/config/policy", "methods": ["post"]},
+    {"spec": "swagger.yml", "path": "/config/snapshot", "methods": ["get"]},
+    {"spec": "swagger.yml", "path": "/config/restore", "methods": ["post"]},
+    {"spec": "swagger.yml", "path": "/config/persist", "methods": ["post"]},
     {"spec": "swagger.yml", "path": "/version", "methods": ["get"]},
     {"spec": "swagger-extras.yml", "path": "/config/ai/apikey/{key_id}", "methods": ["patch"]},
     {"spec": "swagger-extras.yml", "path": "/config/ai/kv/inventory", "methods": ["get"]},
@@ -34,6 +37,36 @@
     {"spec": "swagger.yml", "definition": "TenantRateLimitEntry", "property_path": ["burst_pct"], "type": "integer"},
     {"spec": "swagger.yml", "definition": "TenantRateLimitEntry", "property_path": ["model_limits"], "type": "array"},
     {"spec": "swagger.yml", "definition": "PolicyEntry", "property_path": ["targetObject", "attachment"], "type": "integer", "enum": ["0", "1", "2"]},
-    {"spec": "swagger.yml", "definition": "VersionGetEntry", "property_path": ["product"], "type": "string"}
+    {"spec": "swagger.yml", "definition": "VersionGetEntry", "property_path": ["product"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["result"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["path"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["checksum"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["schema_version"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["generation"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["included_domains"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["excluded_domains"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["external_dependencies"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "PersistResult", "property_path": ["warnings"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["mode"], "type": "string", "enum": ["dry-run", "commit", "boot"]},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["compatible"], "type": "boolean"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["schema_version"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["result"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["plan"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["errors"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["warnings"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["snapshot_generation"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["external_dependencies"], "type": "array"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["persisted"], "type": "boolean"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["persisted_generation"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "RestoreResult", "property_path": ["pre_restore_snapshot_persisted"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "RestorePlanItem", "property_path": ["domain"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "RestorePlanItem", "property_path": ["to_delete"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "RestorePlanItem", "property_path": ["to_apply"], "type": "integer"},
+    {"spec": "swagger.yml", "definition": "ExternalDependencyStatus", "property_path": ["type"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "ExternalDependencyStatus", "property_path": ["id"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "ExternalDependencyStatus", "property_path": ["generation"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "ExternalDependencyStatus", "property_path": ["digest"], "type": "string"},
+    {"spec": "swagger.yml", "definition": "ExternalDependencyStatus", "property_path": ["required"], "type": "boolean"},
+    {"spec": "swagger.yml", "definition": "ExternalDependencyStatus", "property_path": ["status"], "type": "string", "enum": ["ready", "configured", "verified", "warning", "failed", "declared"]}
   ]
 }

@@ -16,19 +16,15 @@
 package get
 
 import (
-	"fmt"
-	"io"
-	"net/http"
-	"os"
-
+	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/lifecycle"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 
 	"github.com/spf13/cobra"
 )
 
 func NewGetSnapshotCmd(restOptions *api.RESTOptions) *cobra.Command {
-	var components string
-	var file string
+	var opts lifecycle.SnapshotOptions
+	var strict bool
 
 	var getSnapshotCmd = &cobra.Command{
 		Use:   "snapshot",
@@ -37,42 +33,26 @@ func NewGetSnapshotCmd(restOptions *api.RESTOptions) *cobra.Command {
 configuration domains (/config/snapshot). Restore it later with
 'loxicmd create restore -f <file>'.
 
+The document is checked against its own checksum before anything is stored,
+and -f writes it through a temporary file that is renamed into place with
+mode 0600 - a failed or truncated download can never overwrite the snapshot
+already at that path.
+
 ex)
 	loxicmd get snapshot -f snapshot.json
-	loxicmd get snapshot --components loadbalancer,endpoint`,
-		Run: func(cmd *cobra.Command, args []string) {
-			client := api.NewLoxiClient(restOptions)
-			ctx, cancel := v2Context(restOptions)
-			defer cancel()
-
-			s := client.Snapshot()
-			snap := &s.CommonAPI
-			if components != "" {
-				snap = snap.Query(map[string]string{"components": components})
-			}
-			resp, err := snap.Get(ctx)
-			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
-			}
-			defer resp.Body.Close()
-			body, _ := io.ReadAll(resp.Body)
-			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
-			}
-			if file != "" {
-				if err := os.WriteFile(file, body, 0600); err != nil {
-					fmt.Printf("Error: Failed to write snapshot file: %s\n", err.Error())
-					return
-				}
-				fmt.Printf("Snapshot written to %s (%d bytes).\n", file, len(body))
-				return
-			}
-			fmt.Println(string(body))
+	loxicmd get snapshot --components loadbalancer,endpoint
+	loxicmd get snapshot -f snapshot.json -o json`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			_ = args
+			return lifecycle.Snapshot(restOptions, cmd.OutOrStdout(), cmd.ErrOrStderr(),
+				lifecycle.OptionsFrom(restOptions, strict), opts)
 		},
 	}
-	getSnapshotCmd.Flags().StringVar(&components, "components", "", "Comma-separated v1 domains to capture (default: all)")
-	getSnapshotCmd.Flags().StringVarP(&file, "file", "f", "", "Write the snapshot to this file instead of stdout")
+	getSnapshotCmd.Flags().StringVar(&opts.Components, "components", "", "Comma-separated v1 domains to capture (default: all)")
+	getSnapshotCmd.Flags().StringVarP(&opts.File, "file", "f", "", "Write the snapshot to this file instead of stdout")
+	getSnapshotCmd.Flags().BoolVar(&strict, "strict", false,
+		"Fail unless the downloaded document carries a checksum to verify it against")
 	return getSnapshotCmd
 }

@@ -308,17 +308,59 @@ Modern snapshot/restore/persist — swagger `/config/snapshot`, `/config/restore
 `/config/persist` (supersede the legacy `/config/export` and `/config/import`).
 
 ```bash
-# Download a versioned, checksummed snapshot of all v1 config domains
+# Download a versioned, checksummed snapshot of all v1 config domains.
+# The document is verified against its own checksum before -f stores it,
+# through a temporary file renamed into place at mode 0600 - a truncated or
+# corrupt download never overwrites the snapshot already at that path.
 loxicmd get snapshot -f snapshot.json
 loxicmd get snapshot --components=loadbalancer,endpoint     # subset
 
 # Restore a snapshot. Default is dry-run (validate + plan, no mutation).
 loxicmd create restore -f snapshot.json            # dry-run: prints the plan
 loxicmd create restore -f snapshot.json --commit   # apply, with rollback on failure
+loxicmd create restore -f snapshot.json --components=loadbalancer,endpoint
 
-# Persist the running config to disk so it survives a daemon restart
+# Persist the running config to disk so it survives a daemon restart.
+# This is the canonical boot-save command.
 loxicmd create persist
 ```
+
+### Exit status and automation
+
+Every command above exits non-zero when the operation did not succeed, and
+prints the failure on stderr. `-o json` renders the same verdict as a
+machine-readable envelope on stdout, carrying a stable `reason` code:
+
+```bash
+loxicmd create persist -o json
+{
+    "command": "create persist",
+    "result": "ok",
+    "reason": "ok",
+    "contract": "durable",
+    "persist": { "path": "/etc/loxilb/snapshot.json", "generation": 12, ... }
+}
+```
+
+| `reason` | Meaning |
+|---|---|
+| `ok` | The operation succeeded. |
+| `invalid-arguments` | The command line is wrong; the gateway was never contacted. |
+| `file-read-failed` / `file-write-failed` / `invalid-json` | A client-local file operation failed. |
+| `request-failed` | No HTTP response (connection refused, TLS failure, timeout). |
+| `unauthorized` / `operation-in-progress` / `maintenance-mode` | 401 / 409 (another snapshot or restore holds the gate) / 503. |
+| `bad-request` / `server-error` | A 4xx or 5xx carrying no lifecycle result. |
+| `decode-failed` / `result-not-ok` | The response could not be decoded, or reported no success. |
+| `incompatible-snapshot` / `validation-failed` | The document cannot be restored onto this gateway. |
+| `dependency-failed` | A required external recovery dependency could not be verified; nothing was mutated. |
+| `rolled-back` / `rollback-failed` | The restore failed; the second means its rollback failed too. |
+| `not-persisted` | A committed restore applied but was not written through - it will not survive a restart. |
+| `checksum-mismatch` | A downloaded document does not match its own checksum; nothing was stored. |
+| `contract-legacy` | `--strict` was requested and the gateway answers with the older contract. |
+
+`--strict`, on the three gateway-facing commands, refuses a gateway that does
+not report the document's identity, coverage and durability, so automation
+never records a claim the gateway never made.
 
 The classic client-side dump/apply also remains available:
 
@@ -326,6 +368,13 @@ The classic client-side dump/apply also remains available:
 loxicmd save        # write local config dumps
 loxicmd apply -f <file>
 ```
+
+`save --api` is a compatibility alias for `loxicmd create persist`: same call,
+same result, same exit status. It cannot be combined with the local dump flags
+it would otherwise skip, but `--api --ip` is valid - interface configuration is
+host-level state the snapshot document excludes. `save --config-path` names the
+client-local directory for those text dumps; where the gateway writes
+`snapshot.json` is decided by the gateway's own `--config-path`.
 
 ---
 

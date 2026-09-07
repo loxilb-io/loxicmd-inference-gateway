@@ -84,7 +84,7 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	rootCmd.PersistentFlags().StringVarP(&restOptions.Protocol, "protocol", "", "http", "Set API server http/https")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.PrintOption, "output", "o", "", "Set output layer (ex.) wide, json)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.ServerIP, "apiserver", "s", "127.0.0.1", "Set API server IP address")
-	rootCmd.PersistentFlags().Int16VarP(&restOptions.ServerPort, "port", "p", 11111, "Set API server port number")
+	rootCmd.PersistentFlags().IntVarP(&restOptions.ServerPort, "port", "p", 11111, "Set API server port number")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.Token, "token", "", "", "Set Token for the API server")
 	rootCmd.PersistentFlags().BoolVarP(&restOptions.BearerAuth, "bearer", "", true, "Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets)")
 	rootCmd.PersistentFlags().BoolVarP(&restOptions.Insecure, "insecure", "k", false, "Skip TLS certificate verification (https only)")
@@ -108,8 +108,8 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	saveCmd.Flags().BoolVarP(&saveOptions.SaveFWConfig, "firewall", "", false, "Saves firewall configuration")
 	saveCmd.Flags().BoolVarP(&saveOptions.SaveEPConfig, "endpoint", "", false, "Saves endpoint configuration")
 	saveCmd.Flags().BoolVarP(&saveOptions.SaveBFDConfig, "bfd", "", false, "Saves BFD configuration")
-	saveCmd.Flags().BoolVarP(&saveOptions.SaveViaApi, "api", "", false, "Ask the gateway to persist its full running config to snapshot.json (POST /config/persist) instead of writing legacy text dumps client-side; combine with --ip to also dump interface config locally")
-	saveCmd.Flags().StringVarP(&saveOptions.ConfigPath, "config-path", "c", "", "config file patch setting")
+	saveCmd.Flags().BoolVarP(&saveOptions.SaveViaApi, "api", "", false, "Compatibility alias for 'loxicmd create persist': ask the gateway to persist its own running configuration to snapshot.json (POST /config/persist). May be combined with --ip to also dump interface configuration locally, which the snapshot excludes")
+	saveCmd.Flags().StringVarP(&saveOptions.ConfigPath, "config-path", "c", "", "Client-local directory for the text dumps this command writes; it does not change where the gateway writes snapshot.json (that is the gateway's own --config-path)")
 
 	saveCmd.MarkFlagsMutuallyExclusive("all", "ip", "lb", "session", "ulcl", "firewall", "endpoint", "bfd")
 
