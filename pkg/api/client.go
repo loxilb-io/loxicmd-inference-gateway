@@ -65,6 +65,7 @@ const (
 	loxiSnapshotResource        = "config/snapshot"
 	loxiRestoreResource         = "config/restore"
 	loxiPersistResource         = "config/persist"
+	loxiMaintenanceResource     = "maintenance"
 )
 
 type LoxiClient struct {
@@ -580,6 +581,19 @@ func (l *LoxiClient) Snapshot() *Snapshot {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiSnapshotResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Maintenance() *Maintenance {
+	return &Maintenance{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiMaintenanceResource,
 			},
 		},
 	}
