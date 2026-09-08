@@ -1,0 +1,31 @@
+exit=0
+--- stdout ---
+Encrypted appliance backups
+
+Usage:
+  loxicmd appliance backup [flags]
+  loxicmd appliance backup [command]
+
+Available Commands:
+  create      Create an authenticated, encrypted backup archive
+  key-create  Create a new root-only backup encryption key
+  verify      Verify a backup archive without changing anything
+
+Flags:
+  -h, --help   help for backup
+
+Global Flags:
+  -s, --apiserver string   Set API server IP address (default "127.0.0.1")
+      --bearer             Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets) (default true)
+      --cacert string      CA certificate (PEM) to verify the server (https only)
+      --cert string        Client certificate (PEM) for mutual TLS (https only)
+  -k, --insecure           Skip TLS certificate verification (https only)
+      --key string         Client private key (PEM) for mutual TLS (https only)
+  -o, --output string      Set output layer (ex.) wide, json)
+  -p, --port int           Set API server port number (default 11111)
+      --protocol string    Set API server http/https (default "http")
+  -t, --timeout int16      Set timeout (default 10)
+      --token string       Set Token for the API server
+
+Use "loxicmd appliance backup [command] --help" for more information about a command.
+--- stderr ---

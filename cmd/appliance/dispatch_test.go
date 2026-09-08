@@ -202,3 +202,117 @@ func TestApplianceBackendFailures(t *testing.T) {
 		}
 	})
 }
+
+// mutatingFake answers the handshake advertising the full mutating slice
+// and records what reaches each channel.
+const mutatingFakeScript = `mkdir -p "$RECDIR" 2>/dev/null
+printf '%s\n' "$@" > "$RECDIR/argv"
+env > "$RECDIR/env"
+cat > "$RECDIR/stdin"
+if [ "$1" = "contract-version" ]; then
+  echo '{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract","backendVersion":"0.1.0","productRelease":"rc","schemaVersion":1,"commands":[{"name":"gateway register-local","readOnly":false,"capabilities":[]},{"name":"logs","readOnly":false,"capabilities":[]}]}'
+else
+  echo '{"done":true}'
+fi`
+
+// TestApplianceMutatingDispatch proves the mutating path end to end: the
+// handshake gate, the secret's stdin-only travel, and the CLI-side
+// validations that refuse an invocation before any process starts.
+func TestApplianceMutatingDispatch(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("loxicmd links Linux netlink; the packaged binary only builds there")
+	}
+	recDir := t.TempDir()
+	binary, _ := buildCLIWithBackend(t, strings.ReplaceAll(mutatingFakeScript, "$RECDIR", recDir))
+	secretDir := t.TempDir()
+	passFile := filepath.Join(secretDir, "oam.pass")
+	if err := os.WriteFile(passFile, []byte("correcthorsebatterystaple\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("register-local streams the secret on stdin only", func(t *testing.T) {
+		status, stdout, stderr := runAppliance(t, binary,
+			"appliance", "gateway", "register-local", "--username", "admin", "--password-file", passFile, "-o", "json")
+		if status != 0 {
+			t.Fatalf("status=%d stdout=%q stderr=%q", status, stdout, stderr)
+		}
+		stdin, _ := os.ReadFile(filepath.Join(recDir, "stdin"))
+		argv, _ := os.ReadFile(filepath.Join(recDir, "argv"))
+		env, _ := os.ReadFile(filepath.Join(recDir, "env"))
+		if !strings.Contains(string(stdin), "correcthorsebatterystaple") {
+			t.Fatalf("secret did not reach stdin: %q", stdin)
+		}
+		if strings.Contains(string(argv), "correcthorse") || strings.Contains(string(env), "correcthorse") ||
+			strings.Contains(stdout, "correcthorse") {
+			t.Fatal("the secret leaked outside the backend's stdin")
+		}
+	})
+
+	t.Run("group-readable password file is refused before any spawn", func(t *testing.T) {
+		loose := filepath.Join(secretDir, "loose.pass")
+		if err := os.WriteFile(loose, []byte("opensesame"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		status, _, stderr := runAppliance(t, binary,
+			"appliance", "gateway", "register-local", "--username", "admin", "--password-file", loose)
+		if status != 4 || !strings.Contains(stderr, "owner-only") {
+			t.Fatalf("status=%d stderr=%q, want 4 + the owner-only refusal", status, stderr)
+		}
+	})
+
+	t.Run("unadvertised mutating command exits 6 after the handshake", func(t *testing.T) {
+		status, _, stderr := runAppliance(t, binary,
+			"appliance", "public-address", "configure", "203.0.113.10")
+		if status != 6 || !strings.Contains(stderr, "does not provide") {
+			t.Fatalf("status=%d stderr=%q, want 6 + the unadvertised refusal", status, stderr)
+		}
+	})
+
+	t.Run("logs dispatches through the gate", func(t *testing.T) {
+		status, _, stderr := runAppliance(t, binary,
+			"appliance", "logs", "gateway", "--redact", "--since", "1h", "--lines", "200")
+		if status != 0 {
+			t.Fatalf("status=%d stderr=%q", status, stderr)
+		}
+	})
+
+	for name, tc := range map[string]struct {
+		args     []string
+		wantExit int
+		wantErr  string
+	}{
+		"bad ipv4":                    {[]string{"appliance", "public-address", "configure", "not.an.ip"}, 2, "canonical IPv4"},
+		"non-canonical ipv4":          {[]string{"appliance", "public-address", "configure", "203.000.113.10"}, 2, "canonical IPv4"},
+		"bad log component":           {[]string{"appliance", "logs", "sshd", "--redact"}, 2, "allowlist"},
+		"logs without redact":         {[]string{"appliance", "logs", "gateway"}, 2, "--redact is required"},
+		"diagnostics without redact":  {[]string{"appliance", "diagnostics", "create"}, 2, "--redact is required"},
+		"relative diagnostics output": {[]string{"appliance", "diagnostics", "create", "--redact", "--output", "rel.tar"}, 2, "absolute"},
+		"oversized since":             {[]string{"appliance", "logs", "gateway", "--redact", "--since", "400h"}, 2, "up to"},
+		"oversized lines":             {[]string{"appliance", "logs", "gateway", "--redact", "--lines", "99999"}, 2, "between"},
+		"flag-shaped username":        {[]string{"appliance", "gateway", "register-local", "--username", "-admin", "--password-file", passFile}, 2, "refuses"},
+		"relative archive":            {[]string{"appliance", "backup", "verify", "rel.tar", "--key-file", passFile}, 2, "absolute"},
+	} {
+		t.Run(name+" is refused CLI-side", func(t *testing.T) {
+			status, _, stderr := runAppliance(t, binary, tc.args...)
+			if status != tc.wantExit || !strings.Contains(stderr, tc.wantErr) {
+				t.Fatalf("status=%d stderr=%q, want %d + %q", status, stderr, tc.wantExit, tc.wantErr)
+			}
+		})
+	}
+
+	t.Run("credentials bootstrap refuses a non-terminal session", func(t *testing.T) {
+		// runAppliance wires pipes, which is exactly the redirected
+		// session the console-only guard must refuse.
+		status, _, stderr := runAppliance(t, binary, "appliance", "credentials", "bootstrap")
+		if status != 4 || !strings.Contains(stderr, "interactive local console") {
+			t.Fatalf("status=%d stderr=%q, want 4 + the console-only refusal", status, stderr)
+		}
+	})
+
+	t.Run("credentials bootstrap has no json mode", func(t *testing.T) {
+		status, stdout, _ := runAppliance(t, binary, "appliance", "credentials", "bootstrap", "-o", "json")
+		if status != 2 || strings.Contains(stdout, "CommandResult") {
+			t.Fatalf("status=%d stdout=%q, want 2 and no envelope", status, stdout)
+		}
+	})
+}

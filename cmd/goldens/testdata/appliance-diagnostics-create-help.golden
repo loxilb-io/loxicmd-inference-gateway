@@ -1,0 +1,31 @@
+exit=0
+--- stdout ---
+Creates a redacted support archive through the backend: allowlisted
+identity and health data only, with a post-generation secret scan the
+backend must pass before reporting success. --redact is mandatory — an
+unredacted mode does not exist.
+
+Examples:
+  loxicmd appliance diagnostics create --redact
+  loxicmd appliance diagnostics create --redact --output /root/support.tar
+
+Usage:
+  loxicmd appliance diagnostics create --redact [--output PATH] [flags]
+
+Flags:
+  -h, --help            help for create
+      --output string   Absolute path for the archive (default: the backend's support directory)
+      --redact          Required: produce the redacted archive (the only kind there is)
+
+Global Flags:
+  -s, --apiserver string   Set API server IP address (default "127.0.0.1")
+      --bearer             Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets) (default true)
+      --cacert string      CA certificate (PEM) to verify the server (https only)
+      --cert string        Client certificate (PEM) for mutual TLS (https only)
+  -k, --insecure           Skip TLS certificate verification (https only)
+      --key string         Client private key (PEM) for mutual TLS (https only)
+  -p, --port int           Set API server port number (default 11111)
+      --protocol string    Set API server http/https (default "http")
+  -t, --timeout int16      Set timeout (default 10)
+      --token string       Set Token for the API server
+--- stderr ---

@@ -56,6 +56,12 @@ and keep working while the gateway container is stopped or unhealthy.`,
 
 	applianceCmd.AddCommand(statusCmd(restOptions))
 	applianceCmd.AddCommand(networkCmd(restOptions))
+	applianceCmd.AddCommand(publicAddressCmd(restOptions))
+	applianceCmd.AddCommand(gatewayCmd(restOptions))
+	applianceCmd.AddCommand(credentialsCmd(restOptions))
+	applianceCmd.AddCommand(diagnosticsCmd(restOptions))
+	applianceCmd.AddCommand(logsCmd(restOptions))
+	applianceCmd.AddCommand(backupCmd(restOptions))
 	for _, unavailable := range []struct{ use, what string }{
 		{"restore", "restoring the appliance from a backup"},
 		{"update", "updating the appliance software"},
