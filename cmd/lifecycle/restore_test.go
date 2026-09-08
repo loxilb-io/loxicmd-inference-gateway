@@ -48,9 +48,9 @@ const commitBody = `{"mode":"commit","compatible":true,"schema_version":"1.5","r
 
 func TestRestoreDryRunSucceeds(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, dryRunBody))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Restore(gw.options(), &out, &errOut, Options{}, RestoreOptions{File: documentFile(t)})
+	err := Restore(gw.options(), &out, Options{}, RestoreOptions{File: documentFile(t)})
 	if err != nil {
 		t.Fatalf("dry-run failed: %v", err)
 	}
@@ -68,9 +68,9 @@ func TestRestoreDryRunSucceeds(t *testing.T) {
 
 func TestRestoreCommitSucceedsAndReportsDurability(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, commitBody))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Restore(gw.options(), &out, &errOut, Options{},
+	err := Restore(gw.options(), &out, Options{},
 		RestoreOptions{File: documentFile(t), Commit: true, Components: "loadbalancer,endpoint"})
 	if err != nil {
 		t.Fatalf("commit failed: %v", err)
@@ -100,9 +100,9 @@ func TestRestoreCommitThatWasNotPersistedFails(t *testing.T) {
 	body := `{"mode":"commit","compatible":true,"result":"ok","schema_version":"1.5","persisted":false,` +
 		`"errors":["persist after restore failed: no space left on device"]}`
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, body))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Restore(gw.options(), &out, &errOut, Options{}, RestoreOptions{File: documentFile(t), Commit: true})
+	err := Restore(gw.options(), &out, Options{}, RestoreOptions{File: documentFile(t), Commit: true})
 	requireReason(t, err, api.ReasonNotPersisted)
 	if !strings.Contains(err.Error(), "will not survive a restart") {
 		t.Fatalf("failure does not say what is at stake: %v", err)
@@ -150,8 +150,8 @@ func TestRestoreFailureClasses(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			gw := newFakeGateway(t, jsonResponse(tc.status, tc.body))
-			var out, errOut bytes.Buffer
-			err := Restore(gw.options(), &out, &errOut, Options{},
+			var out bytes.Buffer
+			err := Restore(gw.options(), &out, Options{},
 				RestoreOptions{File: documentFile(t), Commit: tc.commit})
 			requireReason(t, err, tc.reason)
 			if strings.Contains(out.String(), "Restore committed") {
@@ -167,9 +167,9 @@ func TestRestoreFailureClasses(t *testing.T) {
 func TestRestoreSuccessfulBodyBehindAFailureStatus(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusInternalServerError,
 		`{"mode":"dry-run","compatible":true,"schema_version":"1.5"}`))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Restore(gw.options(), &out, &errOut, Options{}, RestoreOptions{File: documentFile(t)})
+	err := Restore(gw.options(), &out, Options{}, RestoreOptions{File: documentFile(t)})
 	requireReason(t, err, api.ReasonServerError)
 }
 
@@ -177,14 +177,14 @@ func TestRestoreLocalInputFailures(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, dryRunBody))
 
 	t.Run("no file", func(t *testing.T) {
-		var out, errOut bytes.Buffer
-		err := Restore(gw.options(), &out, &errOut, Options{}, RestoreOptions{})
+		var out bytes.Buffer
+		err := Restore(gw.options(), &out, Options{}, RestoreOptions{})
 		requireReason(t, err, api.ReasonInvalidArguments)
 	})
 
 	t.Run("missing file", func(t *testing.T) {
-		var out, errOut bytes.Buffer
-		err := Restore(gw.options(), &out, &errOut, Options{},
+		var out bytes.Buffer
+		err := Restore(gw.options(), &out, Options{},
 			RestoreOptions{File: filepath.Join(t.TempDir(), "absent.json")})
 		requireReason(t, err, api.ReasonFileRead)
 	})
@@ -194,8 +194,8 @@ func TestRestoreLocalInputFailures(t *testing.T) {
 		if err := os.WriteFile(path, []byte("{not json"), 0600); err != nil {
 			t.Fatal(err)
 		}
-		var out, errOut bytes.Buffer
-		err := Restore(gw.options(), &out, &errOut, Options{}, RestoreOptions{File: path})
+		var out bytes.Buffer
+		err := Restore(gw.options(), &out, Options{}, RestoreOptions{File: path})
 		requireReason(t, err, api.ReasonInvalidJSON)
 	})
 
@@ -211,21 +211,20 @@ func TestRestoreStrictRefusesLegacyCommit(t *testing.T) {
 	body := `{"mode":"commit","compatible":true,"schema_version":"1.5","result":"ok"}`
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, body))
 
-	var out, errOut bytes.Buffer
-	if err := Restore(gw.options(), &out, &errOut, Options{},
+	var out bytes.Buffer
+	if err := Restore(gw.options(), &out, Options{},
 		RestoreOptions{File: documentFile(t), Commit: true}); err != nil {
 		t.Fatalf("non-strict commit should succeed: %v", err)
 	}
 	if strings.Contains(out.String(), "Persisted: yes") {
 		t.Fatalf("claimed durability the gateway never reported:\n%s", out.String())
 	}
-	if !strings.Contains(out.String(), legacyContractNote) {
+	if !strings.Contains(out.String(), legacyContractNote.Message) {
 		t.Fatalf("missing legacy note:\n%s", out.String())
 	}
 
 	out.Reset()
-	errOut.Reset()
-	err := Restore(gw.options(), &out, &errOut, Options{Strict: true},
+	err := Restore(gw.options(), &out, Options{Strict: true},
 		RestoreOptions{File: documentFile(t), Commit: true})
 	requireReason(t, err, api.ReasonContractLegacy)
 }
@@ -234,20 +233,20 @@ func TestRestoreJSONFailureEnvelopeCarriesTheBody(t *testing.T) {
 	body := `{"mode":"commit","compatible":true,"schema_version":"1.5","result":"rolled-back",` +
 		`"errors":["apply failed at endpoint"]}`
 	gw := newFakeGateway(t, jsonResponse(http.StatusInternalServerError, body))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Restore(gw.options(), &out, &errOut, Options{JSON: true},
+	err := Restore(gw.options(), &out, Options{JSON: true},
 		RestoreOptions{File: documentFile(t), Commit: true})
 	requireReason(t, err, api.ReasonRolledBack)
 
-	report := decodeReport(t, out.Bytes())
-	if report.Restore == nil || report.Restore.Result != api.RestoreResultRolledBack {
+	doc := decodeEnvelope(t, out.Bytes())
+	if doc.Data.Restore == nil || doc.Data.Restore.Result != api.RestoreResultRolledBack {
 		t.Fatalf("failure envelope dropped the evidence: %s", out.String())
 	}
-	if len(report.Restore.Errors) == 0 {
+	if len(doc.Data.Restore.Errors) == 0 {
 		t.Fatalf("failure envelope dropped the gateway's errors: %s", out.String())
 	}
-	if report.HTTPStatus != http.StatusInternalServerError {
-		t.Fatalf("http_status = %d", report.HTTPStatus)
+	if doc.Data.HTTPStatus != http.StatusInternalServerError {
+		t.Fatalf("httpStatus = %d", doc.Data.HTTPStatus)
 	}
 }

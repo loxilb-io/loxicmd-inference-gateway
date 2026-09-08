@@ -44,8 +44,8 @@ ex)
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return lifecycle.Persist(restOptions, cmd.OutOrStdout(), cmd.ErrOrStderr(),
-				lifecycle.OptionsFrom(restOptions, strict), "create persist")
+			return lifecycle.Persist(restOptions, cmd.OutOrStdout(),
+				lifecycle.OptionsFrom(restOptions, strict), "create.persist")
 		},
 	}
 	createPersistCmd.Flags().BoolVar(&strict, "strict", false,

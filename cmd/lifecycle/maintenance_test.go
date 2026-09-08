@@ -33,8 +33,8 @@ const maintenanceOnBody = `{"state":"maintenance","operation_id":"maint-18000000
 
 func TestMaintenanceGetRendersGatewayTruth(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, maintenanceOnBody))
-	var out, errOut bytes.Buffer
-	if err := MaintenanceGet(gw.options(), &out, &errOut, Options{}); err != nil {
+	var out bytes.Buffer
+	if err := MaintenanceGet(gw.options(), &out, Options{}); err != nil {
 		t.Fatalf("get maintenance failed: %v", err)
 	}
 	if got := gw.requests[0]; got.Method != http.MethodGet || !strings.HasSuffix(got.Path, "/maintenance") {
@@ -57,8 +57,8 @@ func TestMaintenanceGetRendersGatewayTruth(t *testing.T) {
 
 func TestMaintenanceSetSendsDeclaredWindowAndReportsJSON(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, maintenanceOnBody))
-	var out, errOut bytes.Buffer
-	err := MaintenanceSet(gw.options(), &out, &errOut, Options{JSON: true},
+	var out bytes.Buffer
+	err := MaintenanceSet(gw.options(), &out, Options{JSON: true},
 		MaintenanceSetOptions{Enable: true, DrainTimeoutSeconds: 300})
 	if err != nil {
 		t.Fatalf("set maintenance on failed: %v", err)
@@ -70,15 +70,17 @@ func TestMaintenanceSetSendsDeclaredWindowAndReportsJSON(t *testing.T) {
 	if !sent.Enabled || sent.DrainTimeoutSeconds != 300 {
 		t.Fatalf("sent %+v, want enabled with a 300s window", sent)
 	}
-	var report api.LifecycleReport
-	if jerr := json.Unmarshal(out.Bytes(), &report); jerr != nil {
-		t.Fatalf("envelope does not parse: %v\n%s", jerr, out.String())
+	doc := decodeEnvelope(t, out.Bytes())
+	if !doc.Success || doc.Command != "set.maintenance.on" {
+		t.Fatalf("envelope = %v/%s, want success/set.maintenance.on", doc.Success, doc.Command)
 	}
-	if report.Result != "ok" || report.Command != "set maintenance on" {
-		t.Fatalf("envelope = %s/%s, want ok/set maintenance on", report.Result, report.Command)
+	if doc.Data.Maintenance == nil || doc.Data.Maintenance.State != "maintenance" {
+		t.Fatalf("envelope carries no maintenance state: %+v", doc.Data.Maintenance)
 	}
-	if report.Maintenance == nil || report.Maintenance.State != "maintenance" {
-		t.Fatalf("envelope carries no maintenance state: %+v", report.Maintenance)
+	// The gateway reported the episode's operation id; the envelope's
+	// correlationId is where automation expects it.
+	if doc.CorrelationID != "maint-1800000000-1" {
+		t.Fatalf("correlationId = %q, want the gateway's operation id", doc.CorrelationID)
 	}
 }
 
@@ -87,8 +89,8 @@ func TestMaintenanceLeaveCarriesEndedEpisode(t *testing.T) {
 		`"refusing_new_config":false,"refusing_new_inference":false,"in_flight_streams":0,` +
 		`"elapsed_seconds":0,"drain_deadline_exceeded":false,"cancellable":true}`
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, leaveBody))
-	var out, errOut bytes.Buffer
-	err := MaintenanceSet(gw.options(), &out, &errOut, Options{},
+	var out bytes.Buffer
+	err := MaintenanceSet(gw.options(), &out, Options{},
 		MaintenanceSetOptions{Enable: false})
 	if err != nil {
 		t.Fatalf("set maintenance off failed: %v", err)
@@ -107,8 +109,8 @@ func TestMaintenanceSetUnconfirmedIsRecoveryRequired(t *testing.T) {
 	restOptions := gw.options()
 	gw.server.Close() // every request from here on breaks at the transport
 
-	var out, errOut bytes.Buffer
-	err := MaintenanceSet(restOptions, &out, &errOut, Options{},
+	var out bytes.Buffer
+	err := MaintenanceSet(restOptions, &out, Options{},
 		MaintenanceSetOptions{Enable: true})
 	requireReason(t, err, api.ReasonRecoveryRequired)
 	if !strings.Contains(err.Error(), "get maintenance") {
@@ -123,8 +125,8 @@ func TestMaintenanceGetTransportFailureIsRequestFailed(t *testing.T) {
 	restOptions := gw.options()
 	gw.server.Close()
 
-	var out, errOut bytes.Buffer
-	err := MaintenanceGet(restOptions, &out, &errOut, Options{})
+	var out bytes.Buffer
+	err := MaintenanceGet(restOptions, &out, Options{})
 	requireReason(t, err, api.ReasonRequestFailed)
 }
 
@@ -140,8 +142,8 @@ func TestMaintenanceStatusErrorsKeepTheirCodes(t *testing.T) {
 	for _, c := range cases {
 		gw := newFakeGateway(t, jsonResponse(c.status,
 			`{"code":`+strconv.Itoa(c.status)+`,"message":"x","result":"y"}`))
-		var out, errOut bytes.Buffer
-		err := MaintenanceSet(gw.options(), &out, &errOut, Options{},
+		var out bytes.Buffer
+		err := MaintenanceSet(gw.options(), &out, Options{},
 			MaintenanceSetOptions{Enable: true})
 		requireReason(t, err, c.reason)
 		if api.HTTPStatusOf(err) != c.status {
@@ -152,8 +154,8 @@ func TestMaintenanceStatusErrorsKeepTheirCodes(t *testing.T) {
 
 func TestMaintenanceUndecodableSuccessIsDecodeFailed(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, `not json at all`))
-	var out, errOut bytes.Buffer
-	err := MaintenanceGet(gw.options(), &out, &errOut, Options{})
+	var out bytes.Buffer
+	err := MaintenanceGet(gw.options(), &out, Options{})
 	requireReason(t, err, api.ReasonDecodeFailed)
 }
 
@@ -162,16 +164,14 @@ func TestMaintenanceUndecodableSuccessIsDecodeFailed(t *testing.T) {
 func TestMaintenanceJSONFailureIsAnEnvelope(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusServiceUnavailable,
 		`{"code":503,"message":"Maintenance mode","result":"booting"}`))
-	var out, errOut bytes.Buffer
-	err := MaintenanceGet(gw.options(), &out, &errOut, Options{JSON: true})
+	var out bytes.Buffer
+	err := MaintenanceGet(gw.options(), &out, Options{JSON: true})
 	if err == nil {
 		t.Fatal("503 reported as success")
 	}
-	var report api.LifecycleReport
-	if jerr := json.Unmarshal(out.Bytes(), &report); jerr != nil {
-		t.Fatalf("failure envelope does not parse: %v\n%s", jerr, out.String())
-	}
-	if report.Result != "error" || report.Reason != api.ReasonMaintenance || report.HTTPStatus != 503 {
-		t.Fatalf("failure envelope = %+v, want error/maintenance-mode/503", report)
+	doc := decodeEnvelope(t, out.Bytes())
+	if doc.Success || doc.Code != "PRECONDITION" ||
+		doc.Data.ComponentCode != api.ReasonMaintenance || doc.Data.HTTPStatus != 503 {
+		t.Fatalf("failure envelope = %+v, want PRECONDITION/maintenance-mode/503", doc)
 	}
 }

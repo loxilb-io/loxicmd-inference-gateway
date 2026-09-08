@@ -65,7 +65,7 @@ ex)
 					Message: fmt.Sprintf("maintenance takes on or off, not %q", args[0]),
 				}
 			}
-			return lifecycle.MaintenanceSet(restOptions, cmd.OutOrStdout(), cmd.ErrOrStderr(),
+			return lifecycle.MaintenanceSet(restOptions, cmd.OutOrStdout(),
 				lifecycle.OptionsFrom(restOptions, false),
 				lifecycle.MaintenanceSetOptions{Enable: enable, DrainTimeoutSeconds: drainTimeout})
 		},

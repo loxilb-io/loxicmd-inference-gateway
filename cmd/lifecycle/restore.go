@@ -38,14 +38,14 @@ type RestoreOptions struct {
 
 // Restore runs the staged restore pipeline on a snapshot document
 // (POST /config/restore) and reports the outcome.
-func Restore(restOptions *api.RESTOptions, out, errOut io.Writer, o Options, ro RestoreOptions) error {
+func Restore(restOptions *api.RESTOptions, out io.Writer, o Options, ro RestoreOptions) error {
 	result, err := doRestore(restOptions, o, ro)
-	report := &api.LifecycleReport{Command: "create restore", Restore: result}
+	report := &api.LifecycleReport{Restore: result}
 	if result != nil {
 		report.Contract = result.Capabilities()
 		noteLegacy(report, legacyContractNote)
 	}
-	return render(out, errOut, o, report, humanRestore, err)
+	return render(out, o, "create.restore", report, humanRestore, err)
 }
 
 func doRestore(restOptions *api.RESTOptions, o Options, ro RestoreOptions) (*api.RestoreResult, error) {

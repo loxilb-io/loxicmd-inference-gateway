@@ -28,14 +28,14 @@ import (
 // {config-path}/snapshot.json (POST /config/persist) and reports what was
 // written. command names the invocation in the JSON envelope so the
 // compatibility alias is distinguishable from the canonical command.
-func Persist(restOptions *api.RESTOptions, out, errOut io.Writer, o Options, command string) error {
+func Persist(restOptions *api.RESTOptions, out io.Writer, o Options, command string) error {
 	result, err := doPersist(restOptions, o)
-	report := &api.LifecycleReport{Command: command, Persist: result}
+	report := &api.LifecycleReport{Persist: result}
 	if result != nil {
 		report.Contract = result.Capabilities()
 		noteLegacy(report, legacyContractNote)
 	}
-	return render(out, errOut, o, report, humanPersist, err)
+	return render(out, o, command, report, humanPersist, err)
 }
 
 func doPersist(restOptions *api.RESTOptions, o Options) (*api.PersistResult, error) {

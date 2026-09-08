@@ -34,13 +34,13 @@ type MaintenanceSetOptions struct {
 
 // MaintenanceGet reads the operator maintenance state with its drain
 // read-back (GET /maintenance).
-func MaintenanceGet(restOptions *api.RESTOptions, out, errOut io.Writer, o Options) error {
+func MaintenanceGet(restOptions *api.RESTOptions, out io.Writer, o Options) error {
 	state, err := doMaintenanceGet(restOptions)
-	report := &api.LifecycleReport{Command: "get maintenance", Maintenance: state}
+	report := &api.LifecycleReport{Maintenance: state}
 	if err != nil {
-		return render(out, errOut, o, report, nil, err)
+		return render(out, o, "get.maintenance", report, nil, err)
 	}
-	return render(out, errOut, o, report, humanMaintenance, nil)
+	return render(out, o, "get.maintenance", report, humanMaintenance, nil)
 }
 
 // MaintenanceSet enters or leaves operator maintenance (PUT /maintenance).
@@ -51,17 +51,17 @@ func MaintenanceGet(restOptions *api.RESTOptions, out, errOut io.Writer, o Optio
 // is reported as recovery-required, never as success and never as a plain
 // request failure that automation might retry blindly. The gateway may or
 // may not be in maintenance at that point; only 'get maintenance' can say.
-func MaintenanceSet(restOptions *api.RESTOptions, out, errOut io.Writer, o Options, so MaintenanceSetOptions) error {
-	command := "set maintenance off"
+func MaintenanceSet(restOptions *api.RESTOptions, out io.Writer, o Options, so MaintenanceSetOptions) error {
+	command := "set.maintenance.off"
 	if so.Enable {
-		command = "set maintenance on"
+		command = "set.maintenance.on"
 	}
 	state, err := doMaintenanceSet(restOptions, so)
-	report := &api.LifecycleReport{Command: command, Maintenance: state}
+	report := &api.LifecycleReport{Maintenance: state}
 	if err != nil {
-		return render(out, errOut, o, report, nil, err)
+		return render(out, o, command, report, nil, err)
 	}
-	return render(out, errOut, o, report, humanMaintenance, nil)
+	return render(out, o, command, report, humanMaintenance, nil)
 }
 
 func doMaintenanceGet(restOptions *api.RESTOptions) (*api.MaintenanceState, error) {

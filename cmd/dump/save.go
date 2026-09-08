@@ -139,10 +139,10 @@ not affect where the gateway writes snapshot.json; that is the gateway's own
 func runSave(cmd *cobra.Command, saveOpts *SaveOptions, restOptions *api.RESTOptions) error {
 	out, errOut := cmd.OutOrStdout(), cmd.ErrOrStderr()
 	if err := validateSaveOptions(saveOpts); err != nil {
+		// The single exit point prints the stderr line; JSON callers get
+		// the failure envelope on stdout.
 		if restOptions.PrintOption == "json" {
-			_ = api.WriteLifecycleReport(out, api.NewFailureReport("save", err))
-		} else {
-			fmt.Fprintf(errOut, "Error: %s\n", err.Error())
+			lifecycle.WriteFailure(out, "save", err)
 		}
 		return err
 	}
@@ -155,14 +155,13 @@ func runSave(cmd *cobra.Command, saveOpts *SaveOptions, restOptions *api.RESTOpt
 	if saveOpts.SaveViaApi {
 		if saveOpts.SaveIpConfig {
 			if err := saveIPConfig(out, dpath); err != nil {
-				fmt.Fprintf(errOut, "Error: %s\n", err.Error())
 				return err
 			}
 		}
 		// One implementation, so the alias cannot drift from the
 		// canonical command in what it reports or how it exits.
-		return lifecycle.Persist(restOptions, out, errOut,
-			lifecycle.OptionsFrom(restOptions, false), "save --api")
+		return lifecycle.Persist(restOptions, out,
+			lifecycle.OptionsFrom(restOptions, false), "save.api")
 	}
 
 	if err := ensureConfigDir(dpath); err != nil {
