@@ -1,0 +1,8 @@
+exit=0
+--- stdout ---
+Configuration persisted to /etc/loxilb/snapshot.json (checksum sha256:abc).
+  Document: schema 1.5, generation 7
+  Captured: loadbalancer, endpoint
+  Not captured: conntrack
+  Depends on: api-key-db/keys (required): ready
+--- stderr ---

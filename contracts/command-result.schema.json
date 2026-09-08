@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance/v1/command-result.schema.json",
+  "title": "CommandResult",
+  "description": "The single JSON document a loxicmd invocation writes to stdout under -o json. Exactly one document per invocation; progress and prose go to stderr. Every key listed here is always present: an empty value is emitted as \"\", {} or [] and never as null. Secret material is prohibited from every field, including data and warnings; secret-bearing keys are omitted entirely rather than masked.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apiVersion",
+    "kind",
+    "command",
+    "success",
+    "code",
+    "message",
+    "correlationId",
+    "data",
+    "warnings"
+  ],
+  "properties": {
+    "apiVersion": {
+      "const": "loxilb.io/appliance/v1",
+      "description": "Envelope contract version. A breaking envelope change requires a new value here; consumers reject an unknown major."
+    },
+    "kind": {
+      "const": "CommandResult"
+    },
+    "command": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*$",
+      "description": "Dotted command path that produced this result, e.g. \"get.snapshot\", \"appliance.status\"."
+    },
+    "success": {
+      "type": "boolean",
+      "description": "True exactly when the process exit code is 0."
+    },
+    "code": {
+      "type": "string",
+      "enum": [
+        "OK",
+        "INVALID_ARGUMENT",
+        "AUTH",
+        "PRECONDITION",
+        "UNAVAILABLE",
+        "CONTRACT_MISMATCH",
+        "FAILED",
+        "PARTIAL"
+      ],
+      "description": "Machine verdict, in one-to-one correspondence with the exit-code taxonomy (see exit-codes.md): OK=0, INVALID_ARGUMENT=2, AUTH=3, PRECONDITION=4, UNAVAILABLE=5, CONTRACT_MISMATCH=6, FAILED=7, PARTIAL=8."
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable summary of the verdict. Empty on success. Never contains secret material."
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Identifier correlating this invocation across the CLI, the gateway or backend it called, and their logs/journals. Empty only when no downstream call was attempted."
+    },
+    "data": {
+      "type": "object",
+      "description": "Command-specific payload. Its schema is versioned per command. On failure it preserves the error origin without loss: data.origin (\"cli\"|\"gateway\"|\"oam\"|\"backend\"|\"os\"), data.httpStatus (integer, 0 when no HTTP exchange happened), and data.componentCode (the downstream component's own error code, verbatim) are present on every failure so automation never parses message strings.",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "enum": ["cli", "gateway", "oam", "backend", "os"]
+        },
+        "httpStatus": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 599
+        },
+        "componentCode": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string",
+          "description": "Present when the command started or observed a long-running or partially applied operation; used to query progress or drive recovery."
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Conditions that did not change the verdict but that an operator or automation should see. Machine-readable; prose-only progress goes to stderr instead.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

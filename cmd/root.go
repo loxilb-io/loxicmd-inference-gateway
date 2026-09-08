@@ -26,6 +26,7 @@ import (
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/set"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/envelope"
 
 	"github.com/spf13/cobra"
 )
@@ -39,6 +40,15 @@ var VersionCmd = &cobra.Command{
 	Long:  `It shows Loxicmd version.`,
 
 	Run: func(cmd *cobra.Command, args []string) {
+		// The root's persistent -o/--output flag is visible here through
+		// flag inheritance; version has no REST options of its own. The
+		// human output below is a released surface and stays byte-identical.
+		if out, err := cmd.Flags().GetString("output"); err == nil && out == "json" {
+			result := envelope.New("version")
+			result.Data = currentBuildIdentity()
+			_ = result.Write(cmd.OutOrStdout())
+			return
+		}
 		fmt.Printf("Loxicmd version: %s\nLoxicmd build info: %s\n", Version, BuildInfo)
 	},
 }
