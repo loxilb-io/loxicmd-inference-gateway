@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -38,7 +39,7 @@ Note: this is a raw-middleware endpoint; configure it with 'set opa'.
 
 ex)
 	loxicmd delete opa`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -49,16 +50,17 @@ ex)
 
 			resp, err := client.OPA().Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("delete opa: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("delete opa", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("OPA policy watcher stopped.\n")
+			return nil
 		},
 	}
 	return deleteOPACmd

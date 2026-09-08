@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -48,16 +48,12 @@ func NewDeleteRouteCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "route <DestinationIPNet> ",
 		Short: "Delete a Route",
 		Long:  `Delete a Route using DestinationIPNet  in the LoxiLB.`,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete route needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteRouteValidation(args); err != nil {
-				fmt.Println("not valid <DestinationIPNet>")
-				return
+				return exitcode.Invalidf("not valid <DestinationIPNet>")
 			}
 			DestinationIPNet := args[0]
 			client := api.NewLoxiClient(restOptions)
@@ -72,16 +68,15 @@ func NewDeleteRouteCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Route().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Route(UserID: %s)", DestinationIPNet)
-				return
+				return exitcode.Unavailablef("Failed to delete Route(UserID: %s) (%v)", DestinationIPNet, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete route", resp.StatusCode)
 		},
 	}
 

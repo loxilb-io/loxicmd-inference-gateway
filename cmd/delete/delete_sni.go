@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -38,10 +39,9 @@ func NewDeleteSNICmd(restOptions *api.RESTOptions) *cobra.Command {
 
 ex)
 	loxicmd delete sni --hostname=api.example.com`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if hostname == "" {
-				fmt.Printf("Error: --hostname is required\n")
-				return
+				return exitcode.Usagef("--hostname is required")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -53,16 +53,17 @@ ex)
 			// The SNI DELETE identifies the target in the request body.
 			resp, err := client.SNICertificate().DeleteWithBody(ctx, api.SNICertificateDeleteRequest{Hostname: hostname})
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("delete sni: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("delete sni", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("SNI certificate for '%s' deleted.\n", hostname)
+			return nil
 		},
 	}
 	deleteSNICmd.Flags().StringVar(&hostname, "hostname", "", "SNI hostname (required)")

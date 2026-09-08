@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -45,16 +45,12 @@ func NewDeleteVxlanBridgeCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "vxlan <Vnid>",
 		Short: "Delete a vxlanBridge",
 		Long:  `Delete a vxlanBridge using Vnid in the LoxiLB.`,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete vxlan needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeletevxlanBridgeValidation(args); err != nil {
-				fmt.Println("not valid <Vnid>")
-				return
+				return exitcode.Invalidf("not valid <Vnid>")
 			}
 			Vnid := args[0]
 
@@ -68,16 +64,15 @@ func NewDeleteVxlanBridgeCmd(restOptions *api.RESTOptions) *cobra.Command {
 			subResources := []string{Vnid}
 			resp, err := client.Vxlan().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete vxlanBridge : %s", Vnid)
-				return
+				return exitcode.Unavailablef("Failed to delete vxlanBridge : %s (%v)", Vnid, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete vxlan", resp.StatusCode)
 		},
 	}
 

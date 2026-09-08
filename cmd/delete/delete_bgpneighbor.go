@@ -21,11 +21,11 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -48,21 +48,16 @@ func DeleteBGPNeighborValidation(args []string) error {
 func NewDeleteBGPNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 
 	var deleteBGPNeighborCmd = &cobra.Command{
-		Use:   "bgpneighbor <PeerIP> <RemoteAS>",
-		Short: "Delete a BGP Neighbor peer information",
-		Long:  `Delete a BGP Neighbor peer information in the LoxiLB.`,
-		PreRun: func(cmd *cobra.Command, args []string) {
-			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
-			}
-		},
+		Use:     "bgpneighbor <PeerIP> <RemoteAS>",
+		Short:   "Delete a BGP Neighbor peer information",
+		Long:    `Delete a BGP Neighbor peer information in the LoxiLB.`,
 		Aliases: []string{"bgpnei", "bgpneigh"},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return exitcode.Usagef("delete bgpneighbor needs its arguments")
+			}
 			if err := DeleteBGPNeighborValidation(args); err != nil {
-				fmt.Println("not valid <PeerIP> or <RemoteAs>")
-				fmt.Println(err)
-				return
+				return exitcode.Invalidf("not valid <PeerIP> or <RemoteAs>: %v", err)
 			}
 			PeerIP := args[0]
 			RemoteAS := args[1]
@@ -80,16 +75,15 @@ func NewDeleteBGPNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 			qmap["remoteAs"] = fmt.Sprintf("%v", RemoteAS)
 			resp, err := client.BGPNeighbor().SubResources(subResources).Query(qmap).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete BGPNeighbor : %s", PeerIP)
-				return
+				return exitcode.Unavailablef("Failed to delete BGPNeighbor : %s (%v)", PeerIP, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete bgpneighbor", resp.StatusCode)
 		},
 	}
 

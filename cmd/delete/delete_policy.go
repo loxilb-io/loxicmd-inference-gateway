@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -47,16 +47,12 @@ func NewDeletePolicyCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Delete a Policy",
 		Long:    `Delete a Policy using IDENT in the LoxiLB.`,
 		Aliases: []string{"pol", "policys", "pols", "polices"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete policy needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeletePolicyValidation(args); err != nil {
-				fmt.Println("not valid <IDENT>")
-				return
+				return exitcode.Invalidf("not valid <IDENT>")
 			}
 			Ident = args[0]
 			client := api.NewLoxiClient(restOptions)
@@ -71,16 +67,15 @@ func NewDeletePolicyCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Policy().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Policy(IDENT: %s)", Ident)
-				return
+				return exitcode.Unavailablef("Failed to delete Policy(IDENT: %s) (%v)", Ident, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete policy", resp.StatusCode)
 		},
 	}
 	return deletePolicyCmd

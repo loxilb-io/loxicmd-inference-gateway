@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -46,16 +46,12 @@ func NewDeleteSessionCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "session <UserID>",
 		Short: "Delete a Session",
 		Long:  `Delete a Session using USERID in the LoxiLB.`,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete session needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteSessionValidation(args); err != nil {
-				fmt.Println("not valid <UserID>")
-				return
+				return exitcode.Invalidf("not valid <UserID>")
 			}
 			UserID = args[0]
 			client := api.NewLoxiClient(restOptions)
@@ -70,16 +66,15 @@ func NewDeleteSessionCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Session().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Session(UserID: %s)", UserID)
-				return
+				return exitcode.Unavailablef("Failed to delete Session(UserID: %s) (%v)", UserID, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete session", resp.StatusCode)
 		},
 	}
 

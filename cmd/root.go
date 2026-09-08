@@ -27,6 +27,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/envelope"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -140,8 +141,27 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	rootCmd.AddCommand(CompletionCmd)
 	rootCmd.AddCommand(VersionCmd)
 
+	// The single exit point (contracts/exit-codes.md): every failure is
+	// classified into the frozen taxonomy and printed exactly once, to
+	// stderr. Cobra's own printing is silenced so the classification here
+	// is the only reporter — no command calls os.Exit for a failure, and
+	// the legacy 1 is never emitted by this binary.
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
 	err := rootCmd.Execute()
 	if err != nil {
-		os.Exit(1)
+		ce := exitcode.Classify(err)
+		if ce.ShowHelp {
+			// Help shown because the invocation was invalid goes to
+			// stderr; only an explicit --help earns stdout and exit 0.
+			cmd, _, findErr := rootCmd.Find(os.Args[1:])
+			if findErr != nil || cmd == nil {
+				cmd = rootCmd
+			}
+			cmd.SetOut(os.Stderr)
+			_ = cmd.Help()
+		}
+		fmt.Fprintf(os.Stderr, "Error: %s\n", ce.Message)
+		os.Exit(int(ce.Code))
 	}
 }

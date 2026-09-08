@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -45,16 +45,12 @@ func NewDeleteVlanBridgeCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "vlan <Vid>",
 		Short: "Delete a VlanBridge",
 		Long:  `Delete a VlanBridge using Vid in the LoxiLB.`,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete vlan needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteVlanBridgeValidation(args); err != nil {
-				fmt.Println("not valid <Vid>")
-				return
+				return exitcode.Invalidf("not valid <Vid>")
 			}
 			Vid := args[0]
 
@@ -68,16 +64,15 @@ func NewDeleteVlanBridgeCmd(restOptions *api.RESTOptions) *cobra.Command {
 			subResources := []string{Vid}
 			resp, err := client.Vlan().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete VlanBridge : %s", Vid)
-				return
+				return exitcode.Unavailablef("Failed to delete VlanBridge : %s (%v)", Vid, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete vlan", resp.StatusCode)
 		},
 	}
 
