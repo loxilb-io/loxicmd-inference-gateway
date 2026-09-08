@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -42,10 +43,9 @@ service configured with --api-key-auth=required.
 
 ex)
 	loxicmd get ratelimit tenant-a`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				fmt.Printf("Error: get ratelimit needs <TENANT-ID> arg\n")
-				return
+				return exitcode.Usagef("get ratelimit needs <TENANT-ID> arg")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -56,25 +56,29 @@ ex)
 			}
 			resp, err := client.AITenantRatelimit().SubResources([]string{args[0]}).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get ratelimit: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("get ratelimit", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 
 			entry := api.AITenantRateLimitEntry{}
 			if err := json.Unmarshal(body, &entry); err != nil {
-				fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
-				return
+				return &exitcode.CLIError{
+					Code:       exitcode.ContractMismatch,
+					Message:    fmt.Sprintf("Failed to unmarshal HTTP response: (%s)", err.Error()),
+					Origin:     "gateway",
+					HTTPStatus: resp.StatusCode,
+				}
 			}
 			if restOptions.PrintOption == "json" {
 				indent, _ := json.MarshalIndent(entry, "", "    ")
 				fmt.Println(string(indent))
-				return
+				return nil
 			}
 			table := TableInit()
 			wide := restOptions.PrintOption == "wide"
@@ -84,6 +88,7 @@ ex)
 				table.SetHeader(RATELIMIT_TITLE)
 			}
 			TableShow([][]string{rateLimitRow(entry, wide)}, table)
+			return nil
 		},
 	}
 	return getRateLimitCmd

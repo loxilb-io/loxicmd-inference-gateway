@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ The raw key is never shown here; it is only returned once at creation.
 ex)
 	loxicmd get apikey --tenant-id=tenant-a
 	loxicmd get apikey lxb_abc123`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -65,16 +66,17 @@ ex)
 				resp, err = client.AIApiKey().Query(q).Get(ctx)
 			}
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get apikey: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("get apikey", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			PrintGetAPIKeyResult(body, *restOptions, single)
+			return nil
 		},
 	}
 	getAPIKeyCmd.Flags().StringVar(&tenantID, "tenant-id", "", "Filter keys by tenant ID")

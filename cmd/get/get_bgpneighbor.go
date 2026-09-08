@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -33,7 +34,7 @@ func NewGetBGPNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Get a BGP neighbor",
 		Long:    `It shows BGP neighbor Information in the LoxiLB`,
 		Aliases: []string{"bgpnei", "bgpneigh"},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -43,14 +44,13 @@ func NewGetBGPNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.BGPNeighbor().SetUrl("/config/bgp/neigh/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get bgpneighbor: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetBGPNeighborResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get bgpneighbor", resp.StatusCode)
 		},
 	}
 

@@ -16,9 +16,8 @@
 package set
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -53,7 +52,7 @@ ex)
 	loxicmd set llamafirewall --configure --server-url localhost:50052 --block-threshold 0.9
 	loxicmd set llamafirewall --scanners --prompt-guard --code-shield
 	loxicmd set llamafirewall --health`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			n := 0
 			for _, b := range []bool{enable, disable, configure, scanners, health} {
 				if b {
@@ -61,8 +60,7 @@ ex)
 				}
 			}
 			if n != 1 {
-				fmt.Printf("Error: specify exactly one of --enable, --disable, --configure, --scanners, or --health\n")
-				return
+				return exitcode.Usagef("specify exactly one of --enable, --disable, --configure, --scanners, or --health")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
@@ -73,10 +71,9 @@ ex)
 				req := api.LlamaFirewallEnableRequest{Enabled: enable}
 				resp, err := client.LlamaFirewall().SubResources([]string{"enable"}).Create(ctx, req)
 				if enable {
-					reportPost(resp, err, "LlamaFirewall scanning enabled.")
-				} else {
-					reportPost(resp, err, "LlamaFirewall scanning disabled.")
+					return reportPost(resp, err, "LlamaFirewall scanning enabled.")
 				}
+				return reportPost(resp, err, "LlamaFirewall scanning disabled.")
 			case configure:
 				cfg := api.LlamaFirewallConfigEntry{}
 				if cmd.Flags().Changed("server-url") {
@@ -107,7 +104,7 @@ ex)
 					cfg.SkipPatterns = skipPatterns
 				}
 				resp, err := client.LlamaFirewall().SubResources([]string{"configure"}).Create(ctx, cfg)
-				reportPost(resp, err, "LlamaFirewall configuration updated.")
+				return reportPost(resp, err, "LlamaFirewall configuration updated.")
 			case scanners:
 				sc := api.LlamaFirewallScannersEntry{}
 				if cmd.Flags().Changed("prompt-guard") {
@@ -129,11 +126,12 @@ ex)
 					sc.PIIDetection = &piiDetection
 				}
 				resp, err := client.LlamaFirewall().SubResources([]string{"scanners"}).Create(ctx, sc)
-				reportPost(resp, err, "LlamaFirewall scanners updated.")
+				return reportPost(resp, err, "LlamaFirewall scanners updated.")
 			case health:
 				resp, err := client.LlamaFirewall().SubResources([]string{"health"}).Create(ctx, nil)
-				reportPost(resp, err, "LlamaFirewall health check completed.")
+				return reportPost(resp, err, "LlamaFirewall health check completed.")
 			}
+			return nil
 		},
 	}
 	f := setCmd.Flags()

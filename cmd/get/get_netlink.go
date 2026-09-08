@@ -519,8 +519,7 @@ func Nlpdump(dpath string) (string, error) {
 	file := strings.Join(fileP, t.Local().Format("2006-01-02_15:04:05"))
 	f, err = os.Create(file)
 	if err != nil {
-		fmt.Printf("Can't create dump file\n")
-		os.Exit(1)
+		return "", fmt.Errorf("can't create dump file: %w", err)
 	}
 
 	defer os.Remove(f.Name())

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -34,7 +35,7 @@ func NewGetSNICmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "List SNI certificate mappings",
 		Aliases: []string{"snicert", "snicerts"},
 		Long:    `List hostname -> certificate-directory mappings in the SNI store.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -44,24 +45,28 @@ func NewGetSNICmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.SNICertificate().Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get sni: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("get sni", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			list := api.SNICertificateListResponse{}
 			if err := json.Unmarshal(body, &list); err != nil {
-				fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
-				return
+				return &exitcode.CLIError{
+					Code:       exitcode.ContractMismatch,
+					Message:    fmt.Sprintf("Failed to unmarshal HTTP response: (%s)", err.Error()),
+					Origin:     "gateway",
+					HTTPStatus: resp.StatusCode,
+				}
 			}
 			if restOptions.PrintOption == "json" {
 				indent, _ := json.MarshalIndent(list, "", "    ")
 				fmt.Println(string(indent))
-				return
+				return nil
 			}
 			table := TableInit()
 			table.SetHeader(SNI_TITLE)
@@ -70,6 +75,7 @@ func NewGetSNICmd(restOptions *api.RESTOptions) *cobra.Command {
 				data = append(data, []string{c.Hostname, c.CertPath, fmt.Sprintf("%d", c.RefCount)})
 			}
 			TableShow(data, table)
+			return nil
 		},
 	}
 	return getSNICmd

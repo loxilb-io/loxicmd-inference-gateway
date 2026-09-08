@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"strings"
@@ -33,7 +34,7 @@ func NewGetVxlanCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "vxlan",
 		Short: "Get a vxlan",
 		Long:  `It shows vxlan Information in the loxiLB`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -43,14 +44,13 @@ func NewGetVxlanCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Vxlan().SetUrl("/config/tunnel/vxlan/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get vxlan: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetvxlanResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get vxlan", resp.StatusCode)
 		},
 	}
 

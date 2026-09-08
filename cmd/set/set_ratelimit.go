@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -51,23 +52,19 @@ removes that model-specific quota.
 
 ex)
 	loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.TenantID == "" {
-				fmt.Printf("Error: --tenant-id is required\n")
-				return
+				return exitcode.Usagef("--tenant-id is required")
 			}
 			if strings.Contains(o.TenantID, "|") {
-				fmt.Printf("Error: --tenant-id must not contain '|'\n")
-				return
+				return exitcode.Invalidf("--tenant-id must not contain '|'")
 			}
 			if o.Rps < 0 || o.TokensPerMin < 0 || o.BurstPct < 0 {
-				fmt.Printf("Error: --rps, --tokens-per-min, and --burst-pct must be non-negative\n")
-				return
+				return exitcode.Invalidf("--rps, --tokens-per-min, and --burst-pct must be non-negative")
 			}
 			modelLimits, err := parseTenantModelLimits(o.ModelLimits)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			req := api.AITenantRateLimitMod{
 				TenantID: o.TenantID, Rps: o.Rps, TokensPerMin: o.TokensPerMin,
@@ -83,16 +80,17 @@ ex)
 			}
 			resp, err := client.AITenantRatelimit().Create(ctx, req)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("set ratelimit: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("set ratelimit", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("Rate limit for tenant '%s' set.\n", o.TenantID)
+			return nil
 		},
 	}
 	setRateLimitCmd.Flags().StringVar(&o.TenantID, "tenant-id", "", "Tenant ID (required)")

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -32,7 +33,7 @@ func NewGetPortCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "port",
 		Short: "Get a Port dump",
 		Long:  `It shows port dump Information`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = cmd
 			_ = args
 			client := api.NewLoxiClient(restOptions)
@@ -44,14 +45,13 @@ func NewGetPortCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Port().Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get port: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetPortResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get port", resp.StatusCode)
 		},
 	}
 

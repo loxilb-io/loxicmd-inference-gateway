@@ -18,8 +18,8 @@ package set
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net/http"
 	"time"
 
@@ -37,23 +37,22 @@ func NewSetLogLevelCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "log-level configuration",
 		Long:    `log-level congfigration`,
 		Aliases: []string{"loglevel"},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			var parmaMod api.ParamDump
 			// Make paramMod
 			if err := ReadSetLogLevelOptions(&parmaMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := ParamAPICall(restOptions, parmaMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("set log-level: %v", err)
 			}
+			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				PrintSetResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("set log-level", resp.StatusCode)
 		},
 	}
 	return LogLevelCmd

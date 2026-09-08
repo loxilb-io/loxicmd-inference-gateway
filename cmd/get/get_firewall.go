@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"os"
@@ -37,7 +38,7 @@ func NewGetFirewallCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Get a firewall",
 		Aliases: []string{"Firewall", "fw", "firewalls"},
 		Long:    `It shows Load balancer Information`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = cmd
 			_ = args
 			client := api.NewLoxiClient(restOptions)
@@ -49,14 +50,13 @@ func NewGetFirewallCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Firewall().SetUrl("/config/firewall/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get firewall: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetFWResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get firewall", resp.StatusCode)
 		},
 	}
 
@@ -149,8 +149,7 @@ func FWdump(restOptions *api.RESTOptions, path string) (string, error) {
 	file := strings.Join(fileP, t.Local().Format("2006-01-02_15:04:05"))
 	f, err := os.Create(file)
 	if err != nil {
-		fmt.Printf("Can't create dump file\n")
-		os.Exit(1)
+		return "", fmt.Errorf("can't create dump file: %w", err)
 	}
 	defer os.Remove(f.Name())
 

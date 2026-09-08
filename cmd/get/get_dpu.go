@@ -16,10 +16,10 @@
 package get
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -47,7 +47,7 @@ ex)
 	loxicmd get dpu --flows
 	loxicmd get dpu --pipe ct_fwd_5tuple --limit 100
 	loxicmd get dpu --hwcounters`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
 			defer cancel()
@@ -55,11 +55,9 @@ ex)
 			if hwcounters {
 				resp, err := client.DPU().SubResources([]string{"hwcounters"}).Get(ctx)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("get dpu: %v", err)
 				}
-				printJSONResponse(resp, "dpu hwcounters")
-				return
+				return printJSONResponse(resp, "dpu hwcounters")
 			}
 
 			query := map[string]string{}
@@ -85,10 +83,9 @@ ex)
 			}
 			resp, err := dpu.Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get dpu: %v", err)
 			}
-			printJSONResponse(resp, "dpu debug")
+			return printJSONResponse(resp, "dpu debug")
 		},
 	}
 	getDPUCmd.Flags().BoolVar(&hwcounters, "hwcounters", false, "Show per-flow hardware counters")

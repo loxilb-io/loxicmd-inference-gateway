@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -33,7 +34,7 @@ func NewGetVersionCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Get a loxilb version ",
 		Long:    `It shows version in the LoxiLB`,
 		Aliases: []string{"LBversion", "LBVersion", "llbversion"},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -43,14 +44,13 @@ func NewGetVersionCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.LBVersion().Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get lbversion: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetVersionResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get lbversion", resp.StatusCode)
 		},
 	}
 

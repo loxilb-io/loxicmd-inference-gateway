@@ -67,6 +67,26 @@ func TestExitTaxonomy(t *testing.T) {
 		{"create-missing-required-flag-is-usage", []string{"create", "sni"}, http.StatusOK, successBody, 2, "Error:"},
 		{"create-cobra-required-flag-is-usage", []string{"create", "firewall"}, http.StatusOK, successBody, 2, "required flag"},
 		{"create-unreadable-file-is-precondition", []string{"create", "cert", "--cert-file=/nonexistent/no.crt", "--key-file=/nonexistent/no.key"}, http.StatusOK, successBody, 4, "reading --cert-file"},
+
+		// The get, set, and apply families ride the same table after
+		// their conversion. The get family's non-200 fallthrough used to
+		// exit zero silently; these rows pin that it cannot again.
+		{"get-bare-parent-is-usage", []string{"get"}, http.StatusOK, `{}`, 2, "Error:"},
+		{"get-unknown-subcommand-is-usage", []string{"get", "vlans"}, http.StatusOK, `{}`, 2, "unknown command"},
+		{"get-missing-args-is-usage", []string{"get", "cert"}, http.StatusOK, `{}`, 2, "Error:"},
+		{"get-unauthorized-is-auth", []string{"get", "vlan"}, http.StatusUnauthorized, `{}`, 3, "401"},
+		{"get-absent-target-is-precondition", []string{"get", "vlan"}, http.StatusNotFound, `{}`, 4, "404"},
+		{"get-refusing-service-is-unavailable", []string{"get", "vlan"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
+		{"get-server-error-is-failed", []string{"get", "vlan"}, http.StatusInternalServerError, `{}`, 7, "500"},
+		{"get-unreachable-is-unavailable", []string{"get", "vlan"}, 0, "", 5, "Error:"},
+		{"get-v2-error-is-classified", []string{"get", "opa"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
+		{"set-bare-parent-is-usage", []string{"set"}, http.StatusOK, successBody, 2, "Error:"},
+		{"set-missing-mode-flag-is-usage", []string{"set", "gpu"}, http.StatusOK, successBody, 2, "Error:"},
+		{"set-unauthorized-is-auth", []string{"set", "metrics", "--enable"}, http.StatusUnauthorized, `{}`, 3, "401"},
+		{"set-v2-error-is-classified", []string{"set", "gpu", "--enable"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
+		{"set-server-error-is-failed", []string{"set", "log-level", "debug"}, http.StatusInternalServerError, `{}`, 7, "500"},
+		{"set-unreachable-is-unavailable", []string{"set", "log-level", "debug"}, 0, "", 5, "Error:"},
+		{"apply-no-options-is-usage", []string{"apply"}, http.StatusOK, successBody, 2, "Error:"},
 	}
 
 	for _, tc := range cases {

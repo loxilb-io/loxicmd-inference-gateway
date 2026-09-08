@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 )
 
 // v2Context builds a request context honoring the shared --timeout flag.
@@ -39,23 +40,26 @@ func v2Context(restOptions *api.RESTOptions) (context.Context, context.CancelFun
 // The v2 telemetry endpoints (gpu/pii/llamafirewall/trace/l4trace/opa/dpu)
 // return richly nested documents, so the CLI renders the raw JSON rather than
 // modeling every field. A non-2xx status is decoded through APIError, which
-// understands both the main Error and the extras SimpleError envelopes.
-func printJSONResponse(resp *http.Response, what string) {
+// understands both the main Error and the extras SimpleError envelopes, and
+// classified for the caller's taxonomy exit.
+func printJSONResponse(resp *http.Response, what string) error {
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-		return
+		ce := exitcode.FromHTTPStatus(what, resp.StatusCode)
+		ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+		return ce
 	}
 	if len(bytes.TrimSpace(body)) == 0 {
 		fmt.Printf("%s: (empty response)\n", what)
-		return
+		return nil
 	}
 	var out bytes.Buffer
 	if err := json.Indent(&out, body, "", "    "); err != nil {
 		// Not JSON — print as-is.
 		fmt.Println(string(body))
-		return
+		return nil
 	}
 	fmt.Println(out.String())
+	return nil
 }

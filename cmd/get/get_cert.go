@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -38,10 +39,9 @@ There is no list endpoint; a certificate ID is required.
 
 ex)
 	loxicmd get cert web`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				fmt.Printf("Error: get cert needs <CERT-ID> arg\n")
-				return
+				return exitcode.Usagef("get cert needs <CERT-ID> arg")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -52,28 +52,33 @@ ex)
 			}
 			resp, err := client.Cert().SubResources([]string{args[0]}).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get cert: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("get cert", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			cert := api.CertModel{}
 			if err := json.Unmarshal(body, &cert); err != nil {
-				fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
-				return
+				return &exitcode.CLIError{
+					Code:       exitcode.ContractMismatch,
+					Message:    fmt.Sprintf("Failed to unmarshal HTTP response: (%s)", err.Error()),
+					Origin:     "gateway",
+					HTTPStatus: resp.StatusCode,
+				}
 			}
 			if restOptions.PrintOption == "json" {
 				indent, _ := json.MarshalIndent(cert, "", "    ")
 				fmt.Println(string(indent))
-				return
+				return nil
 			}
 			table := TableInit()
 			table.SetHeader(CERT_TITLE)
 			TableShow([][]string{{cert.CertID, strings.Join(cert.Hostnames, ",")}}, table)
+			return nil
 		},
 	}
 	return getCertCmd

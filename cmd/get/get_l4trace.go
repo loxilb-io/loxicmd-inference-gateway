@@ -16,9 +16,8 @@
 package get
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -32,17 +31,16 @@ statistics (/config/l4trace/status).
 
 ex)
 	loxicmd get l4trace`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
 			defer cancel()
 
 			resp, err := client.L4Trace().SubResources([]string{"status"}).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get l4trace: %v", err)
 			}
-			printJSONResponse(resp, "l4trace status")
+			return printJSONResponse(resp, "l4trace status")
 		},
 	}
 	return getL4TraceCmd

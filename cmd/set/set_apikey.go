@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -40,14 +41,12 @@ Only the flags you set are changed.
 ex)
 	loxicmd set apikey lxb_abc123 --allowed-models=mistral-7b
 	loxicmd set apikey lxb_abc123 --enabled=false`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				fmt.Printf("Error: set apikey needs <KEY-ID> arg\n")
-				return
+				return exitcode.Usagef("set apikey needs <KEY-ID> arg")
 			}
 			if !cmd.Flags().Changed("allowed-models") && !cmd.Flags().Changed("enabled") {
-				fmt.Printf("Error: set at least one of --allowed-models or --enabled\n")
-				return
+				return exitcode.Usagef("set at least one of --allowed-models or --enabled")
 			}
 			req := api.AIApiKeyPatchRequest{}
 			if cmd.Flags().Changed("allowed-models") {
@@ -67,16 +66,17 @@ ex)
 			}
 			resp, err := client.AIApiKey().SubResources([]string{args[0]}).Update(ctx, req)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("set apikey: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("set apikey", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("API key '%s' updated.\n", args[0])
+			return nil
 		},
 	}
 	setAPIKeyCmd.Flags().StringSliceVar(&allowedModels, "allowed-models", allowedModels, "Replacement allowed model list")

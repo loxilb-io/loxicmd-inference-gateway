@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -42,7 +43,7 @@ ex)
 	loxicmd set l4trace --sampling-rate 10
 	loxicmd set l4trace --disable
 	loxicmd set l4trace --reset-stats`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			rateChanged := cmd.Flags().Changed("sampling-rate")
 			n := 0
 			for _, b := range []bool{enable, disable, resetStats} {
@@ -55,8 +56,7 @@ ex)
 				n = 1
 			}
 			if n != 1 {
-				fmt.Printf("Error: specify exactly one of --enable, --disable, --sampling-rate, or --reset-stats\n")
-				return
+				return exitcode.Usagef("specify exactly one of --enable, --disable, --sampling-rate, or --reset-stats")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
@@ -69,17 +69,17 @@ ex)
 					req.SamplingRate = &samplingRate
 				}
 				resp, err := client.L4Trace().SubResources([]string{"enable"}).Create(ctx, req)
-				reportPost(resp, err, "L4 connection tracing enabled.")
+				return reportPost(resp, err, "L4 connection tracing enabled.")
 			case disable:
 				resp, err := client.L4Trace().SubResources([]string{"disable"}).Create(ctx, nil)
-				reportPost(resp, err, "L4 connection tracing disabled.")
+				return reportPost(resp, err, "L4 connection tracing disabled.")
 			case resetStats:
 				resp, err := client.L4Trace().SubResources([]string{"stats", "reset"}).Create(ctx, nil)
-				reportPost(resp, err, "L4 tracing statistics reset.")
+				return reportPost(resp, err, "L4 tracing statistics reset.")
 			default: // sampling-rate only → PUT /config/l4trace/sampling
 				req := api.L4TraceSamplingRequest{SamplingRate: samplingRate}
 				resp, err := client.L4Trace().SubResources([]string{"sampling"}).Put(ctx, req)
-				reportPost(resp, err, fmt.Sprintf("L4 sampling rate updated to %d%%.", samplingRate))
+				return reportPost(resp, err, fmt.Sprintf("L4 sampling rate updated to %d%%.", samplingRate))
 			}
 		},
 	}

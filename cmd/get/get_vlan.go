@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -32,7 +33,7 @@ func NewGetVlanCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "vlan",
 		Short: "Get a Vlan",
 		Long:  `It shows Vlan Information in the loxiLB`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -42,14 +43,13 @@ func NewGetVlanCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Vlan().SetUrl("/config/vlan/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get vlan: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetVlanResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get vlan", resp.StatusCode)
 		},
 	}
 

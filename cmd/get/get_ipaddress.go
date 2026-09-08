@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"strings"
@@ -35,7 +36,7 @@ func NewGetIPAddressCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long:    `It shows IP Address Information in the LoxiLB`,
 		Aliases: []string{"ipv4address", "ipv4"},
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -45,14 +46,13 @@ func NewGetIPAddressCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.IPv4Address().SetUrl("/config/ipv4address/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get ip: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetIPAddressResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get ip", resp.StatusCode)
 		},
 	}
 

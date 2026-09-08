@@ -16,10 +16,10 @@
 package get
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -35,17 +35,11 @@ func GetCmd(restOptions *api.RESTOptions) *cobra.Command {
 	Get Port(interface) dump used by loxilb or its docker
 	Get Connection track (TCP/UDP/ICMP/SCTP) information	
 `,
-		Run: func(cmd *cobra.Command, args []string) {
-			_ = cmd
-			_ = args
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
+				return exitcode.Usagef("get needs a subcommand")
 			}
-		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			fmt.Printf("Error: unknown command \"%v\"for \"loxicmd\" \nRun \"loxicmd --help\" for usage.\n", args)
-			cmd.Help()
-			return err
+			return exitcode.Usagef("unknown command %q for \"loxicmd get\"", args[0])
 		},
 	}
 

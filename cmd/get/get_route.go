@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -32,7 +33,7 @@ func NewGetRouteCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "route",
 		Short: "Get a route",
 		Long:  `It shows route Information in the loxiroute`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -42,14 +43,13 @@ func NewGetRouteCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Route().SetUrl("/config/route/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get route: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetRouteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get route", resp.StatusCode)
 		},
 	}
 
