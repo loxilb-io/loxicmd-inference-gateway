@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -53,13 +53,10 @@ preference(int) - User preference for ordering
 ex) loxicmd delete firewall --firewallRule="sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200"
 		`,
 		Aliases: []string{"Firewall", "fw", "firewalls"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(o.FirewallRule) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete firewall needs --firewallRule")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -70,21 +67,19 @@ ex) loxicmd delete firewall --firewallRule="sourceIP:1.2.3.2/32,destinationIP:2.
 
 			query, err := MakefirewallDeleteQuery(o.FirewallRule)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Firewall")
-				return
+				return exitcode.Invalidf("not a valid --firewallRule: %v", err)
 			}
 			resp, err := client.Firewall().Query(query).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Firewall")
-				return
+				return exitcode.Unavailablef("Failed to delete Firewall (%v)", err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete firewall", resp.StatusCode)
 		},
 	}
 

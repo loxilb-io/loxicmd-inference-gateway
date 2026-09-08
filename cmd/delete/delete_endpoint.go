@@ -19,9 +19,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -46,13 +46,10 @@ func NewDeleteEndPointCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd delete endpoint 31.31.31.31 --name=31.31.31.31_http_8080 --probetype=http --probeport=8080"
 		`,
 		Aliases: []string{"EndPoint", "ep", "endpoints"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete endpoint needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -64,28 +61,24 @@ ex) loxicmd delete endpoint 31.31.31.31 --name=31.31.31.31_http_8080 --probetype
 			if val := net.ParseIP(args[0]); val != nil {
 				o.Host = args[0]
 			} else {
-				fmt.Printf("HOSTIP '%s' is invalid format\n", args[0])
-				return
+				return exitcode.Invalidf("HOSTIP '%s' is invalid format", args[0])
 			}
 
 			if o.ProbeType != "http" && o.ProbeType != "https" && o.ProbeType != "ping" &&
 				o.ProbeType != "tcp" && o.ProbeType != "udp" &&
 				o.ProbeType != "sctp" && o.ProbeType != "none" {
-				fmt.Printf("probetype '%s' is invalid\n", o.ProbeType)
-				return
+				return exitcode.Invalidf("probetype '%s' is invalid", o.ProbeType)
 			}
 
 			if o.ProbeType == "http" || o.ProbeType == "https" || o.ProbeType == "tcp" ||
 				o.ProbeType == "udp" || o.ProbeType == "sctp" {
 				if o.ProbePort == 0 {
-					fmt.Printf("probeport cant be 0 for '%s' probes\n", o.ProbeType)
-					return
+					return exitcode.Invalidf("probeport cant be 0 for '%s' probes", o.ProbeType)
 				}
 			}
 
 			if o.ProbeType == "ping" && o.ProbePort != 0 {
-				fmt.Printf("probeport should be 0 for '%s' probes\n", o.ProbeType)
-				return
+				return exitcode.Invalidf("probeport should be 0 for '%s' probes", o.ProbeType)
 			}
 
 			/*		subResources := []string{
@@ -108,15 +101,15 @@ ex) loxicmd delete endpoint 31.31.31.31 --name=31.31.31.31_http_8080 --probetype
 			resp, err := client.EndPoint().SubResources(subResources).Query(qmap).Delete(ctx)
 
 			if err != nil {
-				fmt.Printf("Error: Failed to delete EndPoint\n")
-				return
+				return exitcode.Unavailablef("Failed to delete EndPoint (%v)", err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
+			return exitcode.FromHTTPStatus("delete endpoint", resp.StatusCode)
 		},
 	}
 	deleteEndPointCmd.Flags().StringVar(&o.Name, "name", "", "Endpoint Identifier")

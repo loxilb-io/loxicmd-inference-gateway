@@ -19,9 +19,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,13 +38,10 @@ func NewDeleteBFDCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd delete bfd 32.32.32.2 --instance=default"
 		`,
 		Aliases: []string{"bfd-session"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete bfd needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -56,8 +53,7 @@ ex) loxicmd delete bfd 32.32.32.2 --instance=default"
 			if val := net.ParseIP(args[0]); val != nil {
 				o.RemoteIP = args[0]
 			} else {
-				fmt.Printf("remoteIP '%s' is invalid format\n", args[0])
-				return
+				return exitcode.Invalidf("remoteIP '%s' is invalid format", args[0])
 			}
 			subResources := []string{
 				"remoteIP", o.RemoteIP,
@@ -68,16 +64,16 @@ ex) loxicmd delete bfd 32.32.32.2 --instance=default"
 
 			resp, err := client.BFDSession().SubResources(subResources).Query(qmap).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete bfd session")
-				return
+				return exitcode.Unavailablef("Failed to delete bfd session (%v)", err)
 			}
 			defer resp.Body.Close()
 
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
+			return exitcode.FromHTTPStatus("delete bfd", resp.StatusCode)
 		},
 	}
 	deleteBFDCmd.Flags().StringVarP(&o.Instance, "instance", "", "default", "Specify the cluster instance name")

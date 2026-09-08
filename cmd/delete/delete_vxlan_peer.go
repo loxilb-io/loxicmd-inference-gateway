@@ -19,11 +19,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -48,16 +48,12 @@ ex) loxicmd delete vxlan-peer 100 30.1.3.1
 		
 		`,
 		Aliases: []string{"vxlanPeer", "vxlan-peer", "vxlan_peer"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete vxlanpeer needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteVxlanPeerValidation(args); err != nil {
-				fmt.Println("not valid <Vnid>")
-				return
+				return exitcode.Invalidf("not valid <Vnid>")
 			}
 			Vnid := args[0]
 			PeerIP := args[1]
@@ -73,16 +69,15 @@ ex) loxicmd delete vxlan-peer 100 30.1.3.1
 			}
 			resp, err := client.Vxlan().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete vxlanPeer : %s", Vnid)
-				return
+				return exitcode.Unavailablef("Failed to delete vxlanPeer : %s (%v)", Vnid, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete vxlanpeer", resp.StatusCode)
 		},
 	}
 

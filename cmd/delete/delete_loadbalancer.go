@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -76,13 +77,7 @@ most reliably, by --name). Example:
 
 Tip: creating AI rules with --name lets them be removed with
 'loxicmd delete lb --name=<name>' without repeating the key attributes.`,
-		PreRun: func(cmd *cobra.Command, args []string) {
-			//if len(args) == 0 {
-			//	cmd.Help()
-			//	os.Exit(0)
-			//}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -98,22 +93,21 @@ Tip: creating AI rules with --name lets them be removed with
 				}
 				resp, err := client.LoadBalancer().SubResources(subResources).Delete(ctx)
 				if err != nil {
-					fmt.Printf("Error: Failed to delete LoadBalancer(Name: %s)\n", Name)
-					return
+					return exitcode.Unavailablef("Failed to delete LoadBalancer(Name: %s) (%v)", Name, err)
 				}
 				defer resp.Body.Close()
 				if resp.StatusCode == http.StatusOK {
 					PrintDeleteResult(resp, *restOptions)
-					return
+					return nil
 				}
 				body, _ := io.ReadAll(resp.Body)
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("delete lb", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 
 			if err := validation(args); err != nil {
-				fmt.Println("not valid EXTERNAL-IP")
-				return
+				return exitcode.Invalidf("not valid EXTERNAL-IP")
 			}
 			externalIP = args[0]
 			PortNumberList := make(map[string][]string)
@@ -121,20 +115,19 @@ Tip: creating AI rules with --name lets them be removed with
 			if len(tcpPortNumberList) > 0 {
 				PortNumberList["tcp"] = strings.Split(tcpPortNumberList, "-")
 				if len(PortNumberList["tcp"]) > 2 {
-					fmt.Printf("Error: Too many ports in list to delete LoadBalancer(ExternalIP: %s, tcp, Port:%s)\n", externalIP, tcpPortNumberList)
+					return exitcode.Invalidf("Too many ports in list to delete LoadBalancer(ExternalIP: %s, tcp, Port:%s)", externalIP, tcpPortNumberList)
 				}
 			}
 			if len(udpPortNumberList) > 0 {
 				PortNumberList["udp"] = strings.Split(udpPortNumberList, "-")
 				if len(PortNumberList["udp"]) > 2 {
-					fmt.Printf("Error: Too many ports in list to delete LoadBalancer(ExternalIP: %s, udp, Port:%s)\n", externalIP, udpPortNumberList)
+					return exitcode.Invalidf("Too many ports in list to delete LoadBalancer(ExternalIP: %s, udp, Port:%s)", externalIP, udpPortNumberList)
 				}
 			}
 			if len(sctpPortNumberList) > 0 {
 				PortNumberList["sctp"] = strings.Split(sctpPortNumberList, "-")
 				if len(PortNumberList["sctp"]) > 2 {
-					fmt.Printf("Error: Too many ports in list to delete LoadBalancer(ExternalIP: %s, sctp, Port:%s)\n", externalIP, sctpPortNumberList)
-					return
+					return exitcode.Invalidf("Too many ports in list to delete LoadBalancer(ExternalIP: %s, sctp, Port:%s)", externalIP, sctpPortNumberList)
 				}
 			}
 			if icmpPortNumberList {
@@ -151,13 +144,11 @@ Tip: creating AI rules with --name lets them be removed with
 				}
 				_, err := strconv.Atoi(sPortMin)
 				if err != nil {
-					fmt.Printf("Error: Invalid port in list to delete LoadBalancer(ExternalIP: %s,Port:%s)\n", externalIP, sPortMin)
-					return
+					return exitcode.Invalidf("Invalid port in list to delete LoadBalancer(ExternalIP: %s,Port:%s)", externalIP, sPortMin)
 				}
 				_, err = strconv.Atoi(sPortMax)
 				if err != nil {
-					fmt.Printf("Error: Invalid port in list to delete LoadBalancer(ExternalIP: %s,Port:%s)\n", externalIP, sPortMax)
-					return
+					return exitcode.Invalidf("Invalid port in list to delete LoadBalancer(ExternalIP: %s,Port:%s)", externalIP, sPortMax)
 				}
 				subResources := []string{
 					"hosturl", Host,
@@ -169,18 +160,18 @@ Tip: creating AI rules with --name lets them be removed with
 				qmap := loadBalancerDeleteQuery(BGP, Mark, PathPrefix, PathMatchMode, ModelName)
 				resp, err := client.LoadBalancer().SubResources(subResources).Query(qmap).Delete(ctx)
 				if err != nil {
-					fmt.Printf("Error: Failed to delete LoadBalancer(ExternalIP: %s, Protocol:%s, Port:%v)\n", externalIP, proto, portNum)
-					return
+					return exitcode.Unavailablef("Failed to delete LoadBalancer(ExternalIP: %s, Protocol:%s, Port:%v) (%v)", externalIP, proto, portNum, err)
 				}
 				defer resp.Body.Close()
-				if resp.StatusCode == http.StatusOK {
-					PrintDeleteResult(resp, *restOptions)
-					return
+				if resp.StatusCode != http.StatusOK {
+					body, _ := io.ReadAll(resp.Body)
+					ce := exitcode.FromHTTPStatus("delete lb", resp.StatusCode)
+					ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+					return ce
 				}
-				body, _ := io.ReadAll(resp.Body)
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				PrintDeleteResult(resp, *restOptions)
 			}
+			return nil
 		},
 	}
 

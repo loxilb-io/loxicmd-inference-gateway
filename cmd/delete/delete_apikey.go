@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -39,10 +40,9 @@ not-found. To disable a key reversibly while keeping it visible, use
 
 ex)
 	loxicmd delete apikey lxb_abc123`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
-				fmt.Printf("Error: delete apikey needs <KEY-ID> arg\n")
-				return
+				return exitcode.Usagef("delete apikey needs <KEY-ID> arg")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -53,16 +53,17 @@ ex)
 			}
 			resp, err := client.AIApiKey().SubResources([]string{args[0]}).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("delete apikey: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("delete apikey", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("API key '%s' deleted.\n", args[0])
+			return nil
 		},
 	}
 	return deleteAPIKeyCmd
