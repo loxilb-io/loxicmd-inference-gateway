@@ -21,10 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -262,21 +262,16 @@ ex)
 	loxicmd create lb 10.10.10.254 --sctp=2020:8080 --endpoints=33.33.33.1:1 --attachEP
 	loxicmd create lb 100.100.100.1 --tcp=8080:80 --endpoints=10.10.10.1:1 --ppv2en
 	`,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create lb needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var sctp bool
 			if err := ReadCreateLoadBalancerOptions(&o, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			if err := validateLBAIOptions(&o); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 
 			ProtoPortpair := make(map[string][]string)
@@ -296,36 +291,34 @@ ex)
 				ProtoPortpair["icmp"] = []string{"0:0"}
 			}
 			if !sctp && len(o.SecIPs) > 0 {
-				fmt.Printf("Secondary IPs allowed in SCTP only\n")
-				return
+				return exitcode.Invalidf("Secondary IPs allowed in SCTP only")
 			}
 
 			// Common part of the load balancer. Endpoints are parsed in order so
 			// per-endpoint AI attributes (ep-role, nixl-port) align by index.
 			endpointList, err := GetEndpointList(o.Endpoints)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			epRoles, err := parseEndpointRoles(o.EpRoles, len(endpointList))
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			nixlPorts, err := alignNixlPorts(o.NixlPorts, len(endpointList))
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
+			// Every requested protocol is sent: the loop used to return
+			// after the first successful answer, silently dropping the
+			// remaining protocols of a multi-proto invocation (map order
+			// decided which one won).
 			for proto, portPairList := range ProtoPortpair {
 				portTargetPorts, err := GetPortPairList(portPairList)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Invalidf("%s", err.Error())
 				}
 				if len(portTargetPorts) <= 0 || len(portTargetPorts) > 2 {
-					fmt.Printf("portPair: None specified\n")
-					return
+					return exitcode.Invalidf("portPair: None specified")
 				}
 
 				startSPort := uint16(0)
@@ -378,8 +371,7 @@ ex)
 				for i, e := range endpointList {
 					for _, targetPort := range targetPorts {
 						if o.Mode == "dsr" && targetPort != startSPort {
-							fmt.Printf("Error: No port-translation in dsr mode\n")
-							return
+							return exitcode.Invalidf("No port-translation in dsr mode")
 						}
 						ep := api.LoadBalancerEndpoint{
 							EndpointIP: e.IP,
@@ -408,23 +400,22 @@ ex)
 
 				resp, err := LoadbalancerAPICall(restOptions, lbModel)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("create lb: %v", err)
 				}
 
 				defer resp.Body.Close()
 
-				if resp.StatusCode == http.StatusOK {
-					PrintCreateResult(resp, *restOptions)
-					return
+				if resp.StatusCode != http.StatusOK {
+					// Surface the server's rejection body (e.g. an invalid
+					// --kv-hash-algo enum), classified by its status.
+					body, _ := io.ReadAll(resp.Body)
+					ce := exitcode.FromHTTPStatus("create lb", resp.StatusCode)
+					ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+					return ce
 				}
-				// Surface a non-2xx server rejection instead of silently
-				// no-op'ing (e.g. an invalid --kv-hash-algo enum). Without this the
-				// command exits 0 with no rule created and no diagnostic.
-				body, _ := io.ReadAll(resp.Body)
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				PrintCreateResult(resp, *restOptions)
 			}
+			return nil
 		},
 	}
 

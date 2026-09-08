@@ -21,10 +21,10 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -183,49 +183,44 @@ Policy type(pol-type) 0 : TrTCM,  1 : SrTCM
 
 	`,
 		Aliases: []string{"pol", "policys", "pols", "polices"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create policy needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := ReadCreatePolicyOptions(&o, args); err != nil {
-				fmt.Printf("Read parameter error %s\n", err.Error())
-				return
+				return exitcode.Invalidf("Read parameter error %s", err.Error())
 			}
 			// Make body
 			body := api.PolMod{}
 
 			body.Ident = o.Ident
 			if err := GetRatePair(&body, o.Rate); err != nil {
-				fmt.Printf("Rate Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("Rate Error: %s", err.Error())
 			}
 			if err := GetBlockPair(&body, o.Block); err != nil {
-				fmt.Printf("Block Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("Block Error: %s", err.Error())
 			}
 
 			if err := GetTargetPair(&body, o.Target); err != nil {
-				fmt.Printf("Target Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("Target Error: %s", err.Error())
 			}
 			body.Info.ColorAware = o.Color
 			body.Info.PolType = o.PolType
 			resp, err := PolicyAPICall(restOptions, body)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create policy: %v", err)
 			}
 			defer resp.Body.Close()
 
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
-			if resp.StatusCode != http.StatusOK {
+			// The status check used to be inverted: the result body was
+			// rendered only on a non-200 answer (before exiting 0), and a
+			// 200 printed nothing. Success now prints, failure classifies.
+			if resp.StatusCode == http.StatusOK {
 				PrintCreatePolResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create policy", resp.StatusCode)
 		},
 	}
 

@@ -18,10 +18,9 @@ package create
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -36,31 +35,26 @@ func NewCreateVlanBridgeCmd(restOptions *api.RESTOptions) *cobra.Command {
 
 ex) loxicmd create vlan 100
 `,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create vlan needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var vlanMod api.VlanBridgeMod
 			// Make vlanMod
 			if err := ReadCreateVlanBridgeOptions(&vlanMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := VlanBridgeAPICall(restOptions, vlanMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create vlan: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create vlan", resp.StatusCode)
 		},
 	}
 

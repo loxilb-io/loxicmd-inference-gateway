@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,36 +38,27 @@ func NewCreateBFDCmd(restOptions *api.RESTOptions) *cobra.Command {
 
 ex) loxicmd create bfd 32.32.32.2 --instance=default --sourceIP=32.32.32.1 --interval=200000 --retryCount=3`,
 		Aliases: []string{"bfd-session"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
-			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
-
-			// Make EndPointMod
-			if len(args) <= 0 {
-				fmt.Printf("create bfd needs remoteIP args\n")
-				return
+				return exitcode.Usagef("create bfd needs remoteIP args")
 			}
 
 			// Make bfdMod
 			if err := ReadCreateBfdOptions(&o, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := CreateBFDAPICall(restOptions, o)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create bfd: %v", err)
 			}
+			defer resp.Body.Close()
 
 			//fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
+			return exitcode.FromHTTPStatus("create bfd", resp.StatusCode)
 		},
 	}
 

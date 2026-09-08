@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -44,18 +44,14 @@ ex) loxicmd create vlanmember 100 eno7 --tagged=true
 	loxicmd create vlanmember 100 eno7 
 `,
 		Aliases: []string{"vlanMember", "vlan-member", "vlan_member"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create vlanmember needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var vlanMod api.VlanMemberMod
 			// Make vlanMod
 			if err := ReadCreateVlanMemberOptions(&vlanMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			// Args Setting
 			url := fmt.Sprintf("/config/vlan/%s/member", args[0])
@@ -64,16 +60,15 @@ ex) loxicmd create vlanmember 100 eno7 --tagged=true
 
 			resp, err := VlanMemberAPICall(restOptions, vlanMod, url)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create vlanmember: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create vlanmember", resp.StatusCode)
 		},
 	}
 	createvlanCmd.Flags().BoolVarP(&o.Tagged, "tagged", "", false, "Tagged mode Vlan")

@@ -18,10 +18,9 @@ package create
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -37,37 +36,31 @@ func NewCreateVxlanBridgeCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create vxlan 100 eno7
 
 `,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create vxlan needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var vxlanMod api.VxlanBridgeMod
 			// Make vxlanMod
 			if err := ReadCreateVxlanBridgeOptions(&vxlanMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			VxLanID, err := strconv.Atoi(args[0])
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			vxlanMod.VxLanID = VxLanID
 			resp, err := VxlanBridgeAPICall(restOptions, vxlanMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create vxlan: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create vxlan", resp.StatusCode)
 		},
 	}
 

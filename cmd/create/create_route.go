@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -42,31 +42,26 @@ func NewCreateRouteCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create route 192.168.212.0/24 172.17.0.254 --proto=static
     loxicmd create route 192.168.212.0/24 172.17.0.254
 `,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create route needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var RouteMod api.Routev4Get
 			// Make RouteMod
 			if err := ReadCreateRouteOptions(&RouteMod, args, o); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := RouteAPICall(restOptions, RouteMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create route: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create route", resp.StatusCode)
 		},
 	}
 	createRouteCmd.Flags().StringVarP(&o.StaticProto, "proto", "", "", "Proto static mode")

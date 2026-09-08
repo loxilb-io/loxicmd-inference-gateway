@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -37,32 +37,27 @@ func NewCreateVxlanPeerCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create vxlan-peer 100 30.1.3.1
 `,
 		Aliases: []string{"vxlanPeer", "vxlan-peer", "vxlan_peer"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create vxlanpeer needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var vxlanMod api.VxlanPeerMod
 			// Make vxlanMod
 			if err := ReadCreateVxlanPeerOptions(&vxlanMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			url := fmt.Sprintf("/config/tunnel/vxlan/%s/peer", args[0])
 			resp, err := VxlanPeerAPICall(restOptions, vxlanMod, url)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create vxlanpeer: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create vxlanpeer", resp.StatusCode)
 		},
 	}
 

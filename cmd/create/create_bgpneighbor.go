@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -44,18 +44,14 @@ func NewCreateBGPNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create bgpneighbor 10.10.10.1 64512
 `,
 		Aliases: []string{"bgpnei", "bgpneigh"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create bgpneighbor needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var BGPNeighborMod api.BGPNeighborMod
 			// Make BGPNeighborMod
 			if err := ReadCreateBGPNeighborOptions(&BGPNeighborMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			// option
 			if o.RemotePort != 179 {
@@ -66,16 +62,15 @@ ex) loxicmd create bgpneighbor 10.10.10.1 64512
 			}
 			resp, err := BGPNeighborAPICall(restOptions, BGPNeighborMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create bgpneighbor: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create bgpneighbor", resp.StatusCode)
 		},
 	}
 	createBGPNeighborCmd.Flags().BoolVarP(&o.SetMultiHtop, "setMultiHtop", "", false, "Enable Multihop BGP in the load balancer")

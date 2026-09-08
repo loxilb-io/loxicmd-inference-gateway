@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -35,31 +35,26 @@ func NewCreateFDBCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long: `Create a FDB using LoxiLB. It is working as "bridge fdb add <MacAddress> dev <device>"
 ex) loxicmd create fdb aa:aa:aa:aa:bb:bb eno7	
 `,
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create fdb needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var FDBMod api.FDBMod
 			// Make FDBMod
 			if err := ReadCreateFDBOptions(&FDBMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := FDBAPICall(restOptions, FDBMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create fdb: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create fdb", resp.StatusCode)
 		},
 	}
 

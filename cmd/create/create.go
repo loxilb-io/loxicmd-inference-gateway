@@ -16,8 +16,8 @@
 package create
 
 import (
-	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -30,15 +30,11 @@ func CreateCmd(restOptions *api.RESTOptions) *cobra.Command {
 Create - Service type external load-balancer, Vlan, Vxlan, Qos Policies, 
 	 Endpoint client,FDB, IPaddress, Neighbor, Route,Firewall, Mirror, Session, UlCl
 `,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
+				return exitcode.Usagef("create needs a subcommand")
 			}
-		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			fmt.Printf("Error: unknown command \"%v\"for \"loxicmd\" \nRun \"loxicmd --help\" for usage.\n", args)
-			cmd.Help()
-			return err
+			return exitcode.Usagef("unknown command %q for \"loxicmd create\"", args[0])
 		},
 	}
 
