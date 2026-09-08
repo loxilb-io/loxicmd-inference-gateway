@@ -16,7 +16,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/appliance"
@@ -27,6 +29,7 @@ import (
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/set"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/backend"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/envelope"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
@@ -91,18 +94,79 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	restOptions := &api.RESTOptions{}
 	saveOptions := &dump.SaveOptions{}
 	applyOptions := &dump.ApplyOptions{}
+	var tokenFile string
+
+	// Secret handling for the API token (contracts/exit-codes.md rules
+	// apply): --token-file is the safe path — the file must satisfy the
+	// same owner-only regular-file rules as every other secret file, and
+	// the value never appears in argv. --token stays working through its
+	// deprecation window but earns a warning: the value is visible in
+	// shell history and process listings.
+	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+		_ = args
+		if tokenFile != "" {
+			secret, err := backend.ReadSecretFile("token file", tokenFile)
+			if err != nil {
+				return err
+			}
+			if len(secret) == 0 {
+				return &exitcode.CLIError{
+					Code:          exitcode.Precondition,
+					Message:       fmt.Sprintf("the token file %q is empty; requests would go out unauthenticated", tokenFile),
+					ComponentCode: "secret-file-empty",
+				}
+			}
+			restOptions.Token = string(secret)
+			return nil
+		}
+		if cmd.Root().PersistentFlags().Changed("token") {
+			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: --token places the token in shell history and process listings; use --token-file instead. --token is deprecated and a future release removes it.")
+			return nil
+		}
+		// Session fallback: a previous "set login" left the token on
+		// disk. The file sits in a world-writable directory, so it gets
+		// the same scrutiny as an explicit --token-file — an absent file
+		// just means an unauthenticated session, but a present file that
+		// fails the secret-file rules is refused loudly rather than read
+		// blindly.
+		if _, err := os.Lstat(api.SessionTokenPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return &exitcode.CLIError{
+				Code:          exitcode.Precondition,
+				Message:       fmt.Sprintf("cannot check the session token file %q: %v", api.SessionTokenPath, err),
+				ComponentCode: "file-read-failed",
+			}
+		}
+		secret, err := backend.ReadSecretFile("session token file", api.SessionTokenPath)
+		if err != nil {
+			return err
+		}
+		if len(secret) == 0 {
+			return &exitcode.CLIError{
+				Code:          exitcode.Precondition,
+				Message:       fmt.Sprintf("the session token file %q is empty; remove it or run \"loxicmd set login\" again", api.SessionTokenPath),
+				ComponentCode: "secret-file-empty",
+			}
+		}
+		restOptions.Token = string(secret)
+		return nil
+	}
 
 	rootCmd.PersistentFlags().Int16VarP(&restOptions.Timeout, "timeout", "t", 10, "Set timeout")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.Protocol, "protocol", "", "http", "Set API server http/https")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.PrintOption, "output", "o", "", "Set output layer (ex.) wide, json)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.ServerIP, "apiserver", "s", "127.0.0.1", "Set API server IP address")
 	rootCmd.PersistentFlags().IntVarP(&restOptions.ServerPort, "port", "p", 11111, "Set API server port number")
-	rootCmd.PersistentFlags().StringVarP(&restOptions.Token, "token", "", "", "Set Token for the API server")
+	rootCmd.PersistentFlags().StringVarP(&restOptions.Token, "token", "", "", "Set Token for the API server (deprecated: the value is visible in shell history and process listings; use --token-file)")
+	rootCmd.PersistentFlags().StringVarP(&tokenFile, "token-file", "", "", "Read the API server token from an owner-only (0600) regular file; replaces the deprecated --token")
 	rootCmd.PersistentFlags().BoolVarP(&restOptions.BearerAuth, "bearer", "", true, "Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets)")
 	rootCmd.PersistentFlags().BoolVarP(&restOptions.Insecure, "insecure", "k", false, "Skip TLS certificate verification (https only)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.CACertFile, "cacert", "", "", "CA certificate (PEM) to verify the server (https only)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.ClientCertFile, "cert", "", "", "Client certificate (PEM) for mutual TLS (https only)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.ClientKeyFile, "key", "", "", "Client private key (PEM) for mutual TLS (https only)")
+	rootCmd.MarkFlagsMutuallyExclusive("token", "token-file")
 
 	rootCmd.AddCommand(get.GetCmd(restOptions))
 	rootCmd.AddCommand(create.CreateCmd(restOptions))

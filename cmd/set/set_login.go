@@ -89,12 +89,12 @@ func NewSetLogInCmd(restOptions *api.RESTOptions) *cobra.Command {
 					return fmt.Errorf("refresh token error: %w", err)
 				}
 				RefreshToken = strings.TrimSpace(RefreshToken)
-				tokenFilePath := "/tmp/loxilbtoken"
+				tokenFilePath := api.SessionTokenPath
 				err = os.WriteFile(tokenFilePath, []byte(AccessToken), 0600)
 				if err != nil {
 					return &exitcode.CLIError{Code: exitcode.Failed, Message: fmt.Sprintf("Failed to write token to file: (%s)", err.Error())}
 				}
-				refreshTokenFilePath := "/tmp/loxilbrefreshtoken"
+				refreshTokenFilePath := api.SessionRefreshTokenPath
 				err = os.WriteFile(refreshTokenFilePath, []byte(RefreshToken), 0600)
 				if err != nil {
 					return &exitcode.CLIError{Code: exitcode.Failed, Message: fmt.Sprintf("Failed to write token to file: (%s)", err.Error())}
@@ -109,7 +109,7 @@ func NewSetLogInCmd(restOptions *api.RESTOptions) *cobra.Command {
 					return fmt.Errorf("access token error: %w", err)
 				}
 				AccessToken = strings.TrimSpace(AccessToken)
-				tokenFilePath := "/tmp/loxilbtoken"
+				tokenFilePath := api.SessionTokenPath
 				err = os.WriteFile(tokenFilePath, []byte(AccessToken), 0600)
 				if err != nil {
 					return &exitcode.CLIError{Code: exitcode.Failed, Message: fmt.Sprintf("Failed to write token to file: (%s)", err.Error())}
@@ -164,7 +164,7 @@ func PrintAndSaveTokenResult(resp *http.Response, o api.RESTOptions) {
 	}
 
 	// Save the token to /tmp/loxilbtoken
-	tokenFilePath := "/tmp/loxilbtoken"
+	tokenFilePath := api.SessionTokenPath
 	err = os.WriteFile(tokenFilePath, []byte(Tokenresp.Token), 0600)
 	if err != nil {
 		fmt.Printf("Error: Failed to write token to file: (%s)\n", err.Error())
@@ -233,7 +233,7 @@ func LogOutAPICall(restOptions *api.RESTOptions) (*http.Response, error) {
 
 func PrintAndRemoveTokenResult() {
 	// Delete the token to /tmp/loxilbtoken
-	tokenFilePath := "/tmp/loxilbtoken"
+	tokenFilePath := api.SessionTokenPath
 	err := os.Remove(tokenFilePath)
 	if err != nil {
 		fmt.Printf("Error: Failed to remove token file: (%s)\n", err.Error())
@@ -244,7 +244,7 @@ func PrintAndRemoveTokenResult() {
 
 func PrintAndRemoveRefreshTokenResult() {
 	// Delete the token to /tmp/loxilbtoken
-	tokenFilePath := "/tmp/loxilbrefreshtoken"
+	tokenFilePath := api.SessionRefreshTokenPath
 	err := os.Remove(tokenFilePath)
 	if err != nil {
 		fmt.Printf("Error: Failed to remove refreshtoken file: (%s)\n", err.Error())
@@ -264,13 +264,13 @@ func NewSetRefreshTokenCmd(restOptions *api.RESTOptions) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if SetOptions.Provider == "google" {
 				// Get the token from the file /tmp/loxilbtoken
-				tokenFilePath := "/tmp/loxilbtoken"
+				tokenFilePath := api.SessionTokenPath
 				tokenByte, err := os.ReadFile(tokenFilePath)
 				if err != nil {
 					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("Failed to read token file: (%s)", err.Error())}
 				}
 				// Get the refresh token from the file /tmp/loxilbrefreshtoken
-				refreshTokenFilePath := "/tmp/loxilbrefreshtoken"
+				refreshTokenFilePath := api.SessionRefreshTokenPath
 				refreshTokenByte, err := os.ReadFile(refreshTokenFilePath)
 				if err != nil {
 					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("Failed to read refreshtoken file: (%s)", err.Error())}

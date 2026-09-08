@@ -21,9 +21,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"strings"
+)
+
+// SessionTokenPath and SessionRefreshTokenPath are where "set login"
+// stores the session credentials and where later invocations look for
+// them. The root command resolves the session token through the shared
+// secret-file rules before any request is built; nothing in this package
+// reads the files. The vars exist (rather than consts) so packaged tests
+// can relocate them with -ldflags -X — the same mechanism the backend
+// adapter uses for its executable path.
+var (
+	SessionTokenPath        = "/tmp/loxilbtoken"
+	SessionRefreshTokenPath = "/tmp/loxilbrefreshtoken"
 )
 
 const (
@@ -101,7 +112,6 @@ func (r *RESTClient) GET(ctx context.Context, getURL string) (*http.Response, er
 	if err != nil {
 		return nil, err
 	}
-	r.getTokens()
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
 	return r.Client.Do(req)
@@ -112,7 +122,6 @@ func (r *RESTClient) POST(ctx context.Context, postURL string, body []byte) (*ht
 	if err != nil {
 		return nil, err
 	}
-	r.getTokens()
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
 	return r.Client.Do(req)
@@ -123,7 +132,6 @@ func (r *RESTClient) DELETE(ctx context.Context, deleteURL string) (*http.Respon
 	if err != nil {
 		return nil, err
 	}
-	r.getTokens()
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
 	return r.Client.Do(req)
@@ -136,7 +144,6 @@ func (r *RESTClient) DELETEWithBody(ctx context.Context, deleteURL string, body 
 	if err != nil {
 		return nil, err
 	}
-	r.getTokens()
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
 	return r.Client.Do(req)
@@ -147,7 +154,6 @@ func (r *RESTClient) PATCH(ctx context.Context, patchURL string, body []byte) (*
 	if err != nil {
 		return nil, err
 	}
-	r.getTokens()
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
 	return r.Client.Do(req)
@@ -160,7 +166,6 @@ func (r *RESTClient) PUT(ctx context.Context, putURL string, body []byte) (*http
 	if err != nil {
 		return nil, err
 	}
-	r.getTokens()
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
 	return r.Client.Do(req)
@@ -180,14 +185,4 @@ func (r *RESTClient) setAuthHeader(req *http.Request) {
 		token = "Bearer " + token
 	}
 	req.Header.Set("Authorization", token)
-}
-
-func (r *RESTClient) getTokens() {
-	if r.Options.Token == "" {
-		token, err := os.ReadFile("/tmp/loxilbtoken")
-		if err != nil {
-			return
-		}
-		r.Options.Token = strings.TrimSpace(string(token))
-	}
 }
