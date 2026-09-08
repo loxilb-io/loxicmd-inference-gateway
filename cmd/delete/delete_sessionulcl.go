@@ -20,10 +20,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -52,16 +52,12 @@ func NewDeleteSessionUlClCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Delete a Ulcl configuration in the LoxiLB.",
 		Long:    `Delete a Ulcl configuration in the LoxiLB.`,
 		Aliases: []string{"ulcl", "sessionulcls", "ulcls"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete sessionulcl needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteSessionUlClValidation(args); err != nil {
-				fmt.Println("not valid <UserID>")
-				return
+				return exitcode.Invalidf("not valid <UserID>")
 			}
 
 			o.UserID = args[0]
@@ -79,18 +75,16 @@ func NewDeleteSessionUlClCmd(restOptions *api.RESTOptions) *cobra.Command {
 				}
 				resp, err := client.SessionUlCL().SubResources(subResources).Delete(ctx)
 				if err != nil {
-					fmt.Printf("Error: Failed to delete Session(UserID: %s)", o.UserID)
-					return
+					return exitcode.Unavailablef("Failed to delete Session(UserID: %s) (%v)", o.UserID, err)
 				}
 				defer resp.Body.Close()
 				fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
-				if resp.StatusCode == http.StatusOK {
-					PrintDeleteResult(resp, *restOptions)
-					return
+				if resp.StatusCode != http.StatusOK {
+					return exitcode.FromHTTPStatus("delete sessionulcl", resp.StatusCode)
 				}
-
+				PrintDeleteResult(resp, *restOptions)
 			}
-
+			return nil
 		},
 	}
 	deleteLbCmd.Flags().StringSliceVar(&o.UlClArgs, "ulclArgs", o.UlClArgs, "UlCl IP address can be specified as '<UlClIP>'. It don't need qfi.")

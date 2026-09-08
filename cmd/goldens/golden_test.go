@@ -127,6 +127,30 @@ var goldenCases = []goldenCase{
 	{"version-human", []string{"version"}, http.StatusOK, ""},
 	{"version-json", []string{"version", "-o", "json"}, http.StatusOK, ""},
 	{"completion-bash", []string{"completion", "bash"}, http.StatusOK, ""},
+
+	// The full delete family, pinned ahead of its error-handling
+	// migration: these are the success surfaces the conversion must not
+	// move. Invocations follow each command's own documented example.
+	{"delete-apikey", []string{"delete", "apikey", "lxb_abc123"}, http.StatusOK, successBody},
+	{"delete-bfd", []string{"delete", "bfd", "32.32.32.2", "--instance=default"}, http.StatusOK, successBody},
+	{"delete-bgpneighbor", []string{"delete", "bgpneighbor", "10.10.10.2", "65001"}, http.StatusOK, successBody},
+	{"delete-cert", []string{"delete", "cert", "web"}, http.StatusOK, successBody},
+	{"delete-endpoint", []string{"delete", "endpoint", "31.31.31.31", "--name=31.31.31.31_http_8080", "--probetype=http", "--probeport=8080"}, http.StatusOK, successBody},
+	{"delete-fdb", []string{"delete", "fdb", "aa:bb:cc:dd:ee:ff", "eno1"}, http.StatusOK, successBody},
+	{"delete-firewall", []string{"delete", "firewall", "--firewallRule=sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200"}, http.StatusOK, successBody},
+	{"delete-ip", []string{"delete", "ip", "10.10.10.1/24", "eno1"}, http.StatusOK, successBody},
+	{"delete-mirror", []string{"delete", "mirror", "mirr-1"}, http.StatusOK, successBody},
+	{"delete-neighbor", []string{"delete", "neighbor", "10.10.10.2", "eno1"}, http.StatusOK, successBody},
+	{"delete-opa", []string{"delete", "opa"}, http.StatusOK, successBody},
+	{"delete-policy", []string{"delete", "policy", "pol-1"}, http.StatusOK, successBody},
+	{"delete-route", []string{"delete", "route", "192.168.10.0/24"}, http.StatusOK, successBody},
+	{"delete-session", []string{"delete", "session", "user-1"}, http.StatusOK, successBody},
+	{"delete-sessionulcl", []string{"delete", "sessionulcl", "user-1", "--ulclArgs=10.10.10.1"}, http.StatusOK, successBody},
+	{"delete-sni", []string{"delete", "sni", "--hostname=api.example.com"}, http.StatusOK, successBody},
+	{"delete-vlan", []string{"delete", "vlan", "100"}, http.StatusOK, successBody},
+	{"delete-vlanmember", []string{"delete", "vlanmember", "100", "eno1", "--tagged=true"}, http.StatusOK, successBody},
+	{"delete-vxlan", []string{"delete", "vxlan", "50"}, http.StatusOK, successBody},
+	{"delete-vxlanpeer", []string{"delete", "vxlanpeer", "50", "30.1.3.1"}, http.StatusOK, successBody},
 }
 
 // normalize replaces the only run-dependent value — the Go toolchain of the

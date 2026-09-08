@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -33,23 +34,21 @@ func DeleteCmd(restOptions *api.RESTOptions) *cobra.Command {
 Delete - Service type external load-balancer, Vlan, Vxlan, Qos Policies,
 	 Endpoint client,FDB, IPaddress, Neighbor, Route,Firewall, Mirror, Session, UlCl
 		`,
-		Run: func(cmd *cobra.Command, args []string) {
+		// One RunE only. The previous version defined Run AND RunE; cobra
+		// runs just the RunE, so the -f config-file path below was dead and
+		// an unknown subcommand exited 0 after printing an error.
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(NormalConfigFile) > 0 {
 				if err := DeleteFileConfig(NormalConfigFile, restOptions); err != nil {
-					fmt.Printf("Configuration failed - %s\n", NormalConfigFile)
-				} else {
-					fmt.Printf("Configuration applied - %s\n", NormalConfigFile)
+					return exitcode.Classify(fmt.Errorf("configuration failed - %s: %w", NormalConfigFile, err))
 				}
+				fmt.Printf("Configuration applied - %s\n", NormalConfigFile)
+				return nil
 			}
-			if len(NormalConfigFile) == 0 && len(args) == 0 {
-				cmd.Help()
+			if len(args) == 0 {
+				return exitcode.Usagef("delete needs a subcommand or --file")
 			}
-
-		},
-		RunE: func(cmd *cobra.Command, args []string) (err error) {
-			fmt.Printf("Error: unknown command \"%v\"for \"loxicmd\" \nRun \"loxicmd --help\" for usage.\n", args)
-			cmd.Help()
-			return err
+			return exitcode.Usagef("unknown command %q for \"loxicmd delete\"", args[0])
 		},
 	}
 	deleteCmd.AddCommand(NewDeleteLoadBalancerCmd(restOptions))

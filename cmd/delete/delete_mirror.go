@@ -19,10 +19,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -41,16 +41,12 @@ func NewDeleteMirrorCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Delete a Mirror",
 		Long:    `Delete a Mirror using MirrorIdent in the LoxiLB.`,
 		Aliases: []string{"mirror", "mirr", "mirrors"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete mirror needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteMirrorValidation(args); err != nil {
-				fmt.Println("not valid <MirrorIdent>")
-				return
+				return exitcode.Invalidf("not valid <MirrorIdent>")
 			}
 			MirrorIdent := args[0]
 
@@ -64,16 +60,15 @@ func NewDeleteMirrorCmd(restOptions *api.RESTOptions) *cobra.Command {
 			subResources := []string{"ident", MirrorIdent}
 			resp, err := client.Mirror().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Mirror : %s", MirrorIdent)
-				return
+				return exitcode.Unavailablef("Failed to delete Mirror : %s (%v)", MirrorIdent, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete mirror", resp.StatusCode)
 		},
 	}
 

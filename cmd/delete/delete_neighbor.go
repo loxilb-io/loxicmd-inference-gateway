@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -49,16 +49,12 @@ func NewDeleteNeighborsCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Delete a Neighbors",
 		Long:    `Delete a Neighbors using DeviceIP in the LoxiLB.`,
 		Aliases: []string{"nei", "neigh"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete neighbor needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteNeighborsValidation(args); err != nil {
-				fmt.Println("not valid <DeviceIP>")
-				return
+				return exitcode.Invalidf("not valid <DeviceIP>")
 			}
 			DeviceIP := args[0]
 			Device := args[1]
@@ -75,16 +71,15 @@ func NewDeleteNeighborsCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Neighbor().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete Neighbors : %s", DeviceIP)
-				return
+				return exitcode.Unavailablef("Failed to delete Neighbors : %s (%v)", DeviceIP, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete neighbor", resp.StatusCode)
 		},
 	}
 

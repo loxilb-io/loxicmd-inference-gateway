@@ -21,10 +21,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -49,16 +49,12 @@ func NewDeleteIPv4AddressCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Delete a IPv4Address",
 		Long:    `Delete a IPv4Address using DeviceIPNet  in the LoxiLB.`,
 		Aliases: []string{"ipv4address", "ipv4", "ipaddress"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("delete ip needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			if err := DeleteIPv4AddressValidation(args); err != nil {
-				fmt.Println("not valid <DeviceIPNet>")
-				return
+				return exitcode.Invalidf("not valid <DeviceIPNet>")
 			}
 			DeviceIPNet := args[0]
 			Device := args[1]
@@ -75,16 +71,15 @@ func NewDeleteIPv4AddressCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.IPv4Address().SubResources(subResources).Delete(ctx)
 			if err != nil {
-				fmt.Printf("Error: Failed to delete IPv4Address : %s", DeviceIPNet)
-				return
+				return exitcode.Unavailablef("Failed to delete IPv4Address : %s (%v)", DeviceIPNet, err)
 			}
 			defer resp.Body.Close()
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintDeleteResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("delete ip", resp.StatusCode)
 		},
 	}
 
