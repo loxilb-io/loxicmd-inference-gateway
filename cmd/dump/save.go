@@ -137,7 +137,7 @@ not affect where the gateway writes snapshot.json; that is the gateway's own
 }
 
 func runSave(cmd *cobra.Command, saveOpts *SaveOptions, restOptions *api.RESTOptions) error {
-	out, errOut := cmd.OutOrStdout(), cmd.ErrOrStderr()
+	out := cmd.OutOrStdout()
 	if err := validateSaveOptions(saveOpts); err != nil {
 		// The single exit point prints the stderr line; JSON callers get
 		// the failure envelope on stdout.
@@ -165,7 +165,6 @@ func runSave(cmd *cobra.Command, saveOpts *SaveOptions, restOptions *api.RESTOpt
 	}
 
 	if err := ensureConfigDir(dpath); err != nil {
-		fmt.Fprintf(errOut, "Error: %s\n", err.Error())
 		return err
 	}
 
@@ -191,12 +190,10 @@ func runSave(cmd *cobra.Command, saveOpts *SaveOptions, restOptions *api.RESTOpt
 			// A dump that failed is a save that did not happen:
 			// report it and exit non-zero rather than leave the
 			// caller believing the earlier lines cover everything.
-			wrapped := &api.LifecycleError{
+			return &api.LifecycleError{
 				Reason:  api.ReasonFileWrite,
 				Message: fmt.Sprintf("%s configuration was not saved: %v", d.label, err),
 			}
-			fmt.Fprintf(errOut, "Error: %s\n", wrapped.Error())
-			return wrapped
 		}
 		fmt.Fprintf(out, "%s Configuration saved in %s\n", d.label, file)
 	}

@@ -33,8 +33,8 @@ const notReadyBody = `{"ready":false,"reasons":["dependency keystore: connection
 
 func TestReadyGetRendersVerdictAndAttachments(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, readyBody))
-	var out, errOut bytes.Buffer
-	if err := ReadyGet(gw.options(), &out, &errOut, false); err != nil {
+	var out bytes.Buffer
+	if err := ReadyGet(gw.options(), &out, false); err != nil {
 		t.Fatalf("get ready failed on a ready gateway: %v", err)
 	}
 	if got := gw.requests[0]; got.Method != http.MethodGet || !strings.HasSuffix(got.Path, "/status/ready") {
@@ -53,8 +53,8 @@ func TestReadyGetRendersVerdictAndAttachments(t *testing.T) {
 // verdict for automation probing with exit codes alone.
 func TestReadyGetNotReadyRendersAndExitsNonZero(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusServiceUnavailable, notReadyBody))
-	var out, errOut bytes.Buffer
-	err := ReadyGet(gw.options(), &out, &errOut, false)
+	var out bytes.Buffer
+	err := ReadyGet(gw.options(), &out, false)
 	requireReason(t, err, api.ReasonResultNotOK)
 	if api.HTTPStatusOf(err) != http.StatusServiceUnavailable {
 		t.Fatalf("verdict error lost its HTTP status: %v", err)
@@ -69,8 +69,8 @@ func TestReadyGetNotReadyRendersAndExitsNonZero(t *testing.T) {
 // the verdict.
 func TestReadyGetJSONIsVerbatimBody(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusServiceUnavailable, notReadyBody))
-	var out, errOut bytes.Buffer
-	err := ReadyGet(gw.options(), &out, &errOut, true)
+	var out bytes.Buffer
+	err := ReadyGet(gw.options(), &out, true)
 	requireReason(t, err, api.ReasonResultNotOK)
 	if strings.TrimSpace(out.String()) != notReadyBody {
 		t.Fatalf("JSON mode rewrote the body:\n%s", out.String())
@@ -83,8 +83,8 @@ func TestReadyGetJSONIsVerbatimBody(t *testing.T) {
 func TestReadyGetNonContract503IsStatusError(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusServiceUnavailable,
 		`{"code":503,"message":"Maintenance mode","result":"booting"}`))
-	var out, errOut bytes.Buffer
-	err := ReadyGet(gw.options(), &out, &errOut, false)
+	var out bytes.Buffer
+	err := ReadyGet(gw.options(), &out, false)
 	requireReason(t, err, api.ReasonMaintenance)
 }
 
@@ -96,8 +96,8 @@ func TestDiagnosticsGetRendersAssembly(t *testing.T) {
 		`"maps":[{"name":"conntrack","count":10,"capacity":1000}],` +
 		`"external_dependencies":[{"type":"keystore","required":true,"status":"ready","latency_class":"fast"}]}`
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, body))
-	var out, errOut bytes.Buffer
-	if err := DiagnosticsGet(gw.options(), &out, &errOut, false); err != nil {
+	var out bytes.Buffer
+	if err := DiagnosticsGet(gw.options(), &out, false); err != nil {
 		t.Fatalf("get diagnostics failed: %v", err)
 	}
 	text := out.String()
@@ -118,15 +118,15 @@ func TestDiagnosticsGetRendersAssembly(t *testing.T) {
 
 func TestDiagnosticsGetUndecodableIsDecodeFailed(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, `not json`))
-	var out, errOut bytes.Buffer
-	err := DiagnosticsGet(gw.options(), &out, &errOut, false)
+	var out bytes.Buffer
+	err := DiagnosticsGet(gw.options(), &out, false)
 	requireReason(t, err, api.ReasonDecodeFailed)
 }
 
 func TestDiagnosticsGetStatusErrorKeepsCode(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusUnauthorized,
 		`{"code":401,"message":"Invalid authentication credentials","result":"x"}`))
-	var out, errOut bytes.Buffer
-	err := DiagnosticsGet(gw.options(), &out, &errOut, false)
+	var out bytes.Buffer
+	err := DiagnosticsGet(gw.options(), &out, false)
 	requireReason(t, err, api.ReasonUnauthorized)
 }

@@ -3,11 +3,21 @@ version: "2"
 linters:
   default: none
   enable:
+    - forbidigo
     - govet
     - ineffassign
     - misspell
     - revive
   settings:
+    forbidigo:
+      # The exit-code taxonomy depends on cmd/root.go being the single
+      # exit point: a command that calls os.Exit bypasses classification
+      # and steals the exit status. cmd/guards_test.go enforces the same
+      # rule (plus the Run:-handler and stderr-print rules) structurally;
+      # this linter makes the violation visible in editors and CI listings.
+      forbid:
+        - pattern: ^os\.Exit$
+          msg: only the single exit point in cmd/root.go may call os.Exit (exit-code taxonomy)
     revive:
       rules:
         # Bug-catching / safe rules kept enabled.
@@ -41,6 +51,11 @@ linters:
         - name: var-naming
           disabled: true
 
+  exclusions:
+    rules:
+      # The single exit point itself.
+      - path: cmd/root\.go
+        linters: [forbidigo]
 formatters:
   enable:
     - gofmt
