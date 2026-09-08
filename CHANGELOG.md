@@ -56,6 +56,12 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   happens). `--token` and `--token-file` are mutually exclusive.
 
 ### Changed
+- The session token that `set login` stores on disk is now resolved once at
+  startup under the same secret-file rules as `--token-file` (regular file,
+  no symlinks, owner-only permissions, non-empty) instead of being read
+  blindly on every request; an absent file still just means an
+  unauthenticated session, and explicit `--token`/`--token-file` always win
+  over the session file.
 - **Exit codes**: failures now terminate with the frozen taxonomy
   (`2`–`8`, see [contracts/exit-codes.md](contracts/exit-codes.md)) instead of
   the legacy `0`/`1`. Success stays `0`; `1` is reserved so automation can

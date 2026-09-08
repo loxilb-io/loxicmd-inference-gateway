@@ -16,7 +16,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/appliance"
@@ -119,7 +121,36 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 		}
 		if cmd.Root().PersistentFlags().Changed("token") {
 			fmt.Fprintln(cmd.ErrOrStderr(), "Warning: --token places the token in shell history and process listings; use --token-file instead. --token is deprecated and a future release removes it.")
+			return nil
 		}
+		// Session fallback: a previous "set login" left the token on
+		// disk. The file sits in a world-writable directory, so it gets
+		// the same scrutiny as an explicit --token-file — an absent file
+		// just means an unauthenticated session, but a present file that
+		// fails the secret-file rules is refused loudly rather than read
+		// blindly.
+		if _, err := os.Lstat(api.SessionTokenPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return nil
+			}
+			return &exitcode.CLIError{
+				Code:          exitcode.Precondition,
+				Message:       fmt.Sprintf("cannot check the session token file %q: %v", api.SessionTokenPath, err),
+				ComponentCode: "file-read-failed",
+			}
+		}
+		secret, err := backend.ReadSecretFile("session token file", api.SessionTokenPath)
+		if err != nil {
+			return err
+		}
+		if len(secret) == 0 {
+			return &exitcode.CLIError{
+				Code:          exitcode.Precondition,
+				Message:       fmt.Sprintf("the session token file %q is empty; remove it or run \"loxicmd set login\" again", api.SessionTokenPath),
+				ComponentCode: "secret-file-empty",
+			}
+		}
+		restOptions.Token = string(secret)
 		return nil
 	}
 

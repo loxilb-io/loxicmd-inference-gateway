@@ -23,6 +23,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -65,6 +66,175 @@ func (rec *authRecorder) headers() []string {
 	rec.mu.Lock()
 	defer rec.mu.Unlock()
 	return append([]string(nil), rec.seen...)
+}
+
+// buildCLIWithSessionPath builds the packaged binary with the session
+// token path relocated into the test's own directory — the ldflags-only
+// relocation mechanism the backend adapter also uses — so the suite never
+// touches a real operator's /tmp/loxilbtoken.
+func buildCLIWithSessionPath(t *testing.T, sessionPath string) string {
+	t.Helper()
+	if testing.Short() {
+		t.Skip("skipping packaged-binary test in short mode")
+	}
+	if runtime.GOOS != "linux" {
+		t.Skip("loxicmd links Linux netlink; the packaged binary only builds there")
+	}
+	binary := filepath.Join(t.TempDir(), "loxicmd")
+	ldflags := "-X github.com/loxilb-io/loxicmd-inference-gateway/pkg/api.SessionTokenPath=" + sessionPath
+	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", binary, ".")
+	cmd.Dir = filepath.Join("..", "..")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("building the CLI failed: %v\n%s", err, out)
+	}
+	return binary
+}
+
+// TestSessionTokenFallback pins the implicit session path: the token a
+// previous "set login" left on disk authenticates later invocations, but
+// only after passing the same secret-file rules as an explicit
+// --token-file — the file lives in a world-writable directory and used to
+// be read blindly. Explicit flags always win over the session file.
+func TestSessionTokenFallback(t *testing.T) {
+	dir := t.TempDir()
+	sessionPath := filepath.Join(dir, "session")
+	binary := buildCLIWithSessionPath(t, sessionPath)
+
+	fileTokenPath := filepath.Join(dir, "explicit")
+	if err := os.WriteFile(fileTokenPath, []byte("filetoken\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	targetPath := filepath.Join(dir, "target")
+	if err := os.WriteFile(targetPath, []byte("sessiontoken\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	setSession := func(t *testing.T, content string, mode os.FileMode) {
+		t.Helper()
+		if err := os.Remove(sessionPath); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(sessionPath, []byte(content), mode); err != nil {
+			t.Fatal(err)
+		}
+	}
+	clearSession := func(t *testing.T) {
+		t.Helper()
+		if err := os.Remove(sessionPath); err != nil && !os.IsNotExist(err) {
+			t.Fatal(err)
+		}
+	}
+
+	run := func(t *testing.T, rec *authRecorder, args ...string) (int, string, string) {
+		t.Helper()
+		host, port := rec.hostPort(t)
+		full := append([]string{"-s", host, "-p", port}, args...)
+		cmd := exec.Command(binary, full...)
+		var stdout, stderr strings.Builder
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
+		err := cmd.Run()
+		exit := 0
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exit = exitErr.ExitCode()
+		} else if err != nil {
+			t.Fatalf("running the CLI failed: %v", err)
+		}
+		if exit == 1 {
+			t.Errorf("the reserved legacy exit 1 was emitted")
+		}
+		return exit, stdout.String(), stderr.String()
+	}
+
+	t.Run("valid-session-authenticates", func(t *testing.T) {
+		setSession(t, "sessiontoken\n", 0o600)
+		rec := newAuthRecorder(t)
+		exit, _, stderr := run(t, rec, "delete", "vlan", "100")
+		if exit != 0 {
+			t.Fatalf("exit %d, want 0\nstderr:\n%s", exit, stderr)
+		}
+		if headers := rec.headers(); len(headers) == 0 || headers[0] != "Bearer sessiontoken" {
+			t.Errorf("Authorization headers %q, want the session token as a Bearer credential", headers)
+		}
+		if strings.Contains(stderr, "Warning:") {
+			t.Errorf("the session path must not warn:\n%s", stderr)
+		}
+	})
+
+	t.Run("absent-session-is-unauthenticated", func(t *testing.T) {
+		clearSession(t)
+		rec := newAuthRecorder(t)
+		exit, _, stderr := run(t, rec, "delete", "vlan", "100")
+		if exit != 0 {
+			t.Fatalf("exit %d, want 0\nstderr:\n%s", exit, stderr)
+		}
+		if headers := rec.headers(); len(headers) == 0 || headers[0] != "" {
+			t.Errorf("Authorization headers %q, want one request with no credential", headers)
+		}
+	})
+
+	t.Run("explicit-token-file-wins", func(t *testing.T) {
+		setSession(t, "sessiontoken\n", 0o600)
+		rec := newAuthRecorder(t)
+		exit, _, stderr := run(t, rec, "--token-file", fileTokenPath, "delete", "vlan", "100")
+		if exit != 0 {
+			t.Fatalf("exit %d, want 0\nstderr:\n%s", exit, stderr)
+		}
+		if headers := rec.headers(); len(headers) == 0 || headers[0] != "Bearer filetoken" {
+			t.Errorf("Authorization headers %q, want the explicit file's token over the session token", headers)
+		}
+	})
+
+	t.Run("explicit-token-flag-wins", func(t *testing.T) {
+		setSession(t, "sessiontoken\n", 0o600)
+		rec := newAuthRecorder(t)
+		exit, _, stderr := run(t, rec, "--token", "flagtoken", "delete", "vlan", "100")
+		if exit != 0 {
+			t.Fatalf("exit %d, want 0\nstderr:\n%s", exit, stderr)
+		}
+		if headers := rec.headers(); len(headers) == 0 || headers[0] != "Bearer flagtoken" {
+			t.Errorf("Authorization headers %q, want the explicit flag's token over the session token", headers)
+		}
+		if got := strings.Count(stderr, "Warning:"); got != 1 {
+			t.Errorf("deprecation warning on stderr %d times, want exactly once:\n%s", got, stderr)
+		}
+	})
+
+	sessionRefusals := []struct {
+		name       string
+		setup      func(t *testing.T)
+		wantExit   int
+		wantStderr string
+	}{
+		{"symlink-session-is-refused", func(t *testing.T) {
+			clearSession(t)
+			if err := os.Symlink(targetPath, sessionPath); err != nil {
+				t.Fatal(err)
+			}
+		}, 4, "symlink"},
+		{"open-session-is-refused", func(t *testing.T) {
+			setSession(t, "sessiontoken\n", 0o644)
+		}, 4, "owner-only"},
+		{"empty-session-is-refused", func(t *testing.T) {
+			setSession(t, " \n", 0o600)
+		}, 4, "empty"},
+	}
+	for _, tc := range sessionRefusals {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.setup(t)
+			rec := newAuthRecorder(t)
+			exit, stdout, stderr := run(t, rec, "delete", "vlan", "100")
+			if exit != tc.wantExit {
+				t.Errorf("exit %d, want %d\nstdout:\n%s\nstderr:\n%s", exit, tc.wantExit, stdout, stderr)
+			}
+			if !strings.Contains(stderr, tc.wantStderr) {
+				t.Errorf("stderr missing %q:\n%s", tc.wantStderr, stderr)
+			}
+			if headers := rec.headers(); len(headers) != 0 {
+				t.Errorf("a refused session file still let %d request(s) reach the gateway", len(headers))
+			}
+		})
+	}
 }
 
 // TestTokenSecretHandling pins the root --token/--token-file contract
