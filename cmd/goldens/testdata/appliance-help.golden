@@ -9,12 +9,18 @@ Usage:
   loxicmd appliance [command]
 
 Available Commands:
-  factory-reset Not available in this release
-  network       Appliance network checks (read-only)
-  restore       Not available in this release
-  rollback      Not available in this release
-  status        Read the complete appliance lifecycle state (read-only)
-  update        Not available in this release
+  backup         Encrypted appliance backups
+  credentials    Initial appliance credentials
+  diagnostics    Appliance support diagnostics
+  factory-reset  Not available in this release
+  gateway        Local gateway registration in OAM
+  logs           Retrieve bounded, redacted logs for an approved component
+  network        Appliance network checks (read-only)
+  public-address Appliance public address (CSP 1:1 NAT) management
+  restore        Not available in this release
+  rollback       Not available in this release
+  status         Read the complete appliance lifecycle state (read-only)
+  update         Not available in this release
 
 Flags:
   -h, --help   help for appliance

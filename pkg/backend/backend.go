@@ -34,6 +34,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -61,14 +62,72 @@ const (
 	contractMajor     = 1
 )
 
+// argvRule is one subcommand's spawn surface: how many positional arguments
+// it may carry and which flags it may carry beyond `--json` and
+// `--correlation-id <id>`. A flag ending in '=' takes exactly one value
+// token; any argv token outside the rule is rejected CLI-side before a
+// process starts.
+type argvRule struct {
+	positionals int
+	flags       []string
+	// mutating subcommands run only after the contract-version handshake
+	// proves the installed backend advertises them.
+	mutating bool
+	// stdinSecret marks the subcommand as receiving a secret on stdin;
+	// it is the only stdin use the invocation contract permits.
+	stdinSecret bool
+}
+
 // allowedArgv is the complete set of backend subcommands this CLI build may
-// spawn, each with the exact extra argv tokens permitted beyond the
-// subcommand words, `--json`, and `--correlation-id <id>`. Anything not in
-// this table is rejected CLI-side before a process starts.
-var allowedArgv = map[string][]string{
-	"contract-version": {},
-	"status":           {},
-	"network validate": {},
+// spawn. Anything not in this table — subcommand or argv shape — never
+// reaches exec.
+var allowedArgv = map[string]argvRule{
+	"contract-version":         {},
+	"status":                   {},
+	"network validate":         {},
+	"public-address configure": {positionals: 1, flags: []string{"--no-restart"}, mutating: true},
+	"gateway register-local":   {flags: []string{"--username=", "--password-stdin"}, mutating: true, stdinSecret: true},
+	"credentials bootstrap":    {mutating: true},
+	"diagnostics create":       {flags: []string{"--redact", "--output="}, mutating: true},
+	"logs":                     {positionals: 1, flags: []string{"--redact", "--since=", "--lines="}, mutating: true},
+	"backup key-create":        {flags: []string{"--key-file="}, mutating: true},
+	"backup create":            {positionals: 1, flags: []string{"--key-file="}, mutating: true},
+	"backup verify":            {positionals: 1, flags: []string{"--key-file="}, mutating: true},
+}
+
+// validate checks one extra-argv slice against the rule. Positional tokens
+// must come first; flags must match the rule exactly, with '='-suffixed
+// flags consuming exactly one following value token.
+func (r argvRule) validate(args []string) error {
+	i := 0
+	for i < len(args) && !strings.HasPrefix(args[i], "-") {
+		i++
+	}
+	if i > r.positionals {
+		return fmt.Errorf("%d positional argument(s), at most %d allowed", i, r.positionals)
+	}
+	for i < len(args) {
+		token := args[i]
+		matched := false
+		for _, flag := range r.flags {
+			if valued := strings.HasSuffix(flag, "="); valued && token == strings.TrimSuffix(flag, "=") {
+				if i+1 >= len(args) {
+					return fmt.Errorf("flag %s needs a value", token)
+				}
+				i += 2
+				matched = true
+				break
+			} else if !valued && token == flag {
+				i++
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return fmt.Errorf("token %q is not in the allowlist", token)
+		}
+	}
+	return nil
 }
 
 // Contract is the response of `contract-version --json`, mirroring
@@ -129,10 +188,15 @@ func newCorrelationID() string {
 }
 
 // run spawns the backend with the exact argv given, a scrubbed environment,
-// and full stream capture. Only Invoke and Handshake call it, after
+// and full stream capture. Only invoke and Handshake call it, after
 // allowlist validation.
 func run(ctx context.Context, argv []string) (*Result, error) {
+	return runWithStdin(ctx, argv, nil)
+}
+
+func runWithStdin(ctx context.Context, argv []string, stdin io.Reader) (*Result, error) {
 	cmd := exec.CommandContext(ctx, executablePath, argv...)
+	cmd.Stdin = stdin
 	// The child environment is fixed by the CLI: nothing from the caller
 	// is forwarded, so no environment variable can redirect the backend's
 	// product root or config/state directories.
@@ -159,29 +223,76 @@ func run(ctx context.Context, argv []string) (*Result, error) {
 	}
 }
 
-// Invoke runs one allowlisted backend subcommand. jsonOut appends the
-// backend's `--json` selector; a correlation ID is generated, passed to the
-// backend, and returned with the result. Argv outside the allowlist is
-// rejected here, before any process is started.
+// Request is one backend invocation as the command layer asks for it.
+// Args carries the extra argv beyond the subcommand words; Secret, when
+// non-nil, is streamed to the backend's stdin (the invocation contract's
+// only stdin use) and never appears in argv or the environment.
+type Request struct {
+	Subcommand string
+	Args       []string
+	JSON       bool
+	Secret     io.Reader
+}
+
+// Invoke runs one allowlisted read-only backend subcommand with no extra
+// arguments. Kept as the simple entry point for the read-only set.
 func Invoke(ctx context.Context, subcommand string, jsonOut bool) (*Result, error) {
-	extra, ok := allowedArgv[subcommand]
-	if !ok || len(extra) != 0 {
-		// len(extra) != 0 cannot happen with the current table; the
-		// check keeps a future table edit from silently widening the
-		// spawn surface without widening this validation.
+	return invoke(ctx, &Request{Subcommand: subcommand, JSON: jsonOut}, false)
+}
+
+// InvokeMutating runs one allowlisted mutating subcommand. Per the
+// invocation contract it performs the contract-version handshake first and
+// refuses — changing no host state — when the installed backend does not
+// advertise the subcommand.
+func InvokeMutating(ctx context.Context, req *Request) (*Result, error) {
+	contract, err := Handshake(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !contract.Supports(req.Subcommand) {
 		return nil, &exitcode.CLIError{
 			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("subcommand %q is not in this CLI's backend allowlist", subcommand),
+			Message:       fmt.Sprintf("the installed backend does not provide %q (backend %s, release %s)", req.Subcommand, contract.BackendVersion, contract.ProductRelease),
+			Origin:        "backend",
+			ComponentCode: "command-unavailable",
+		}
+	}
+	return invoke(ctx, req, true)
+}
+
+func invoke(ctx context.Context, req *Request, mutating bool) (*Result, error) {
+	rule, ok := allowedArgv[req.Subcommand]
+	if !ok || rule.mutating != mutating {
+		return nil, &exitcode.CLIError{
+			Code:          exitcode.ContractMismatch,
+			Message:       fmt.Sprintf("subcommand %q is not in this CLI's backend allowlist", req.Subcommand),
+			Origin:        "cli",
+			ComponentCode: "argv-not-allowlisted",
+		}
+	}
+	if err := rule.validate(req.Args); err != nil {
+		return nil, &exitcode.CLIError{
+			Code:          exitcode.ContractMismatch,
+			Message:       fmt.Sprintf("argv for %q rejected: %v", req.Subcommand, err),
+			Origin:        "cli",
+			ComponentCode: "argv-not-allowlisted",
+		}
+	}
+	if req.Secret != nil && !rule.stdinSecret {
+		return nil, &exitcode.CLIError{
+			Code:          exitcode.ContractMismatch,
+			Message:       fmt.Sprintf("subcommand %q does not take a secret stream", req.Subcommand),
 			Origin:        "cli",
 			ComponentCode: "argv-not-allowlisted",
 		}
 	}
 	id := newCorrelationID()
-	argv := append(strings.Fields(subcommand), "--correlation-id", id)
-	if jsonOut {
+	argv := append(strings.Fields(req.Subcommand), req.Args...)
+	argv = append(argv, "--correlation-id", id)
+	if req.JSON {
 		argv = append(argv, "--json")
 	}
-	res, err := run(ctx, argv)
+	res, err := runWithStdin(ctx, argv, req.Secret)
 	if err != nil {
 		return nil, err
 	}

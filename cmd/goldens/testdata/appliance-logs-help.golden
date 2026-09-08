@@ -1,0 +1,33 @@
+exit=0
+--- stdout ---
+Retrieves redacted troubleshooting logs for one approved component
+(gateway, oam, ui, caddy, postgres, state, dataplane, management). Bounded
+by design: no follow mode, no arbitrary unit names, and --redact is
+mandatory.
+
+Examples:
+  loxicmd appliance logs gateway --redact
+  loxicmd appliance logs oam --redact --since 1h --lines 500
+
+Usage:
+  loxicmd appliance logs COMPONENT --redact [--since DURATION] [--lines N] [flags]
+
+Flags:
+  -h, --help           help for logs
+      --lines int      Maximum lines to return (up to 10000)
+      --redact         Required: redact tokens, credentials, and customer content (the only mode there is)
+      --since string   How far back to read (Go duration, up to 168h)
+
+Global Flags:
+  -s, --apiserver string   Set API server IP address (default "127.0.0.1")
+      --bearer             Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets) (default true)
+      --cacert string      CA certificate (PEM) to verify the server (https only)
+      --cert string        Client certificate (PEM) for mutual TLS (https only)
+  -k, --insecure           Skip TLS certificate verification (https only)
+      --key string         Client private key (PEM) for mutual TLS (https only)
+  -o, --output string      Set output layer (ex.) wide, json)
+  -p, --port int           Set API server port number (default 11111)
+      --protocol string    Set API server http/https (default "http")
+  -t, --timeout int16      Set timeout (default 10)
+      --token string       Set Token for the API server
+--- stderr ---

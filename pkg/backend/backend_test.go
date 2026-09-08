@@ -43,6 +43,7 @@ func fakeBackend(t *testing.T, script string) (dir string) {
 	full := "#!/bin/sh\n" +
 		"printf '%s\\n' \"$@\" > \"" + dir + "/argv\"\n" +
 		"env > \"" + dir + "/env\"\n" +
+		"cat > \"" + dir + "/stdin\"\n" +
 		script
 	if err := os.WriteFile(path, []byte(full), 0o755); err != nil {
 		t.Fatal(err)
@@ -169,5 +170,104 @@ func TestHandshakeFailureExitIsUnavailable(t *testing.T) {
 	ce := requireCLIError(t, err, exitcode.Unavailable, CodeBackendUnavailable)
 	if !strings.Contains(ce.Message, "not-today") {
 		t.Fatalf("handshake failure dropped the backend's stderr: %v", ce)
+	}
+}
+
+// mutatingContract advertises the mutating slice this CLI ships, so gate
+// tests can exercise both sides of Supports.
+const mutatingContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract",` +
+	`"backendVersion":"0.1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":1,` +
+	`"commands":[{"name":"gateway register-local","readOnly":false,"capabilities":[]},` +
+	`{"name":"logs","readOnly":false,"capabilities":["redaction"]}]}`
+
+// contractThenEcho answers contract-version with the given contract and
+// every other invocation with a fixed JSON document.
+func contractThenEcho(contract string) string {
+	return `if [ "$1" = "contract-version" ]; then echo '` + contract + `'; else echo '{"done":true}'; fi`
+}
+
+func TestArgvRuleShapes(t *testing.T) {
+	rule := argvRule{positionals: 1, flags: []string{"--redact", "--since=", "--lines="}}
+	for name, tc := range map[string]struct {
+		args []string
+		ok   bool
+	}{
+		"empty":                     {nil, true},
+		"positional plus flags":     {[]string{"gateway", "--redact", "--since", "1h"}, true},
+		"valued flag without value": {[]string{"gateway", "--since"}, false},
+		"unknown flag":              {[]string{"gateway", "--follow"}, false},
+		"too many positionals":      {[]string{"gateway", "oam"}, false},
+		"flag not in rule as value": {[]string{"--redact", "--lines", "10"}, true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := rule.validate(tc.args)
+			if (err == nil) != tc.ok {
+				t.Fatalf("validate(%v) = %v, want ok=%v", tc.args, err, tc.ok)
+			}
+		})
+	}
+}
+
+func TestMutatingRunsTheHandshakeFirstAndRefusesUnadvertised(t *testing.T) {
+	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	_, err := InvokeMutating(context.Background(), &Request{
+		Subcommand: "backup create", Args: []string{"/root/a.tar", "--key-file", "/root/k"}})
+	requireCLIError(t, err, exitcode.ContractMismatch, "command-unavailable")
+	// The handshake ran; the refused subcommand itself never spawned.
+	argv, _ := os.ReadFile(filepath.Join(dir, "argv"))
+	if !strings.Contains(string(argv), "contract-version") {
+		t.Fatalf("no handshake before the mutating call; argv file: %q", argv)
+	}
+	if strings.Contains(string(argv), "backup") {
+		t.Fatal("an unadvertised mutating subcommand still spawned")
+	}
+}
+
+func TestMutatingSecretTravelsOnStdinOnly(t *testing.T) {
+	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	secret := "correcthorsebatterystaple"
+	res, err := InvokeMutating(context.Background(), &Request{
+		Subcommand: "gateway register-local",
+		Args:       []string{"--username", "admin", "--password-stdin"},
+		Secret:     strings.NewReader(secret),
+	})
+	if err != nil {
+		t.Fatalf("register-local failed: %v", err)
+	}
+	stdin, _ := os.ReadFile(filepath.Join(dir, "stdin"))
+	if !strings.Contains(string(stdin), secret) {
+		t.Fatalf("the secret did not reach the backend's stdin: %q", stdin)
+	}
+	argv, _ := os.ReadFile(filepath.Join(dir, "argv"))
+	env, _ := os.ReadFile(filepath.Join(dir, "env"))
+	if strings.Contains(string(argv), secret) || strings.Contains(string(env), secret) {
+		t.Fatalf("the secret leaked outside stdin\nargv: %q\nenv: %q", argv, env)
+	}
+	if !strings.Contains(string(argv), "--username\nadmin\n--password-stdin") {
+		t.Fatalf("register-local argv shape wrong: %q", argv)
+	}
+	if res.CorrelationID == "" {
+		t.Fatal("mutating invocation lost its correlation id")
+	}
+}
+
+func TestMutatingRefusesSecretForNonSecretSubcommand(t *testing.T) {
+	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	_, err := InvokeMutating(context.Background(), &Request{
+		Subcommand: "logs", Args: []string{"gateway", "--redact"},
+		Secret: strings.NewReader("sneaky"),
+	})
+	requireCLIError(t, err, exitcode.ContractMismatch, "argv-not-allowlisted")
+	if argv, _ := os.ReadFile(filepath.Join(dir, "argv")); strings.Contains(string(argv), "logs") {
+		t.Fatal("a refused secret-bearing invocation still spawned")
+	}
+}
+
+func TestReadOnlyEntryRefusesMutatingSubcommands(t *testing.T) {
+	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	_, err := Invoke(context.Background(), "logs", false)
+	requireCLIError(t, err, exitcode.ContractMismatch, "argv-not-allowlisted")
+	if argv, _ := os.ReadFile(filepath.Join(dir, "argv")); strings.Contains(string(argv), "logs") {
+		t.Fatal("a mutating subcommand spawned through the read-only entry point")
 	}
 }

@@ -169,6 +169,12 @@ var goldenCases = []goldenCase{
 	{"appliance-help", []string{"appliance", "--help"}, http.StatusOK, ""},
 	{"appliance-status-help", []string{"appliance", "status", "--help"}, http.StatusOK, ""},
 	{"appliance-network-validate-help", []string{"appliance", "network", "validate", "--help"}, http.StatusOK, ""},
+	{"appliance-public-address-configure-help", []string{"appliance", "public-address", "configure", "--help"}, http.StatusOK, ""},
+	{"appliance-gateway-register-local-help", []string{"appliance", "gateway", "register-local", "--help"}, http.StatusOK, ""},
+	{"appliance-credentials-bootstrap-help", []string{"appliance", "credentials", "bootstrap", "--help"}, http.StatusOK, ""},
+	{"appliance-diagnostics-create-help", []string{"appliance", "diagnostics", "create", "--help"}, http.StatusOK, ""},
+	{"appliance-logs-help", []string{"appliance", "logs", "--help"}, http.StatusOK, ""},
+	{"appliance-backup-help", []string{"appliance", "backup", "--help"}, http.StatusOK, ""},
 
 	// The full delete family, pinned ahead of its error-handling
 	// migration: these are the success surfaces the conversion must not
