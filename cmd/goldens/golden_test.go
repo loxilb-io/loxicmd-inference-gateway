@@ -162,6 +162,14 @@ var goldenCases = []goldenCase{
 	{"get-ready-json", []string{"get", "ready", "-o", "json"}, http.StatusOK, readyBody},
 	{"get-diagnostics-human", []string{"get", "diagnostics"}, http.StatusOK, diagnosticsBody},
 
+	// The appliance namespace never contacts the gateway, so only its
+	// help surfaces are pinned here (the not-available markers are part
+	// of the public capability contract); runtime behavior is proven by
+	// cmd/appliance's packaged-binary tests against a fake backend.
+	{"appliance-help", []string{"appliance", "--help"}, http.StatusOK, ""},
+	{"appliance-status-help", []string{"appliance", "status", "--help"}, http.StatusOK, ""},
+	{"appliance-network-validate-help", []string{"appliance", "network", "validate", "--help"}, http.StatusOK, ""},
+
 	// The full delete family, pinned ahead of its error-handling
 	// migration: these are the success surfaces the conversion must not
 	// move. Invocations follow each command's own documented example.
