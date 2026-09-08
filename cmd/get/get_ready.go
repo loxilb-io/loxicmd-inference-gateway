@@ -43,7 +43,7 @@ ex)
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return lifecycle.ReadyGet(restOptions, cmd.OutOrStdout(), cmd.ErrOrStderr(),
+			return lifecycle.ReadyGet(restOptions, cmd.OutOrStdout(),
 				restOptions.PrintOption == "json")
 		},
 	}

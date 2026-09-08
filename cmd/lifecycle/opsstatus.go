@@ -30,25 +30,25 @@ import (
 // both are rendered identically; the exit status carries the verdict. In
 // JSON mode the gateway's body is printed verbatim - the contract body IS
 // the machine interface here, so no envelope is wrapped around it.
-func ReadyGet(restOptions *api.RESTOptions, out, errOut io.Writer, jsonOut bool) error {
+func ReadyGet(restOptions *api.RESTOptions, out io.Writer, jsonOut bool) error {
 	ctx, cancel := requestContext(restOptions)
 	defer cancel()
 
 	client := api.NewLoxiClient(restOptions)
 	resp, err := client.StatusReady().Get(ctx)
 	if err != nil {
-		return renderOpsFailure(errOut, transportError("readiness request failed", err))
+		return transportError("readiness request failed", err)
 	}
 	defer resp.Body.Close()
 	body, err := readBody(resp.Body, "readiness")
 	if err != nil {
-		return renderOpsFailure(errOut, err)
+		return err
 	}
 
 	var state api.ReadyState
 	decodable := json.Unmarshal(body, &state) == nil && state.Ready != nil
 	if (resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusServiceUnavailable) || !decodable {
-		return renderOpsFailure(errOut, api.NewStatusError(resp.StatusCode, body))
+		return api.NewStatusError(resp.StatusCode, body)
 	}
 
 	if jsonOut {
@@ -70,30 +70,30 @@ func ReadyGet(restOptions *api.RESTOptions, out, errOut io.Writer, jsonOut bool)
 
 // DiagnosticsGet reads the secret-safe diagnostics assembly
 // (GET /diagnostics). JSON mode prints the gateway's body verbatim.
-func DiagnosticsGet(restOptions *api.RESTOptions, out, errOut io.Writer, jsonOut bool) error {
+func DiagnosticsGet(restOptions *api.RESTOptions, out io.Writer, jsonOut bool) error {
 	ctx, cancel := requestContext(restOptions)
 	defer cancel()
 
 	client := api.NewLoxiClient(restOptions)
 	resp, err := client.Diagnostics().Get(ctx)
 	if err != nil {
-		return renderOpsFailure(errOut, transportError("diagnostics request failed", err))
+		return transportError("diagnostics request failed", err)
 	}
 	defer resp.Body.Close()
 	body, err := readBody(resp.Body, "diagnostics")
 	if err != nil {
-		return renderOpsFailure(errOut, err)
+		return err
 	}
 	if resp.StatusCode != http.StatusOK {
-		return renderOpsFailure(errOut, api.NewStatusError(resp.StatusCode, body))
+		return api.NewStatusError(resp.StatusCode, body)
 	}
 	var state api.DiagnosticsState
 	if json.Unmarshal(body, &state) != nil || state.Version == "" {
-		return renderOpsFailure(errOut, &api.LifecycleError{
+		return &api.LifecycleError{
 			Reason:  api.ReasonDecodeFailed,
 			Message: "the gateway's diagnostics response could not be decoded",
 			Body:    string(body),
-		})
+		}
 	}
 	if jsonOut {
 		_, _ = out.Write(append(body, '\n'))
@@ -101,15 +101,6 @@ func DiagnosticsGet(restOptions *api.RESTOptions, out, errOut io.Writer, jsonOut
 	}
 	humanDiagnostics(out, &state)
 	return nil
-}
-
-// renderOpsFailure prints a read failure as prose on stderr and returns
-// the error for cobra's exit status. These are reads: there is no
-// unknown-state problem and no envelope contract, so prose is the whole
-// failure surface.
-func renderOpsFailure(errOut io.Writer, err error) error {
-	fmt.Fprintf(errOut, "Error: %s\n", err.Error())
-	return err
 }
 
 func humanAttachments(out io.Writer, attachments []api.EbpfAttachment) {

@@ -39,3 +39,21 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
 - Docs: [command reference](docs/COMMANDS.md) and [quickstart](docs/QUICKSTART.md).
 - Project scaffolding: CI (build/vet/gofmt/tests, golangci-lint, CodeQL, govulncheck, gitleaks,
   release-hygiene gate), tag-triggered release workflow, and issue/PR templates.
+- Public machine contracts under [contracts/](contracts/): the `CommandResult`
+  JSON envelope schema and the frozen exit-code taxonomy, with golden tests
+  pinning every command family's success output.
+
+### Changed
+- **Exit codes**: failures now terminate with the frozen taxonomy
+  (`2`–`8`, see [contracts/exit-codes.md](contracts/exit-codes.md)) instead of
+  the legacy `0`/`1`. Success stays `0`; `1` is reserved so automation can
+  detect a pre-taxonomy binary. Scripts that tested `$? -eq 1` must test
+  `$? -ne 0` (or branch on the specific code); commands that previously
+  printed an error but exited `0` now exit non-zero.
+- **JSON output**: `-o json` emits the `CommandResult` envelope
+  ([contracts/command-result.schema.json](contracts/command-result.schema.json))
+  for every command, including the configuration-lifecycle family, which
+  previously used an interim document of its own — the field-by-field
+  migration table is in [contracts/README.md](contracts/README.md).
+- Failure text prints exactly once, on stderr, from the single exit point;
+  commands no longer print their own `Error:` lines.
