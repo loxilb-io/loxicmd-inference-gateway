@@ -3,8 +3,17 @@ name: Release
 # Tag-triggered release. Versions follow loxilb-io/loxilb-inference-gateway —
 # vMAJOR.MINOR.PATCH with an optional build component (v0.9.8.6), or a
 # -rc./-alpha./-beta. suffix for a prerelease; the tag is validated below and
-# stamped into the binary. Produces a linux/amd64 + linux/arm64 binary tarball
-# and SHA256SUMS attached to a GitHub Release.
+# stamped into the binary. Produces a linux/amd64 + linux/arm64 binary tarball,
+# SHA256SUMS, an SPDX SBOM, signed build provenance, and machine-readable
+# release metadata attached to a GitHub Release.
+#
+# Release-input rules enforced here:
+#   - only an annotated v* tag reaches this workflow, so the input is an
+#     immutable ref by construction; the resolved commit is still recorded and
+#     re-verified from inside the built binary
+#   - a dirty tree, or generated files modified by the build, fail the job
+#   - each binary is built twice from identical inputs; a differing pair is a
+#     reproducibility failure that blocks the release
 #
 # AUTHORIZATION: this job targets the `release` Environment, which should be
 # configured with required reviewers and a deployment branch policy allowing
@@ -24,10 +33,12 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     environment: release
     permissions:
       contents: write # create the GitHub Release
+      id-token: write # sign build provenance
+      attestations: write # store build provenance
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
@@ -50,36 +61,184 @@ jobs:
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve and verify build inputs
+        id: inputs
+        run: |
+          # The commit the tag resolved to is the one identity every later
+          # step verifies against.
+          REV="$(git rev-parse HEAD)"
+          if [ "$REV" != "${GITHUB_SHA}" ]; then
+            echo "::error::checked-out commit ${REV} does not match the triggering commit ${GITHUB_SHA}"
+            exit 1
+          fi
+          # A release builds a committed tree, nothing else.
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            echo "::error::working tree is dirty; a release builds only committed sources"
+            exit 1
+          fi
+          if [ -n "$(git submodule status --recursive 2>/dev/null | grep -E '^[+U-]')" ]; then
+            echo "::error::unexpected submodule state"
+            exit 1
+          fi
+          # Reproducible timestamp: the commit time, not the build time.
+          SDE="$(git log -1 --pretty=%ct)"
+          # The gateway API contract this CLI consumes, from the pinned
+          # manifest (verified against the gateway spec by build.yml).
+          CONTRACT="$(sed -n 's/.*"swagger_sha256": "\([0-9a-f]*\)".*/\1/p' testdata/contracts/gateway-api.json)"
+          if [ -z "$CONTRACT" ]; then
+            echo "::error::could not read the gateway contract digest from testdata/contracts/gateway-api.json"
+            exit 1
+          fi
+          {
+            echo "revision=${REV}"
+            echo "sde=${SDE}"
+            echo "contract=${CONTRACT}"
+            echo "workflow=${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: 'stable'
           cache: true
 
-      - name: Build binaries
+      - name: Build binaries (twice, proving reproducibility)
         env:
           CGO_ENABLED: 0
+          VERSION: ${{ steps.ver.outputs.version }}
+          REV: ${{ steps.inputs.outputs.revision }}
+          SDE: ${{ steps.inputs.outputs.sde }}
+          CONTRACT: ${{ steps.inputs.outputs.contract }}
+          WORKFLOW: ${{ steps.inputs.outputs.workflow }}
         run: |
-          VERSION="${{ steps.ver.outputs.version }}"
-          BUILDINFO="$(date '+%Y_%m_%d')-release-$(git rev-parse --short HEAD)"
+          BUILDINFO="$(date -u -d "@${SDE}" '+%Y_%m_%d')-release-$(git rev-parse --short HEAD)"
+          MOD="github.com/loxilb-io/loxicmd-inference-gateway/cmd"
+          LDFLAGS="-X '${MOD}.Version=${VERSION}' \
+                   -X '${MOD}.BuildInfo=${BUILDINFO}' \
+                   -X '${MOD}.SourceRevision=${REV}' \
+                   -X '${MOD}.GatewayContract=${CONTRACT}' \
+                   -X '${MOD}.BuildWorkflow=${WORKFLOW}' \
+                   -X '${MOD}.SourceDateEpoch=${SDE}'"
           for arch in amd64 arm64; do
-            GOOS=linux GOARCH="$arch" go build \
-              -ldflags "-X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.Version=${VERSION}' -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=${BUILDINFO}'" \
-              -o "loxicmd_${arch}"
+            for round in 1 2; do
+              GOOS=linux GOARCH="$arch" go build -trimpath \
+                -ldflags "$LDFLAGS" -o "loxicmd_${arch}.round${round}"
+            done
+            if ! cmp -s "loxicmd_${arch}.round1" "loxicmd_${arch}.round2"; then
+              sha256sum "loxicmd_${arch}.round1" "loxicmd_${arch}.round2"
+              echo "::error::linux/${arch} build is not reproducible: two builds from identical inputs differ"
+              exit 1
+            fi
+            mv "loxicmd_${arch}.round1" "loxicmd_${arch}"
+            rm "loxicmd_${arch}.round2"
+          done
+          # The build must not have modified any committed file (uncommitted
+          # generated sources would make the tag a lie).
+          git diff --exit-code || {
+            echo "::error::the build modified committed files"
+            exit 1
+          }
+
+      - name: Verify the binary reports the release identity
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          REV: ${{ steps.inputs.outputs.revision }}
+          CONTRACT: ${{ steps.inputs.outputs.contract }}
+        run: |
+          # The runner is linux/amd64, so the amd64 binary runs natively.
+          # What the binary says about itself must match what this job knows
+          # it built; anything else means the stamping pipeline lies.
+          chmod +x loxicmd_amd64
+          ./loxicmd_amd64 version -o json | tee version.json
+          for check in \
+            '.data.version == env.VERSION' \
+            '.data.sourceRevision == env.REV' \
+            '.data.gatewayContract == env.CONTRACT' \
+            '.code == "OK"'; do
+            jq -e "$check" version.json >/dev/null || {
+              echo "::error::binary identity check failed: $check"
+              exit 1
+            }
           done
 
       - name: Package tarballs + checksums
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          SDE: ${{ steps.inputs.outputs.sde }}
         run: |
-          VERSION="${{ steps.ver.outputs.version }}"
           mkdir -p dist
           for arch in amd64 arm64; do
             DIST="loxicmd-inference-gateway_${VERSION}_linux_${arch}"
             mkdir -p "dist/${DIST}"
             cp "loxicmd_${arch}" "dist/${DIST}/loxicmd"
             cp LICENSE NOTICE README.md "dist/${DIST}/"
-            tar -C dist -czf "dist/${DIST}.tar.gz" "${DIST}"
+            # Deterministic archive: fixed order, epoch from the commit,
+            # no owner/group leakage, gzip without a timestamp header.
+            tar -C dist --sort=name --mtime="@${SDE}" \
+              --owner=0 --group=0 --numeric-owner \
+              -cf "dist/${DIST}.tar" "${DIST}"
+            gzip -n "dist/${DIST}.tar"
           done
           ( cd dist && sha256sum ./*.tar.gz > SHA256SUMS )
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/loxicmd-inference-gateway_${{ steps.ver.outputs.version }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Write release metadata
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          REV: ${{ steps.inputs.outputs.revision }}
+          CONTRACT: ${{ steps.inputs.outputs.contract }}
+          WORKFLOW: ${{ steps.inputs.outputs.workflow }}
+          SDE: ${{ steps.inputs.outputs.sde }}
+        run: |
+          # Machine-readable identity for downstream product-lock intake:
+          # which sources produced which artifact digests, verifiable offline
+          # against SHA256SUMS and the provenance attestation.
+          jq -n \
+            --arg version "$VERSION" \
+            --arg revision "$REV" \
+            --arg contract "$CONTRACT" \
+            --arg workflow "$WORKFLOW" \
+            --arg sde "$SDE" \
+            --arg go "$(go version | awk '{print $3}')" \
+            --slurpfile identity version.json \
+            '{
+              apiVersion: "loxilb.io/appliance/v1",
+              kind: "ReleaseMetadata",
+              component: "loxicmd-inference-gateway",
+              version: $version,
+              sourceRevision: $revision,
+              gatewayContract: $contract,
+              goVersion: $go,
+              buildWorkflow: $workflow,
+              sourceDateEpoch: $sde,
+              binaryIdentity: $identity[0].data,
+              artifacts: []
+            }' > release-metadata.tmp
+          for f in dist/*.tar.gz dist/*.spdx.json; do
+            jq --arg name "$(basename "$f")" \
+               --arg sha256 "$(sha256sum "$f" | awk '{print $1}')" \
+               '.artifacts += [{name: $name, sha256: $sha256}]' \
+               release-metadata.tmp > release-metadata.next
+            mv release-metadata.next release-metadata.tmp
+          done
+          mv release-metadata.tmp "dist/release-metadata_${VERSION}.json"
+          cat "dist/release-metadata_${VERSION}.json"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/release-metadata_*.json
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
@@ -90,3 +249,5 @@ jobs:
           files: |
             dist/*.tar.gz
             dist/SHA256SUMS
+            dist/*.spdx.json
+            dist/release-metadata_*.json

@@ -1,0 +1,31 @@
+exit=0
+--- stdout ---
+{
+    "command": "create persist",
+    "result": "ok",
+    "reason": "ok",
+    "contract": "durable",
+    "persist": {
+        "result": "ok",
+        "path": "/etc/loxilb/snapshot.json",
+        "checksum": "sha256:abc",
+        "schema_version": "1.5",
+        "generation": 7,
+        "included_domains": [
+            "loadbalancer",
+            "endpoint"
+        ],
+        "excluded_domains": [
+            "conntrack"
+        ],
+        "external_dependencies": [
+            {
+                "type": "api-key-db",
+                "id": "keys",
+                "required": true,
+                "status": "ready"
+            }
+        ]
+    }
+}
+--- stderr ---

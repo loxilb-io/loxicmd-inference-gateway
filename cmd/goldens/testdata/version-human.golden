@@ -1,0 +1,5 @@
+exit=0
+--- stdout ---
+Loxicmd version: v0.9.8.6
+Loxicmd build info: 
+--- stderr ---
