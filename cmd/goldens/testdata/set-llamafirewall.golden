@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+LlamaFirewall scanning enabled.
+--- stderr ---

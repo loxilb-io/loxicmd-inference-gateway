@@ -59,6 +59,8 @@ func GetCmd(restOptions *api.RESTOptions) *cobra.Command {
 	GetCmd.AddCommand(NewGetIPAddressCmd(restOptions))
 	GetCmd.AddCommand(NewGetNeighborCmd(restOptions))
 	GetCmd.AddCommand(NewGetStatusProcessCmd(restOptions))
+	GetCmd.AddCommand(NewGetStatusDeviceCmd(restOptions))
+	GetCmd.AddCommand(NewGetStatusFileSystemCmd(restOptions))
 	GetCmd.AddCommand(NewGetVlanCmd(restOptions))
 	GetCmd.AddCommand(NewGetMirrorCmd(restOptions))
 	GetCmd.AddCommand(NewGetFirewallCmd(restOptions))

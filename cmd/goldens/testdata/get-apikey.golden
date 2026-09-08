@@ -1,0 +1,5 @@
+exit=0
+--- stdout ---
+| KEY ID | TENANT | NAME | MODELS | RPS | BURST | TOKENS/MIN | ENABLED |
+|--------|--------|------|--------|-----|-------|------------|---------|
+--- stderr ---
