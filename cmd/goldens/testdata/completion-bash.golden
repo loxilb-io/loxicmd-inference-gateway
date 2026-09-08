@@ -3562,6 +3562,51 @@ _loxicmd_get_conntrack()
     noun_aliases=()
 }
 
+_loxicmd_get_diagnostics()
+{
+    last_command="loxicmd_get_diagnostics"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _loxicmd_get_dpu()
 {
     last_command="loxicmd_get_dpu"
@@ -4183,6 +4228,51 @@ _loxicmd_get_log-level()
     noun_aliases=()
 }
 
+_loxicmd_get_maintenance()
+{
+    last_command="loxicmd_get_maintenance"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _loxicmd_get_metrics()
 {
     last_command="loxicmd_get_metrics"
@@ -4548,6 +4638,51 @@ _loxicmd_get_process()
 _loxicmd_get_ratelimit()
 {
     last_command="loxicmd_get_ratelimit"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_get_ready()
+{
+    last_command="loxicmd_get_ready"
 
     command_aliases=()
 
@@ -4996,6 +5131,7 @@ _loxicmd_get()
         command_aliases+=("cts")
         aliashash["cts"]="conntrack"
     fi
+    commands+=("diagnostics")
     commands+=("dpu")
     commands+=("endpoint")
     if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
@@ -5061,6 +5197,7 @@ _loxicmd_get()
         command_aliases+=("loglevel")
         aliashash["loglevel"]="log-level"
     fi
+    commands+=("maintenance")
     commands+=("metrics")
     commands+=("mirror")
     if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
@@ -5106,6 +5243,7 @@ _loxicmd_get()
         command_aliases+=("ratelimits")
         aliashash["ratelimits"]="ratelimit"
     fi
+    commands+=("ready")
     commands+=("route")
     commands+=("session")
     if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
@@ -5810,6 +5948,55 @@ _loxicmd_set_logout()
     noun_aliases=()
 }
 
+_loxicmd_set_maintenance()
+{
+    last_command="loxicmd_set_maintenance"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--drain-timeout=")
+    two_word_flags+=("--drain-timeout")
+    local_nonpersistent_flags+=("--drain-timeout")
+    local_nonpersistent_flags+=("--drain-timeout=")
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _loxicmd_set_metrics()
 {
     last_command="loxicmd_set_metrics"
@@ -6242,6 +6429,7 @@ _loxicmd_set()
     fi
     commands+=("login")
     commands+=("logout")
+    commands+=("maintenance")
     commands+=("metrics")
     commands+=("opa")
     commands+=("pii")
