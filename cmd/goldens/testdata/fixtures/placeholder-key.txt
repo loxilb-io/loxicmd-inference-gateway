@@ -1,0 +1,1 @@
+placeholder key material for the create-cert golden; not a real key

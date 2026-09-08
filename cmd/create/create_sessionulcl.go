@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -46,40 +46,36 @@ func NewCreateSessionUlClCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create sessionulcl user1 --ulclArgs=16:192.33.125.1
 		`,
 		Aliases: []string{"ulcl", "sessionulcls", "ulcls"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create sessionulcl needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var SessionMods api.UlclInformationGet
 			// Make SessionMod
 			if err := ReadCreateSessionUlClOptions(&SessionMods, args, len(o.UlClArgs)); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 
 			if err := GetUlClArgsPairList(&SessionMods, o.UlClArgs); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
+			// Every requested ulcl entry is sent: the loop used to return
+			// after the first successful answer, silently dropping the rest
+			// of a multi-value --ulclArgs invocation.
 			for _, SessionMod := range SessionMods.UlclInfo {
 				resp, err := SessionUlClAPICall(restOptions, SessionMod)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("create sessionulcl: %v", err)
 				}
 				defer resp.Body.Close()
 
 				fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
-				if resp.StatusCode == http.StatusOK {
-					PrintCreateResult(resp, *restOptions)
-					return
+				if resp.StatusCode != http.StatusOK {
+					return exitcode.FromHTTPStatus("create sessionulcl", resp.StatusCode)
 				}
-
+				PrintCreateResult(resp, *restOptions)
 			}
-
+			return nil
 		},
 	}
 

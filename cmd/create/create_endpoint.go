@@ -19,9 +19,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -49,50 +49,37 @@ func NewCreateEndPointCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create endpoint 32.32.32.1 --name=32.32.32.1_http_8080 --probetype=http --probeport=8080 --period=60 --retries=2
 `,
 		Aliases: []string{"Endpoint", "ep", "endpoints"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create ep need HOST-IP args")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var EPMod api.EndPointMod
-			// Make EndPointMod
-			if len(args) <= 0 {
-				fmt.Printf("create ep need HOST-IP args\n")
-				return
-			}
 
 			if val := net.ParseIP(args[0]); val != nil {
 				o.Host = args[0]
 			} else {
-				fmt.Printf("HOSTIP '%s' is invalid format\n", args[0])
-				return
+				return exitcode.Invalidf("HOSTIP '%s' is invalid format", args[0])
 			}
 
 			if o.ProbeType != "http" && o.ProbeType != "https" && o.ProbeType != "ping" &&
 				o.ProbeType != "tcp" && o.ProbeType != "udp" &&
 				o.ProbeType != "sctp" && o.ProbeType != "none" {
-				fmt.Printf("probetype '%s' is invalid\n", o.ProbeType)
-				return
+				return exitcode.Invalidf("probetype '%s' is invalid", o.ProbeType)
 			}
 
 			if o.ProbeType == "http" || o.ProbeType == "https" || o.ProbeType == "tcp" ||
 				o.ProbeType == "udp" || o.ProbeType == "sctp" {
 				if o.ProbePort == 0 {
-					fmt.Printf("probeport cant be 0 for '%s' probes\n", o.ProbeType)
-					return
+					return exitcode.Invalidf("probeport cant be 0 for '%s' probes", o.ProbeType)
 				}
 			}
 
 			if o.ProbeType == "ping" && o.ProbePort != 0 {
-				fmt.Printf("probeport should be 0 for '%s' probes\n", o.ProbeType)
-				return
+				return exitcode.Invalidf("probeport should be 0 for '%s' probes", o.ProbeType)
 			}
 
 			if o.ProbeDuration > 24*60*60 {
-				fmt.Printf("probe period is out of bounds\n")
-				return
+				return exitcode.Invalidf("probe period is out of bounds")
 			}
 
 			EPMod.HostName = o.Host
@@ -105,16 +92,16 @@ ex) loxicmd create endpoint 32.32.32.1 --name=32.32.32.1_http_8080 --probetype=h
 			EPMod.ProbeResp = o.ProbeResp
 			resp, err := EndPointAPICall(restOptions, EPMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create endpoint: %v", err)
 			}
 			defer resp.Body.Close()
 
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
+			return exitcode.FromHTTPStatus("create endpoint", resp.StatusCode)
 		},
 	}
 

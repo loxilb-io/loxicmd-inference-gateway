@@ -131,6 +131,11 @@ const diagnosticsBody = `{"version":"v1.2.3","build_info":"rev abc","product":"l
 	`"maps":[{"name":"conntrack","count":10,"capacity":1000}],` +
 	`"external_dependencies":[{"type":"keystore","required":true,"status":"ready","latency_class":"fast"}]}`
 
+// apiKeyCreatedBody mirrors the gateway's 201 answer to POST /config/ai/apikey.
+// The raw-key value is a deliberately digit-free lowercase placeholder so the
+// repository's history-wide secret scan never mistakes it for a credential.
+const apiKeyCreatedBody = `{"key_id":"key-abc","raw_key":"raw-key-material-placeholder"}`
+
 // goldenCase is one pinned invocation. Every case runs against a fake
 // gateway that answers with the given canned response.
 type goldenCase struct {
@@ -180,6 +185,32 @@ var goldenCases = []goldenCase{
 	{"delete-vlanmember", []string{"delete", "vlanmember", "100", "eno1", "--tagged=true"}, http.StatusOK, successBody},
 	{"delete-vxlan", []string{"delete", "vxlan", "50"}, http.StatusOK, successBody},
 	{"delete-vxlanpeer", []string{"delete", "vxlanpeer", "50", "30.1.3.1"}, http.StatusOK, successBody},
+
+	// The full create family, pinned ahead of its error-handling
+	// migration, same contract as the delete block above: these are the
+	// success surfaces the conversion must not move. Invocations follow
+	// each command's own documented example. create-lb and create-persist
+	// are already pinned with the founding cases.
+	{"create-apikey", []string{"create", "apikey", "--tenant-id=tenant-a", "--name=key-1", "--allowed-models=llama-70b,mistral-7b", "--rps=5", "--burst=10", "--tokens-per-min=1000"}, http.StatusCreated, apiKeyCreatedBody},
+	{"create-bfd", []string{"create", "bfd", "32.32.32.2", "--instance=default", "--sourceIP=32.32.32.1", "--interval=200000", "--retryCount=3"}, http.StatusOK, successBody},
+	{"create-bgpneighbor", []string{"create", "bgpneighbor", "10.10.10.1", "64512"}, http.StatusOK, successBody},
+	{"create-cert", []string{"create", "cert", "--cert-file=testdata/fixtures/placeholder-cert.txt", "--key-file=testdata/fixtures/placeholder-key.txt", "--cert-id=web"}, http.StatusCreated, successBody},
+	{"create-endpoint", []string{"create", "endpoint", "32.32.32.1", "--name=32.32.32.1_http_8080", "--probetype=http", "--probeport=8080", "--period=60", "--retries=2"}, http.StatusOK, successBody},
+	{"create-fdb", []string{"create", "fdb", "aa:aa:aa:aa:bb:bb", "eno7"}, http.StatusOK, successBody},
+	{"create-firewall", []string{"create", "firewall", "--firewallRule=sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200", "--allow"}, http.StatusOK, successBody},
+	{"create-ip", []string{"create", "ip", "192.168.0.1/24", "eno7"}, http.StatusOK, successBody},
+	{"create-mirror", []string{"create", "mirror", "mirr-1", "--mirrorInfo=type:0,port:hs0", "--targetObject=attachement:1,mirrObjName:hs1"}, http.StatusOK, successBody},
+	{"create-neighbor", []string{"create", "neighbor", "192.168.0.1", "eno7", "--macAddress=aa:aa:aa:aa:aa:aa"}, http.StatusOK, successBody},
+	{"create-policy", []string{"create", "policy", "pol-rule", "--rate=100:100", "--target=192.0.2.10:443:tcp:rule"}, http.StatusOK, successBody},
+	{"create-route", []string{"create", "route", "192.168.212.0/24", "172.17.0.254", "--proto=static"}, http.StatusOK, successBody},
+	{"create-session", []string{"create", "session", "user1", "192.168.20.1", "--accessNetworkTunnel=1:1.232.16.1", "--coreNetworkTunnel=1:1.233.16.1"}, http.StatusOK, successBody},
+	{"create-sessionulcl", []string{"create", "sessionulcl", "user1", "--ulclArgs=16:192.33.125.1"}, http.StatusOK, successBody},
+	{"create-sni", []string{"create", "sni", "--hostname=api.example.com"}, http.StatusOK, successBody},
+	{"create-user", []string{"create", "user", "--username=admin", "--password=placeholder-pass", "--role=admin"}, http.StatusCreated, successBody},
+	{"create-vlan", []string{"create", "vlan", "100"}, http.StatusOK, successBody},
+	{"create-vlanmember", []string{"create", "vlanmember", "100", "eno7", "--tagged=true"}, http.StatusOK, successBody},
+	{"create-vxlan", []string{"create", "vxlan", "100", "eno7"}, http.StatusOK, successBody},
+	{"create-vxlanpeer", []string{"create", "vxlanpeer", "100", "30.1.3.1"}, http.StatusOK, successBody},
 }
 
 // normalize replaces the only run-dependent value — the Go toolchain of the

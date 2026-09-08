@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -39,10 +40,9 @@ If --cert-path is omitted the gateway uses /opt/loxilb/cert/<hostname>.
 
 ex)
 	loxicmd create sni --hostname=api.example.com --cert-path=/opt/loxilb/cert`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if hostname == "" {
-				fmt.Printf("Error: --hostname is required\n")
-				return
+				return exitcode.Usagef("--hostname is required")
 			}
 			req := api.SNICertificateEntry{Hostname: hostname, CertPath: certPath}
 			client := api.NewLoxiClient(restOptions)
@@ -52,16 +52,17 @@ ex)
 			}
 			resp, err := client.SNICertificate().Create(ctx, req)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create sni: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("create sni", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("SNI certificate registered for '%s'.\n", hostname)
+			return nil
 		},
 	}
 	createSNICmd.Flags().StringVar(&hostname, "hostname", "", "SNI hostname (required)")

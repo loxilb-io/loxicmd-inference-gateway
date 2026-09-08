@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -36,31 +36,26 @@ func NewCreateIPv4AddressCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex) loxicmd create ip 192.168.0.1/24 eno7
 `,
 		Aliases: []string{"ipv4address", "ipv4", "ipaddress"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create ip needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var IPv4AddressMod api.Ipv4AddrMod
 			// Make IPv4AddressMod
 			if err := ReadCreateIPv4AddressOptions(&IPv4AddressMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := IPv4AddressAPICall(restOptions, IPv4AddressMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create ip: %v", err)
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create ip", resp.StatusCode)
 		},
 	}
 

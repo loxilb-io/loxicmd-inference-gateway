@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -67,15 +68,13 @@ X-Api-Key credentials are separate identities.
 
 ex)
 	loxicmd create apikey --tenant-id=tenant-a --name=key-1 --allowed-models=llama-70b,mistral-7b --rps=5 --burst=10 --tokens-per-min=1000`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.TenantID == "" {
-				fmt.Printf("Error: --tenant-id is required\n")
-				return
+				return exitcode.Usagef("--tenant-id is required")
 			}
 			importedKey, imported, err := readImportedAPIKey(&o, cmd.InOrStdin())
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return err
 			}
 			enabled := o.Enabled
 			req := api.AIApiKeyCreateRequest{
@@ -97,25 +96,27 @@ ex)
 			}
 			resp, err := client.AIApiKey().Create(ctx, req)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create apikey: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 
 			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("create apikey", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 
 			result := api.AIApiKeyCreateResponse{}
 			if err := json.Unmarshal(body, &result); err != nil {
-				fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
-				return
+				return &exitcode.CLIError{
+					Code:       exitcode.ContractMismatch,
+					Message:    fmt.Sprintf("Failed to unmarshal HTTP response: (%s)", err.Error()),
+					Origin:     "gateway",
+					HTTPStatus: resp.StatusCode,
+				}
 			}
-			if err := printCreateAPIKeyResult(cmd.OutOrStdout(), result, imported, restOptions.PrintOption); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-			}
+			return printCreateAPIKeyResult(cmd.OutOrStdout(), result, imported, restOptions.PrintOption)
 		},
 	}
 
@@ -135,7 +136,7 @@ ex)
 
 func readImportedAPIKey(o *CreateAPIKeyOptions, stdin io.Reader) (string, bool, error) {
 	if o.APIKeyFile != "" && o.APIKeyStdin {
-		return "", false, fmt.Errorf("--api-key-file and --api-key-stdin are mutually exclusive")
+		return "", false, exitcode.Usagef("--api-key-file and --api-key-stdin are mutually exclusive")
 	}
 	if o.APIKeyFile == "" && !o.APIKeyStdin {
 		return "", false, nil
@@ -147,7 +148,9 @@ func readImportedAPIKey(o *CreateAPIKeyOptions, stdin io.Reader) (string, bool, 
 		var err error
 		file, err = os.Open(o.APIKeyFile)
 		if err != nil {
-			return "", false, fmt.Errorf("read API key file: %w", err)
+			// An unreadable input file is a missing precondition, per
+			// the taxonomy's file-read row.
+			return "", false, &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("read API key file: %v", err)}
 		}
 		defer file.Close()
 		reader = file
@@ -155,15 +158,15 @@ func readImportedAPIKey(o *CreateAPIKeyOptions, stdin io.Reader) (string, bool, 
 
 	b, err := io.ReadAll(io.LimitReader(reader, maxImportedAPIKeyLength+2))
 	if err != nil {
-		return "", false, fmt.Errorf("read imported API key: %w", err)
+		return "", false, &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("read imported API key: %v", err)}
 	}
 	key := strings.TrimSpace(string(b))
 	if len(key) < minImportedAPIKeyLength || len(key) > maxImportedAPIKeyLength {
-		return "", false, fmt.Errorf("imported API key must be between %d and %d characters", minImportedAPIKeyLength, maxImportedAPIKeyLength)
+		return "", false, exitcode.Invalidf("imported API key must be between %d and %d characters", minImportedAPIKeyLength, maxImportedAPIKeyLength)
 	}
 	for i := 0; i < len(key); i++ {
 		if key[i] < 0x21 || key[i] > 0x7e {
-			return "", false, fmt.Errorf("imported API key must contain only printable non-space ASCII characters")
+			return "", false, exitcode.Invalidf("imported API key must contain only printable non-space ASCII characters")
 		}
 	}
 	return key, true, nil

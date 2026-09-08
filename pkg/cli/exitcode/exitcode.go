@@ -210,6 +210,7 @@ var cobraUsageShapes = []string{
 	"unknown flag",
 	"unknown shorthand flag",
 	"flag needs an argument",
+	"required flag",
 	"invalid argument ",
 	"accepts ",
 	"requires at least ",

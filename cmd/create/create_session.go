@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -49,41 +49,34 @@ ex) loxicmd create session user1 192.168.20.1 --accessNetworkTunnel=1:1.232.16.1
 
 		`,
 		Aliases: []string{"session", "sessions"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create session needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var SessionMod api.SessionMod
 			// Make SessionMod
 			if err := ReadCreateSessionOptions(&SessionMod, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			if err := GetNetworkTunnelPairList(&SessionMod, o.ANTunnel, true); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			if err := GetNetworkTunnelPairList(&SessionMod, o.CNTunnel, false); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 
 			resp, err := SessionAPICall(restOptions, SessionMod)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create session: %v", err)
 			}
 			defer resp.Body.Close()
 
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create session", resp.StatusCode)
 		},
 	}
 

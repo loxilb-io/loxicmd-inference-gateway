@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -55,40 +55,33 @@ ex) loxicmd create mirror mirr-1 --mirrorInfo="type:0,port:hs0" --targetObject="
 
 `,
 		Aliases: []string{"mirror", "mirr", "mirrors"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create mirror needs its arguments")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var mirrorMods api.MirrMod
 			// Make mirrorMod
 			if err := ReadCreateMirrorOptions(&mirrorMods, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			if err := GetMirrorInfoPairList(&mirrorMods, o.MirrInfo); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			if err := GetTargetObjPairList(&mirrorMods, o.TargerObj); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := MirrorAPICall(restOptions, mirrorMods)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create mirror: %v", err)
 			}
 			defer resp.Body.Close()
 
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create mirror", resp.StatusCode)
 		},
 	}
 

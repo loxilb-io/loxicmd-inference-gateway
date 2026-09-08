@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+API key created.
+  key_id : key-abc
+  raw_key: raw-key-material-placeholder
+Store the raw_key now - it will not be shown again.
+--- stderr ---

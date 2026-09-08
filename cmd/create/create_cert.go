@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -44,27 +45,25 @@ If --cert-id is omitted the server mints one. The private key is never returned 
 
 ex)
 	loxicmd create cert --cert-file=server.crt --key-file=server.key --chain-file=chain.pem --cert-id=web`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.CertFile == "" || o.KeyFile == "" {
-				fmt.Printf("Error: --cert-file and --key-file are required\n")
-				return
+				return exitcode.Usagef("--cert-file and --key-file are required")
 			}
+			// An unreadable input file is a missing precondition, per the
+			// taxonomy's file-read row.
 			certPem, err := os.ReadFile(o.CertFile)
 			if err != nil {
-				fmt.Printf("Error: reading --cert-file: %s\n", err.Error())
-				return
+				return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --cert-file: %v", err)}
 			}
 			keyPem, err := os.ReadFile(o.KeyFile)
 			if err != nil {
-				fmt.Printf("Error: reading --key-file: %s\n", err.Error())
-				return
+				return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --key-file: %v", err)}
 			}
 			model := api.CertModel{CertID: o.CertID, CertPem: string(certPem), KeyPem: string(keyPem)}
 			if o.ChainFile != "" {
 				chainPem, err := os.ReadFile(o.ChainFile)
 				if err != nil {
-					fmt.Printf("Error: reading --chain-file: %s\n", err.Error())
-					return
+					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --chain-file: %v", err)}
 				}
 				model.ChainPem = string(chainPem)
 			}
@@ -76,20 +75,21 @@ ex)
 			}
 			resp, err := client.Cert().Create(ctx, model)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create cert: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("create cert", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			if o.CertID != "" {
 				fmt.Printf("Certificate '%s' created.\n", o.CertID)
 			} else {
 				fmt.Printf("Certificate created.\n")
 			}
+			return nil
 		},
 	}
 	createCertCmd.Flags().StringVar(&o.CertID, "cert-id", "", "Certificate ID (optional; server mints one if omitted)")

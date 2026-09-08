@@ -52,6 +52,21 @@ func TestExitTaxonomy(t *testing.T) {
 		{"peer-validation-is-contract-mismatch", []string{"delete", "vlan", "100"}, http.StatusBadRequest, `{}`, 6, "400"},
 		{"server-error-is-failed", []string{"delete", "vlan", "100"}, http.StatusInternalServerError, `{}`, 7, "500"},
 		{"unreachable-is-unavailable", []string{"delete", "vlan", "100"}, 0, "", 5, "Error:"},
+
+		// The create family rides the same table after its own
+		// conversion; one row per failure class it can produce.
+		{"create-missing-args-is-usage", []string{"create", "vlan"}, http.StatusOK, successBody, 2, "Error:"},
+		{"create-invalid-value-is-usage", []string{"create", "vlan", "not-a-vid"}, http.StatusOK, successBody, 2, "Error:"},
+		{"create-unknown-subcommand-is-usage", []string{"create", "vlans", "100"}, http.StatusOK, successBody, 2, "unknown command"},
+		{"create-bare-parent-is-usage", []string{"create"}, http.StatusOK, successBody, 2, "Error:"},
+		{"create-unauthorized-is-auth", []string{"create", "vlan", "100"}, http.StatusUnauthorized, `{}`, 3, "401"},
+		{"create-refusing-service-is-unavailable", []string{"create", "vlan", "100"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
+		{"create-peer-validation-is-contract-mismatch", []string{"create", "vlan", "100"}, http.StatusBadRequest, `{}`, 6, "400"},
+		{"create-server-error-is-failed", []string{"create", "vlan", "100"}, http.StatusInternalServerError, `{}`, 7, "500"},
+		{"create-unreachable-is-unavailable", []string{"create", "vlan", "100"}, 0, "", 5, "Error:"},
+		{"create-missing-required-flag-is-usage", []string{"create", "sni"}, http.StatusOK, successBody, 2, "Error:"},
+		{"create-cobra-required-flag-is-usage", []string{"create", "firewall"}, http.StatusOK, successBody, 2, "required flag"},
+		{"create-unreadable-file-is-precondition", []string{"create", "cert", "--cert-file=/nonexistent/no.crt", "--key-file=/nonexistent/no.key"}, http.StatusOK, successBody, 4, "reading --cert-file"},
 	}
 
 	for _, tc := range cases {

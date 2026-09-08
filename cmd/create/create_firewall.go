@@ -20,8 +20,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -73,37 +73,31 @@ ex) loxicmd create firewall --firewallRule="sourceIP:1.2.3.2/32,destinationIP:2.
 	loxicmd create firewall --firewallRule="sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200" --snat=10.10.10.1,3030 --egress (Egress rules match for non-k8s traffic)
 `,
 		Aliases: []string{"Firewall", "fw", "firewalls"},
-		PreRun: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(o.FirewallRule) == 0 {
-				cmd.Help()
-				os.Exit(0)
+				return exitcode.Usagef("create firewall needs its --firewallRule option")
 			}
-		},
-		Run: func(cmd *cobra.Command, args []string) {
 			var FirewallMods api.FwRuleMod
 			// Make FirewallMod
 			if err := GetFirewallRulePairList(&FirewallMods, o.FirewallRule); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 
 			if err := GetFWOptionPairList(&FirewallMods, o); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := FirewallAPICall(restOptions, FirewallMods)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create firewall: %v", err)
 			}
 			defer resp.Body.Close()
 
 			fmt.Printf("Debug: response.StatusCode: %d\n", resp.StatusCode)
 			if resp.StatusCode == http.StatusOK {
 				PrintCreateResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("create firewall", resp.StatusCode)
 		},
 	}
 

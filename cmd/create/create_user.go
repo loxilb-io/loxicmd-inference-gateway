@@ -21,6 +21,7 @@ import (
 	"net/http"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -47,10 +48,9 @@ Bearer identities are separate from data-plane X-Api-Key credentials.
 
 ex)
 	loxicmd create user --username=admin --password='<your-password>' --role=admin`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.Username == "" || o.Password == "" {
-				fmt.Printf("Error: --username and --password are required\n")
-				return
+				return exitcode.Usagef("--username and --password are required")
 			}
 			req := api.UserModel{Username: o.Username, Password: o.Password, Role: o.Role}
 
@@ -61,17 +61,18 @@ ex)
 			}
 			resp, err := client.User().Create(ctx, req)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("create user: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 
 			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("create user", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			fmt.Printf("User '%s' created.\n", o.Username)
+			return nil
 		},
 	}
 
