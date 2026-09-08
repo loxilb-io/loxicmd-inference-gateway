@@ -44,9 +44,9 @@ func TestSnapshotWritesVerifiedDocument(t *testing.T) {
 	document := snapshotDocument(t, "1.5", 7)
 	gw := newFakeGateway(t, documentResponse(document, documentChecksum(t, document)))
 	path := filepath.Join(t.TempDir(), "snapshot.json")
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Snapshot(gw.options(), &out, &errOut, Options{}, SnapshotOptions{File: path, Components: "loadbalancer"})
+	err := Snapshot(gw.options(), &out, Options{}, SnapshotOptions{File: path, Components: "loadbalancer"})
 	if err != nil {
 		t.Fatalf("snapshot failed: %v", err)
 	}
@@ -108,9 +108,9 @@ func TestSnapshotDoesNotClobberOnBadDownload(t *testing.T) {
 				t.Fatal(err)
 			}
 			gw := newFakeGateway(t, documentResponse(tc.body, tc.header))
-			var out, errOut bytes.Buffer
+			var out bytes.Buffer
 
-			err := Snapshot(gw.options(), &out, &errOut, Options{}, SnapshotOptions{File: path})
+			err := Snapshot(gw.options(), &out, Options{}, SnapshotOptions{File: path})
 			requireReason(t, err, tc.reason)
 
 			after, rerr := os.ReadFile(path)
@@ -140,30 +140,30 @@ func TestSnapshotWithoutChecksumIsReportedNotClaimed(t *testing.T) {
 	document := uncheckedDocument()
 	gw := newFakeGateway(t, documentResponse(document, ""))
 	path := filepath.Join(t.TempDir(), "snapshot.json")
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	if err := Snapshot(gw.options(), &out, &errOut, Options{}, SnapshotOptions{File: path}); err != nil {
+	if err := Snapshot(gw.options(), &out, Options{}, SnapshotOptions{File: path}); err != nil {
 		t.Fatalf("snapshot failed: %v", err)
 	}
 	text := out.String()
 	if strings.Contains(text, "Checksum verified") {
 		t.Fatalf("claimed a verification that never happened:\n%s", text)
 	}
-	if !strings.Contains(text, uncheckedDocumentNote) {
+	if !strings.Contains(text, uncheckedDocumentNote.Message) {
 		t.Fatalf("missing the unverified note:\n%s", text)
 	}
 
 	out.Reset()
-	err := Snapshot(gw.options(), &out, &errOut, Options{Strict: true}, SnapshotOptions{File: path})
+	err := Snapshot(gw.options(), &out, Options{Strict: true}, SnapshotOptions{File: path})
 	requireReason(t, err, api.ReasonContractLegacy)
 }
 
 func TestSnapshotToStdout(t *testing.T) {
 	document := snapshotDocument(t, "1.5", 7)
 	gw := newFakeGateway(t, documentResponse(document, documentChecksum(t, document)))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	if err := Snapshot(gw.options(), &out, &errOut, Options{}, SnapshotOptions{}); err != nil {
+	if err := Snapshot(gw.options(), &out, Options{}, SnapshotOptions{}); err != nil {
 		t.Fatalf("snapshot failed: %v", err)
 	}
 	// Redirecting stdout into a file must yield the document, not a report
@@ -178,9 +178,9 @@ func TestSnapshotStdoutStillRefusesACorruptDocument(t *testing.T) {
 	corrupt := bytes.Replace(document, []byte(`"kind":"loxilb-snapshot"`),
 		[]byte(`"kind":"loxilb-snapshoT"`), 1)
 	gw := newFakeGateway(t, documentResponse(corrupt, ""))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Snapshot(gw.options(), &out, &errOut, Options{}, SnapshotOptions{})
+	err := Snapshot(gw.options(), &out, Options{}, SnapshotOptions{})
 	requireReason(t, err, api.ReasonChecksumMismatch)
 	if out.Len() != 0 {
 		t.Fatalf("a corrupt document was printed anyway:\n%s", out.String())
@@ -202,8 +202,8 @@ func TestSnapshotFailureClasses(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			gw := newFakeGateway(t, jsonResponse(tc.status, tc.body))
 			path := filepath.Join(t.TempDir(), "snapshot.json")
-			var out, errOut bytes.Buffer
-			err := Snapshot(gw.options(), &out, &errOut, Options{}, SnapshotOptions{File: path})
+			var out bytes.Buffer
+			err := Snapshot(gw.options(), &out, Options{}, SnapshotOptions{File: path})
 			requireReason(t, err, tc.reason)
 			if _, serr := os.Stat(path); serr == nil {
 				t.Fatal("a failed download still created the destination file")
@@ -215,9 +215,9 @@ func TestSnapshotFailureClasses(t *testing.T) {
 func TestSnapshotUnwritableDestination(t *testing.T) {
 	document := snapshotDocument(t, "1.5", 7)
 	gw := newFakeGateway(t, documentResponse(document, documentChecksum(t, document)))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Snapshot(gw.options(), &out, &errOut, Options{},
+	err := Snapshot(gw.options(), &out, Options{},
 		SnapshotOptions{File: filepath.Join(t.TempDir(), "no-such-directory", "snapshot.json")})
 	requireReason(t, err, api.ReasonFileWrite)
 }
@@ -226,15 +226,18 @@ func TestSnapshotJSONEnvelope(t *testing.T) {
 	document := snapshotDocument(t, "1.5", 7)
 	gw := newFakeGateway(t, documentResponse(document, documentChecksum(t, document)))
 	path := filepath.Join(t.TempDir(), "snapshot.json")
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	if err := Snapshot(gw.options(), &out, &errOut, Options{JSON: true}, SnapshotOptions{File: path}); err != nil {
+	if err := Snapshot(gw.options(), &out, Options{JSON: true}, SnapshotOptions{File: path}); err != nil {
 		t.Fatalf("snapshot failed: %v", err)
 	}
-	report := decodeReport(t, out.Bytes())
-	if report.Snapshot == nil || !report.Snapshot.ChecksumVerified ||
-		report.Snapshot.Path != path || report.Snapshot.Generation != 7 ||
-		report.Snapshot.Bytes != len(document) {
-		t.Fatalf("unexpected envelope: %+v", report.Snapshot)
+	doc := decodeEnvelope(t, out.Bytes())
+	if doc.Command != "get.snapshot" || !doc.Success {
+		t.Fatalf("unexpected envelope verdict: %+v", doc)
+	}
+	if doc.Data.Snapshot == nil || !doc.Data.Snapshot.ChecksumVerified ||
+		doc.Data.Snapshot.Path != path || doc.Data.Snapshot.Generation != 7 ||
+		doc.Data.Snapshot.Bytes != len(document) {
+		t.Fatalf("unexpected envelope: %+v", doc.Data.Snapshot)
 	}
 }

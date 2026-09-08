@@ -46,7 +46,7 @@ ex)
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return lifecycle.Snapshot(restOptions, cmd.OutOrStdout(), cmd.ErrOrStderr(),
+			return lifecycle.Snapshot(restOptions, cmd.OutOrStdout(),
 				lifecycle.OptionsFrom(restOptions, strict), opts)
 		},
 	}

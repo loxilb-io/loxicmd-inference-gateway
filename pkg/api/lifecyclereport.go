@@ -16,9 +16,7 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 )
 
@@ -176,46 +174,36 @@ type SnapshotFileResult struct {
 	ChecksumVerified bool `json:"checksum_verified"`
 }
 
-// LifecycleReport is the --output json envelope shared by every
-// configuration-lifecycle command. Its shape is part of the automation
-// contract: result is always one of ok/error, reason is always populated, and
-// the operation-specific body hangs off exactly one of the typed fields.
+// Note is a condition a lifecycle command recorded instead of claiming
+// something the gateway never reported. Code is a stable identifier for the
+// condition class; Message is the human sentence.
+type Note struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// LifecycleReport is the data payload of the CommandResult envelope
+// (contracts/command-result.schema.json) for the configuration-lifecycle
+// commands. The verdict itself — command, success, code, message — lives on
+// the envelope; this document carries what the operation observed, and on a
+// failure the origin/httpStatus/componentCode triple the schema requires so
+// automation never parses message strings.
 type LifecycleReport struct {
-	Command    string              `json:"command"`
-	Result     string              `json:"result"`
-	Reason     string              `json:"reason"`
-	Message    string              `json:"message,omitempty"`
-	HTTPStatus int                 `json:"http_status,omitempty"`
-	Contract   LifecycleContract   `json:"contract,omitempty"`
-	Notes      []string            `json:"notes,omitempty"`
-	Persist    *PersistResult      `json:"persist,omitempty"`
-	Restore    *RestoreResult      `json:"restore,omitempty"`
-	Snapshot   *SnapshotFileResult `json:"snapshot,omitempty"`
+	Contract LifecycleContract   `json:"contract,omitempty"`
+	Notes    []Note              `json:"-"`
+	Persist  *PersistResult      `json:"persist,omitempty"`
+	Restore  *RestoreResult      `json:"restore,omitempty"`
+	Snapshot *SnapshotFileResult `json:"snapshot,omitempty"`
 	// Maintenance carries the gateway's maintenance state as reported by
 	// GET/PUT /maintenance. On a recovery-required failure it is absent:
 	// the CLI has no state it can honestly report.
 	Maintenance *MaintenanceState `json:"maintenance,omitempty"`
-}
-
-// WriteLifecycleReport renders the JSON envelope. It is used for both success
-// and failure so that automation reading --output json never has to parse
-// prose off stderr to learn what happened.
-func WriteLifecycleReport(w io.Writer, report *LifecycleReport) error {
-	b, err := json.MarshalIndent(report, "", "    ")
-	if err != nil {
-		return err
-	}
-	_, err = fmt.Fprintln(w, string(b))
-	return err
-}
-
-// NewFailureReport builds the envelope for a failed lifecycle command.
-func NewFailureReport(command string, err error) *LifecycleReport {
-	return &LifecycleReport{
-		Command:    command,
-		Result:     "error",
-		Reason:     ReasonOf(err),
-		Message:    err.Error(),
-		HTTPStatus: HTTPStatusOf(err),
-	}
+	// Origin, HTTPStatus and ComponentCode are the failure triple of the
+	// envelope's data contract: present on every failure (pointers so a
+	// success omits them entirely), absent on success. ComponentCode is
+	// the downstream component's own stable code — for lifecycle failures,
+	// the LifecycleError reason — verbatim.
+	Origin        *string `json:"origin,omitempty"`
+	HTTPStatus    *int    `json:"httpStatus,omitempty"`
+	ComponentCode *string `json:"componentCode,omitempty"`
 }

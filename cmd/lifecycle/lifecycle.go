@@ -34,6 +34,8 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/envelope"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 )
 
 // Options are the parts of a lifecycle invocation that every operation shares.
@@ -78,17 +80,24 @@ func readBody(r io.Reader, what string) ([]byte, error) {
 }
 
 // Notes a command records instead of claiming something the gateway never
-// reported. They are carried in the JSON envelope and printed after the human
-// summary.
-const (
-	legacyContractNote = "this gateway answers with the older response contract; " +
-		"the document's identity and coverage were not reported and are not claimed here"
-	uncheckedDocumentNote = "this document carries no checksum, so its integrity was not verified"
+// reported. They surface as envelope warnings under -o json and are printed
+// after the human summary otherwise. The codes are a stable surface: they
+// identify the condition class, never the wording.
+var (
+	legacyContractNote = api.Note{
+		Code: "contract-legacy",
+		Message: "this gateway answers with the older response contract; " +
+			"the document's identity and coverage were not reported and are not claimed here",
+	}
+	uncheckedDocumentNote = api.Note{
+		Code:    "unchecked-document",
+		Message: "this document carries no checksum, so its integrity was not verified",
+	}
 )
 
 // noteLegacy records the note for a report whose gateway spoke the older
 // contract, and returns the report so callers can chain.
-func noteLegacy(report *api.LifecycleReport, note string) *api.LifecycleReport {
+func noteLegacy(report *api.LifecycleReport, note api.Note) *api.LifecycleReport {
 	if report.Contract == api.ContractLegacy {
 		report.Notes = append(report.Notes, note)
 	}
@@ -98,32 +107,60 @@ func noteLegacy(report *api.LifecycleReport, note string) *api.LifecycleReport {
 // writeNotes prints whatever the operation refused to claim.
 func writeNotes(out io.Writer, report *api.LifecycleReport) {
 	for _, note := range report.Notes {
-		fmt.Fprintf(out, "  Note: %s\n", note)
+		fmt.Fprintf(out, "  Note: %s\n", note.Message)
 	}
+}
+
+// envelopeFor builds the CommandResult document for a lifecycle outcome: the
+// report becomes the data payload, notes become warnings, and on failure the
+// classified verdict fills code/message plus the data failure triple. The
+// correlationId carries the operation id the gateway reported, when it
+// reported one.
+func envelopeFor(command string, report *api.LifecycleReport, err error) *envelope.CommandResult {
+	result := envelope.New(command)
+	if report.Maintenance != nil {
+		result.CorrelationID = report.Maintenance.OperationID
+	}
+	for _, note := range report.Notes {
+		result.Warnings = append(result.Warnings, envelope.Warning{Code: note.Code, Message: note.Message})
+	}
+	if err != nil {
+		ce := exitcode.Classify(err)
+		result.Fail(envelope.Code(ce.Code.Label()), ce.Message)
+		origin := ce.Origin
+		if origin == "" {
+			origin = "cli"
+		}
+		httpStatus, componentCode := ce.HTTPStatus, ce.ComponentCode
+		report.Origin, report.HTTPStatus, report.ComponentCode = &origin, &httpStatus, &componentCode
+	}
+	result.Data = report
+	return result
 }
 
 // render emits the outcome of a lifecycle operation and returns err unchanged,
 // so the caller's only job is to hand the error back to cobra for the exit
-// status. Failures go to errOut as prose, or to out as the JSON envelope --
-// automation asking for JSON gets a machine-readable failure, not prose on a
-// stream it is not reading.
-func render(out, errOut io.Writer, o Options, report *api.LifecycleReport, human func(io.Writer, *api.LifecycleReport) error, err error) error {
-	if err != nil {
-		report.Result = "error"
-		report.Reason = api.ReasonOf(err)
-		report.Message = err.Error()
-		report.HTTPStatus = api.HTTPStatusOf(err)
-		if o.JSON {
-			_ = api.WriteLifecycleReport(out, report)
-		} else {
-			fmt.Fprintf(errOut, "Error: %s\n", err.Error())
+// status. Under -o json the outcome is the CommandResult envelope on stdout —
+// success and failure alike, so automation never parses prose. A human-mode
+// failure prints nothing here: the root command's single exit point owns the
+// one stderr line, so the message can never appear twice.
+func render(out io.Writer, o Options, command string, report *api.LifecycleReport, human func(io.Writer, *api.LifecycleReport) error, err error) error {
+	if o.JSON {
+		if werr := envelopeFor(command, report, err).Write(out); err == nil {
+			return werr
 		}
 		return err
 	}
-	report.Result = "ok"
-	report.Reason = api.ReasonOK
-	if o.JSON {
-		return api.WriteLifecycleReport(out, report)
+	if err != nil {
+		return err
 	}
 	return human(out, report)
+}
+
+// WriteFailure emits the CommandResult failure envelope for a lifecycle
+// command that failed before any operation ran (argument validation). It
+// exists for callers outside this package that share the lifecycle contract —
+// the 'save' compatibility surface.
+func WriteFailure(out io.Writer, command string, err error) {
+	_ = envelopeFor(command, &api.LifecycleReport{}, err).Write(out)
 }

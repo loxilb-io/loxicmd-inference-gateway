@@ -23,6 +23,7 @@ import (
 	"testing"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/envelope"
 )
 
 // everyReason is the complete stable-reason surface of the api package.
@@ -129,5 +130,23 @@ func TestLabelsMatchTheContractTable(t *testing.T) {
 		if code.Label() != want {
 			t.Errorf("Code %d label %q, want %q", code, code.Label(), want)
 		}
+	}
+}
+
+// TestEnvelopeCodeAgreement proves the two halves of the public contract can
+// never disagree: for every taxonomy row, the envelope code string derived
+// from it maps back to the same process exit status. A row added to one
+// enum without the other fails here.
+func TestEnvelopeCodeAgreement(t *testing.T) {
+	for _, code := range []Code{OK, InvalidArgument, Auth, Precondition,
+		Unavailable, ContractMismatch, Failed, Partial} {
+		if got := envelope.Code(code.Label()).ExitCode(); got != int(code) {
+			t.Errorf("envelope code %q exits %d, exit taxonomy says %d", code.Label(), got, int(code))
+		}
+	}
+	// An unknown envelope code exits with the reserved legacy 1, never a
+	// stolen taxonomy slot.
+	if got := envelope.Code("NOT_A_CODE").ExitCode(); got != 1 {
+		t.Errorf("unknown envelope code exits %d, want the reserved 1", got)
 	}
 }

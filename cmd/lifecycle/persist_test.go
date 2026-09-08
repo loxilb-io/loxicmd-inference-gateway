@@ -34,9 +34,9 @@ const legacyPersistBody = `{"result":"ok","path":"/etc/loxilb/snapshot.json","ch
 
 func TestPersistSucceedsOnDurableContract(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, durablePersistBody))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	if err := Persist(gw.options(), &out, &errOut, Options{}, "create persist"); err != nil {
+	if err := Persist(gw.options(), &out, Options{}, "create.persist"); err != nil {
 		t.Fatalf("persist failed: %v", err)
 	}
 	if len(gw.requests) != 1 || gw.requests[0].Method != http.MethodPost ||
@@ -50,20 +50,17 @@ func TestPersistSucceedsOnDurableContract(t *testing.T) {
 			t.Fatalf("output missing %q:\n%s", want, text)
 		}
 	}
-	if errOut.Len() != 0 {
-		t.Fatalf("unexpected stderr: %s", errOut.String())
-	}
 }
 
 func TestPersistReportsLegacyContractWithoutClaimingCoverage(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, legacyPersistBody))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	if err := Persist(gw.options(), &out, &errOut, Options{}, "create persist"); err != nil {
+	if err := Persist(gw.options(), &out, Options{}, "create.persist"); err != nil {
 		t.Fatalf("persist failed: %v", err)
 	}
 	text := out.String()
-	if !strings.Contains(text, legacyContractNote) {
+	if !strings.Contains(text, legacyContractNote.Message) {
 		t.Fatalf("legacy answer did not carry the note:\n%s", text)
 	}
 	// The gateway reported no coverage, so the CLI must not print one.
@@ -74,12 +71,14 @@ func TestPersistReportsLegacyContractWithoutClaimingCoverage(t *testing.T) {
 
 func TestPersistStrictRefusesLegacyContract(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, legacyPersistBody))
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Persist(gw.options(), &out, &errOut, Options{Strict: true}, "create persist")
+	err := Persist(gw.options(), &out, Options{Strict: true}, "create.persist")
 	requireReason(t, err, api.ReasonContractLegacy)
-	if !strings.Contains(errOut.String(), "Error:") {
-		t.Fatalf("failure was not reported on stderr: %q", errOut.String())
+	// A human-mode failure prints nothing itself: the root command's
+	// single exit point owns the one stderr line.
+	if out.Len() != 0 {
+		t.Fatalf("failure wrote to stdout: %q", out.String())
 	}
 }
 
@@ -102,8 +101,8 @@ func TestPersistFailureClasses(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			gw := newFakeGateway(t, jsonResponse(tc.status, tc.body))
-			var out, errOut bytes.Buffer
-			err := Persist(gw.options(), &out, &errOut, Options{}, "create persist")
+			var out bytes.Buffer
+			err := Persist(gw.options(), &out, Options{}, "create.persist")
 			requireReason(t, err, tc.reason)
 			if strings.Contains(out.String(), "Configuration persisted") {
 				t.Fatalf("a failure printed a success line:\n%s", out.String())
@@ -116,42 +115,47 @@ func TestPersistUnreachableGateway(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, durablePersistBody))
 	options := gw.options()
 	gw.server.Close() // nothing is listening any more
-	var out, errOut bytes.Buffer
+	var out bytes.Buffer
 
-	err := Persist(options, &out, &errOut, Options{}, "create persist")
+	err := Persist(options, &out, Options{}, "create.persist")
 	requireReason(t, err, api.ReasonRequestFailed)
 }
 
 func TestPersistJSONEnvelope(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		gw := newFakeGateway(t, jsonResponse(http.StatusOK, durablePersistBody))
-		var out, errOut bytes.Buffer
-		if err := Persist(gw.options(), &out, &errOut, Options{JSON: true}, "create persist"); err != nil {
+		var out bytes.Buffer
+		if err := Persist(gw.options(), &out, Options{JSON: true}, "create.persist"); err != nil {
 			t.Fatalf("persist failed: %v", err)
 		}
-		report := decodeReport(t, out.Bytes())
-		if report.Result != "ok" || report.Reason != api.ReasonOK ||
-			report.Contract != api.ContractDurable || report.Command != "create persist" {
-			t.Fatalf("unexpected envelope: %+v", report)
+		doc := decodeEnvelope(t, out.Bytes())
+		if !doc.Success || doc.Code != "OK" || doc.Command != "create.persist" ||
+			doc.Data.Contract != api.ContractDurable {
+			t.Fatalf("unexpected envelope: %+v", doc)
 		}
-		if report.Persist == nil || report.Persist.Generation == nil || *report.Persist.Generation != 7 {
-			t.Fatalf("envelope did not carry the persisted identity: %+v", report.Persist)
+		if doc.Data.Persist == nil || doc.Data.Persist.Generation == nil || *doc.Data.Persist.Generation != 7 {
+			t.Fatalf("envelope did not carry the persisted identity: %+v", doc.Data.Persist)
+		}
+		// Success carries no failure triple.
+		if doc.Data.Origin != "" || doc.Data.ComponentCode != "" {
+			t.Fatalf("success envelope carries failure fields: %+v", doc.Data)
 		}
 	})
 
 	t.Run("failure is machine readable", func(t *testing.T) {
 		gw := newFakeGateway(t, jsonResponse(http.StatusConflict, `{"message":"busy"}`))
-		var out, errOut bytes.Buffer
-		err := Persist(gw.options(), &out, &errOut, Options{JSON: true}, "create persist")
+		var out bytes.Buffer
+		err := Persist(gw.options(), &out, Options{JSON: true}, "create.persist")
 		requireReason(t, err, api.ReasonBusy)
-		report := decodeReport(t, out.Bytes())
-		if report.Result != "error" || report.Reason != api.ReasonBusy || report.HTTPStatus != http.StatusConflict {
-			t.Fatalf("unexpected failure envelope: %+v", report)
+		doc := decodeEnvelope(t, out.Bytes())
+		if doc.Success || doc.Code != "UNAVAILABLE" || doc.Message == "" {
+			t.Fatalf("unexpected failure envelope: %+v", doc)
 		}
-		// Automation asked for JSON, so the failure belongs on the
-		// stream it is reading.
-		if errOut.Len() != 0 {
-			t.Fatalf("json mode also wrote prose to stderr: %q", errOut.String())
+		// The schema's failure triple: automation branches on these, so
+		// they must survive with the downstream reason verbatim.
+		if doc.Data.Origin != "gateway" || doc.Data.HTTPStatus != http.StatusConflict ||
+			doc.Data.ComponentCode != api.ReasonBusy {
+			t.Fatalf("failure triple lost: %+v", doc.Data)
 		}
 	})
 }
@@ -162,12 +166,11 @@ func TestPersistJSONEnvelope(t *testing.T) {
 func TestPersistAliasIsTheSameCall(t *testing.T) {
 	gw := newFakeGateway(t, jsonResponse(http.StatusOK, durablePersistBody))
 	var canonical, alias bytes.Buffer
-	var errOut bytes.Buffer
 
-	if err := Persist(gw.options(), &canonical, &errOut, Options{}, "create persist"); err != nil {
+	if err := Persist(gw.options(), &canonical, Options{}, "create.persist"); err != nil {
 		t.Fatal(err)
 	}
-	if err := Persist(gw.options(), &alias, &errOut, Options{}, "save --api"); err != nil {
+	if err := Persist(gw.options(), &alias, Options{}, "save.api"); err != nil {
 		t.Fatal(err)
 	}
 	if canonical.String() != alias.String() {
@@ -179,11 +182,52 @@ func TestPersistAliasIsTheSameCall(t *testing.T) {
 	}
 }
 
-func decodeReport(t *testing.T, b []byte) api.LifecycleReport {
+// envelopeDoc mirrors contracts/command-result.schema.json for assertions.
+type envelopeDoc struct {
+	APIVersion    string `json:"apiVersion"`
+	Kind          string `json:"kind"`
+	Command       string `json:"command"`
+	Success       bool   `json:"success"`
+	Code          string `json:"code"`
+	Message       string `json:"message"`
+	CorrelationID string `json:"correlationId"`
+	Data          struct {
+		api.LifecycleReport
+		Origin        string `json:"origin"`
+		HTTPStatus    int    `json:"httpStatus"`
+		ComponentCode string `json:"componentCode"`
+	} `json:"data"`
+	Warnings []struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"warnings"`
+}
+
+// decodeEnvelope parses a -o json document and proves it is the CommandResult
+// contract: every schema-required key present, the identity pair correct, and
+// success derived from the code — an envelope whose two verdict fields
+// disagree is a contract violation wherever it appears.
+func decodeEnvelope(t *testing.T, b []byte) envelopeDoc {
 	t.Helper()
-	var report api.LifecycleReport
-	if err := json.Unmarshal(b, &report); err != nil {
-		t.Fatalf("output is not a JSON report (%v): %s", err, string(b))
+	var doc envelopeDoc
+	if err := json.Unmarshal(b, &doc); err != nil {
+		t.Fatalf("output is not a JSON envelope (%v): %s", err, string(b))
 	}
-	return report
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(b, &keys); err != nil {
+		t.Fatalf("output is not a JSON object (%v): %s", err, string(b))
+	}
+	for _, required := range []string{"apiVersion", "kind", "command", "success",
+		"code", "message", "correlationId", "data", "warnings"} {
+		if _, ok := keys[required]; !ok {
+			t.Fatalf("envelope is missing required key %q: %s", required, string(b))
+		}
+	}
+	if doc.APIVersion != "loxilb.io/appliance/v1" || doc.Kind != "CommandResult" {
+		t.Fatalf("envelope identity = %s/%s, want loxilb.io/appliance/v1/CommandResult", doc.APIVersion, doc.Kind)
+	}
+	if doc.Success != (doc.Code == "OK") {
+		t.Fatalf("success=%v disagrees with code=%q", doc.Success, doc.Code)
+	}
+	return doc
 }

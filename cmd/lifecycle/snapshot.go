@@ -43,9 +43,9 @@ type SnapshotOptions struct {
 // Verification happens before anything durable: a corrupt or truncated
 // download must not overwrite the last good snapshot sitting at the
 // destination path.
-func Snapshot(restOptions *api.RESTOptions, out, errOut io.Writer, o Options, so SnapshotOptions) error {
+func Snapshot(restOptions *api.RESTOptions, out io.Writer, o Options, so SnapshotOptions) error {
 	document, result, err := doSnapshot(restOptions, o, so)
-	report := &api.LifecycleReport{Command: "get snapshot", Snapshot: result}
+	report := &api.LifecycleReport{Snapshot: result}
 	if result != nil {
 		if result.ChecksumVerified {
 			report.Contract = api.ContractDurable
@@ -55,7 +55,7 @@ func Snapshot(restOptions *api.RESTOptions, out, errOut io.Writer, o Options, so
 		noteLegacy(report, uncheckedDocumentNote)
 	}
 	if err != nil {
-		return render(out, errOut, o, report, nil, err)
+		return render(out, o, "get.snapshot", report, nil, err)
 	}
 	// Printing the document to stdout and reporting on it are mutually
 	// exclusive: a caller redirecting stdout into a file must receive the
@@ -64,7 +64,7 @@ func Snapshot(restOptions *api.RESTOptions, out, errOut io.Writer, o Options, so
 		_, werr := out.Write(append(document, '\n'))
 		return werr
 	}
-	return render(out, errOut, o, report, humanSnapshot, nil)
+	return render(out, o, "get.snapshot", report, humanSnapshot, nil)
 }
 
 func doSnapshot(restOptions *api.RESTOptions, o Options, so SnapshotOptions) ([]byte, *api.SnapshotFileResult, error) {

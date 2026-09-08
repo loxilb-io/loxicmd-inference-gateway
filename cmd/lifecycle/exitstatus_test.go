@@ -16,7 +16,6 @@
 package lifecycle
 
 import (
-	"encoding/json"
 	"net/http"
 	"os"
 	"os/exec"
@@ -107,6 +106,11 @@ func TestPackagedBinaryExitStatus(t *testing.T) {
 			if !strings.Contains(stderr, "Error:") {
 				t.Fatalf("failure printed nothing on stderr: %q", stderr)
 			}
+			// Exactly once: the single exit point owns the stderr line,
+			// so a command that also printed would show it twice.
+			if strings.Count(stderr, "Error:") != 1 {
+				t.Fatalf("the failure line appeared more than once on stderr: %q", stderr)
+			}
 		})
 	}
 
@@ -131,11 +135,9 @@ func TestPackagedBinaryExitStatus(t *testing.T) {
 		if status == 0 {
 			t.Fatal("failure exited 0")
 		}
-		var report map[string]any
-		if err := json.Unmarshal([]byte(stdout), &report); err != nil {
-			t.Fatalf("stdout is not JSON (%v): %s", err, stdout)
-		}
-		if report["reason"] != "operation-in-progress" || report["result"] != "error" {
+		doc := decodeEnvelope(t, []byte(stdout))
+		if doc.Success || doc.Code != "UNAVAILABLE" ||
+			doc.Data.ComponentCode != "operation-in-progress" {
 			t.Fatalf("unexpected envelope: %s", stdout)
 		}
 	})

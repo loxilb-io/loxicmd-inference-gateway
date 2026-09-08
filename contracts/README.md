@@ -31,3 +31,26 @@ depend on across releases:
 Automation must parse the JSON envelope and the exit code, never the human
 text. Human-readable output (the default, without `-o json`) is not a
 contract and may change between releases.
+
+## Migration: the interim lifecycle report
+
+Before the envelope ships as the product contract, the configuration-lifecycle
+commands (`get snapshot`, `create restore`, `create persist`, `save --api`,
+`get/set maintenance`) emitted an interim document of their own under
+`-o json`. That shape was never pinned in a ProductLock; in-house automation
+written against it migrates as follows:
+
+| Interim field | Envelope location |
+|---|---|
+| `command` | `command` (dotted form, e.g. `create.persist`) |
+| `result` (`ok`/`error`) | `success` (boolean) |
+| `reason` | `data.componentCode` (verbatim; the coarse verdict is `code`) |
+| `message` | `message` |
+| `http_status` | `data.httpStatus` |
+| `contract` | `data.contract` |
+| `notes` | `warnings` (each with a stable `code`) |
+| `persist` / `restore` / `snapshot` / `maintenance` | same keys under `data` |
+
+The exit codes of these commands moved from the interim `0/1` to the frozen
+taxonomy at the same release, so a consumer branching on the exit status and
+one branching on the envelope migrate together.
