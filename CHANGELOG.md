@@ -42,6 +42,18 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
 - Public machine contracts under [contracts/](contracts/): the `CommandResult`
   JSON envelope schema and the frozen exit-code taxonomy, with golden tests
   pinning every command family's success output.
+- `--token-file`: read the API token from an owner-only (`0600`) regular file
+  instead of passing it on the command line. The file follows the same
+  secret-file rules as every other secret-bearing path (absolute path, no
+  symlinks, owner-only permissions) and the value never appears in argv or
+  the process environment.
+
+### Deprecated
+- `--token`: the literal token is visible in shell history and process
+  listings. It keeps working through the deprecation window but now prints a
+  one-line warning on stderr; use `--token-file` instead. A future release
+  removes `--token` (announced here and in that release's notes before it
+  happens). `--token` and `--token-file` are mutually exclusive.
 
 ### Changed
 - **Exit codes**: failures now terminate with the frozen taxonomy
