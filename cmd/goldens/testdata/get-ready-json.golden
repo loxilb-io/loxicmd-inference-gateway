@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+{"ready":true,"reasons":[],"ebpf_attachments":[{"name":"eno1","mode":"tc","attached":true},{"name":"eno2","mode":"tc","attached":false}]}
+--- stderr ---

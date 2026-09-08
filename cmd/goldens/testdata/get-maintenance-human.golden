@@ -1,0 +1,10 @@
+exit=0
+--- stdout ---
+Maintenance: maintenance
+  Operation: maint-1800000000-1
+  Refusing new config: true
+  Refusing new inference: false
+  In-flight streams: 3
+  Elapsed: 42s of a 300s drain window
+  Entered at: 2027-01-15T10:00:00.000Z
+--- stderr ---

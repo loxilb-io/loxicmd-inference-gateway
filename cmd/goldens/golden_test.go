@@ -108,6 +108,29 @@ const durablePersistBody = `{"result":"ok","path":"/etc/loxilb/snapshot.json",` 
 
 const successBody = `{"result":"Success"}`
 
+// maintenanceBody mirrors the gateway's GET/PUT /maintenance answer while a
+// drain window is open — the same shape the lifecycle tests pin. Every value
+// is server-provided, so the rendering is deterministic.
+const maintenanceBody = `{"state":"maintenance","operation_id":"maint-1800000000-1",` +
+	`"refusing_new_config":true,"refusing_new_inference":false,"in_flight_streams":3,` +
+	`"entered_at":"2027-01-15T10:00:00.000Z","elapsed_seconds":42,"drain_timeout_seconds":300,` +
+	`"drain_deadline_exceeded":false,"cancellable":true}`
+
+// readyBody mirrors GET /status/ready on a ready gateway with one attached
+// and one detached interface, so both renderings are pinned.
+const readyBody = `{"ready":true,"reasons":[],` +
+	`"ebpf_attachments":[{"name":"eno1","mode":"tc","attached":true},` +
+	`{"name":"eno2","mode":"tc","attached":false}]}`
+
+// diagnosticsBody mirrors GET /diagnostics with every assembly section
+// populated once.
+const diagnosticsBody = `{"version":"v1.2.3","build_info":"rev abc","product":"loxilb-inference-gateway",` +
+	`"api_version":"/netlox/v1 0.0.1","uptime_seconds":42,"ready":true,"ready_reasons":[],` +
+	`"maintenance_state":"active",` +
+	`"ebpf_attachments":[{"name":"eno1","mode":"tc","attached":true}],` +
+	`"maps":[{"name":"conntrack","count":10,"capacity":1000}],` +
+	`"external_dependencies":[{"type":"keystore","required":true,"status":"ready","latency_class":"fast"}]}`
+
 // goldenCase is one pinned invocation. Every case runs against a fake
 // gateway that answers with the given canned response.
 type goldenCase struct {
@@ -127,6 +150,12 @@ var goldenCases = []goldenCase{
 	{"version-human", []string{"version"}, http.StatusOK, ""},
 	{"version-json", []string{"version", "-o", "json"}, http.StatusOK, ""},
 	{"completion-bash", []string{"completion", "bash"}, http.StatusOK, ""},
+	{"get-maintenance-human", []string{"get", "maintenance"}, http.StatusOK, maintenanceBody},
+	{"get-maintenance-json", []string{"get", "maintenance", "-o", "json"}, http.StatusOK, maintenanceBody},
+	{"set-maintenance-on", []string{"set", "maintenance", "on", "--drain-timeout", "300"}, http.StatusOK, maintenanceBody},
+	{"get-ready-human", []string{"get", "ready"}, http.StatusOK, readyBody},
+	{"get-ready-json", []string{"get", "ready", "-o", "json"}, http.StatusOK, readyBody},
+	{"get-diagnostics-human", []string{"get", "diagnostics"}, http.StatusOK, diagnosticsBody},
 
 	// The full delete family, pinned ahead of its error-handling
 	// migration: these are the success surfaces the conversion must not

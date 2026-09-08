@@ -49,6 +49,12 @@ const (
 	// ReasonMaintenance — 503: the gateway has not finished booting, or is
 	// otherwise not accepting configuration operations.
 	ReasonMaintenance = "maintenance-mode"
+	// ReasonRecoveryRequired — a state-changing request failed in a way
+	// that leaves the gateway's state unknown to this process (the
+	// request may or may not have been applied). The command never
+	// reports success from here; the operator must verify the actual
+	// state before acting on any assumption about it.
+	ReasonRecoveryRequired = "recovery-required"
 	// ReasonServerError — a 5xx that carried no lifecycle body.
 	ReasonServerError = "server-error"
 	// ReasonBadRequest — a 4xx that carried no lifecycle body.
@@ -185,6 +191,10 @@ type LifecycleReport struct {
 	Persist    *PersistResult      `json:"persist,omitempty"`
 	Restore    *RestoreResult      `json:"restore,omitempty"`
 	Snapshot   *SnapshotFileResult `json:"snapshot,omitempty"`
+	// Maintenance carries the gateway's maintenance state as reported by
+	// GET/PUT /maintenance. On a recovery-required failure it is absent:
+	// the CLI has no state it can honestly report.
+	Maintenance *MaintenanceState `json:"maintenance,omitempty"`
 }
 
 // WriteLifecycleReport renders the JSON envelope. It is used for both success

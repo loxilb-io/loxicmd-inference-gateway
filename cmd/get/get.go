@@ -84,6 +84,9 @@ func GetCmd(restOptions *api.RESTOptions) *cobra.Command {
 	GetCmd.AddCommand(NewGetOPACmd(restOptions))
 	GetCmd.AddCommand(NewGetDPUCmd(restOptions))
 	GetCmd.AddCommand(NewGetSnapshotCmd(restOptions))
+	GetCmd.AddCommand(NewGetMaintenanceCmd(restOptions))
+	GetCmd.AddCommand(NewGetReadyCmd(restOptions))
+	GetCmd.AddCommand(NewGetDiagnosticsCmd(restOptions))
 
 	return GetCmd
 }

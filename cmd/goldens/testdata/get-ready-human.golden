@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+Ready: true
+eBPF attachment (kernel-verified):
+  eno1 (tc): attached
+  eno2 (tc): NOT ATTACHED
+--- stderr ---
