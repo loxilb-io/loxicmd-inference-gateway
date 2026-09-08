@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/appliance"
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/create"
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/delete"
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/dump"
@@ -138,6 +139,7 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 
 	rootCmd.AddCommand(saveCmd)
 	rootCmd.AddCommand(applyCmd)
+	rootCmd.AddCommand(appliance.ApplianceCmd(restOptions))
 	rootCmd.AddCommand(CompletionCmd)
 	rootCmd.AddCommand(VersionCmd)
 

@@ -362,6 +362,373 @@ __loxicmd_handle_word()
     __loxicmd_handle_word
 }
 
+_loxicmd_appliance_factory-reset()
+{
+    last_command="loxicmd_appliance_factory-reset"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance_network_validate()
+{
+    last_command="loxicmd_appliance_network_validate"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance_network()
+{
+    last_command="loxicmd_appliance_network"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("validate")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance_restore()
+{
+    last_command="loxicmd_appliance_restore"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance_rollback()
+{
+    last_command="loxicmd_appliance_rollback"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance_status()
+{
+    last_command="loxicmd_appliance_status"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance_update()
+{
+    last_command="loxicmd_appliance_update"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_appliance()
+{
+    last_command="loxicmd_appliance"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("factory-reset")
+    commands+=("network")
+    commands+=("restore")
+    commands+=("rollback")
+    commands+=("status")
+    commands+=("update")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _loxicmd_apply()
 {
     last_command="loxicmd_apply"
@@ -6626,6 +6993,7 @@ _loxicmd_root_command()
     command_aliases=()
 
     commands=()
+    commands+=("appliance")
     commands+=("apply")
     commands+=("completion")
     commands+=("create")
