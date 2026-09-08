@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Debug: response.StatusCode: 200
+--- stderr ---

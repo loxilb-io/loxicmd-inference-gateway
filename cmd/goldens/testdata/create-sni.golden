@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+SNI certificate registered for 'api.example.com'.
+--- stderr ---
