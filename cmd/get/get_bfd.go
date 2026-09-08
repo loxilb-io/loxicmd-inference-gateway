@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"os"
@@ -37,7 +38,7 @@ func NewGetBFDCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short: "Get all BFD sessions",
 		Long:  `It shows BFD Sessions in the LoxiLB`,
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -47,14 +48,13 @@ func NewGetBFDCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Status().SetUrl("config/bfd/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get bfd: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetBFDResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get bfd", resp.StatusCode)
 		},
 	}
 
@@ -109,8 +109,7 @@ func BFDdump(restOptions *api.RESTOptions, path string) (string, error) {
 	file := strings.Join(fileP, t.Local().Format("2006-01-02_15:04:05"))
 	f, err := os.Create(file)
 	if err != nil {
-		fmt.Printf("Can't create dump file\n")
-		os.Exit(1)
+		return "", fmt.Errorf("can't create dump file: %w", err)
 	}
 	defer f.Close()
 

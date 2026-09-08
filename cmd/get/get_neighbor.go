@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -34,7 +35,7 @@ func NewGetNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long:    `It shows neighbors Information in the LoxiLB`,
 		Aliases: []string{"nei", "neigh"},
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -44,14 +45,13 @@ func NewGetNeighborCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Neighbor().SetUrl("/config/neighbor/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get neighbor: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetNeighborResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get neighbor", resp.StatusCode)
 		},
 	}
 

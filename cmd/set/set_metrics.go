@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -39,10 +40,9 @@ func NewSetMetricsCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex)
 	loxicmd set metrics --enable
 	loxicmd set metrics --disable`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if enable == disable {
-				fmt.Printf("Error: specify exactly one of --enable or --disable\n")
-				return
+				return exitcode.Usagef("specify exactly one of --enable or --disable")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -60,20 +60,21 @@ ex)
 				resp, err = client.Metrics().Delete(ctx) // DELETE disables
 			}
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("set metrics: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("set metrics", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 			if enable {
 				fmt.Printf("Prometheus metrics enabled.\n")
 			} else {
 				fmt.Printf("Prometheus metrics disabled.\n")
 			}
+			return nil
 		},
 	}
 	setMetricsCmd.Flags().BoolVar(&enable, "enable", false, "Enable Prometheus metrics")

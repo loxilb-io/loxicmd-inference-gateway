@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -34,7 +35,7 @@ func NewGetStatusProcessCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long:    `It shows process status in the LoxiLB`,
 		Aliases: []string{"Process", "processes"},
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -44,14 +45,13 @@ func NewGetStatusProcessCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Status().SetUrl("status/process").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get process: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetStatusProcessResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get process", resp.StatusCode)
 		},
 	}
 
@@ -102,7 +102,7 @@ func NewGetStatusDeviceCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long:    `It shows device status in the LoxiLB`,
 		Aliases: []string{"devices"},
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -112,14 +112,13 @@ func NewGetStatusDeviceCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Status().SetUrl("status/device").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get device: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetStatusDeviceResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get device", resp.StatusCode)
 		},
 	}
 
@@ -166,7 +165,7 @@ func NewGetStatusFileSystemCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long:    `It shows filesystem status in the LoxiLB`,
 		Aliases: []string{"fs"},
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -176,14 +175,13 @@ func NewGetStatusFileSystemCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Status().SetUrl("status/filesystem").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get filesystem: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetStatusFilesystemResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get filesystem", resp.StatusCode)
 		},
 	}
 

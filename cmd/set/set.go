@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 
@@ -39,9 +40,11 @@ func SetParamCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "set",
 		Short: "Set configurations",
 		Long:  `Set the configuration like log-level or bfd session`,
-		Run: func(cmd *cobra.Command, args []string) {
-			_ = cmd
-			_ = args
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return exitcode.Usagef("set needs a subcommand")
+			}
+			return exitcode.Usagef("unknown command %q for \"loxicmd set\"", args[0])
 		},
 	}
 	SetParamCmd.AddCommand(NewSetLogLevelCmd(restOptions))

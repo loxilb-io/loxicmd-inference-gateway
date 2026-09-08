@@ -16,9 +16,8 @@
 package get
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -38,7 +37,7 @@ ex)
 	loxicmd get trace
 	loxicmd get trace --otlp
 	loxicmd get trace --parsers`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
 			defer cancel()
@@ -55,10 +54,9 @@ ex)
 			}
 			resp, err := client.Trace().SubResources([]string{sub}).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get trace: %v", err)
 			}
-			printJSONResponse(resp, what)
+			return printJSONResponse(resp, what)
 		},
 	}
 	getTraceCmd.Flags().BoolVar(&otlp, "otlp", false, "Show the OTLP exporter configuration")

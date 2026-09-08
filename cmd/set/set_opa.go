@@ -16,9 +16,8 @@
 package set
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -40,10 +39,9 @@ ranges are rejected server-side (SSRF protection).
 
 ex)
 	loxicmd set opa --opa-url http://opa.example.com:8181 --policy-path loxilb/l4 --poll-interval-sec 30`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if opaURL == "" {
-				fmt.Printf("Error: --opa-url is required\n")
-				return
+				return exitcode.Usagef("--opa-url is required")
 			}
 			req := api.OPAWatcherConfig{
 				OpaURL:          opaURL,
@@ -56,7 +54,7 @@ ex)
 			defer cancel()
 
 			resp, err := client.OPA().Create(ctx, req)
-			reportPost(resp, err, "OPA policy watcher configured and started.")
+			return reportPost(resp, err, "OPA policy watcher configured and started.")
 		},
 	}
 	setOPACmd.Flags().StringVar(&opaURL, "opa-url", "", "Base URL of the OPA server (required)")

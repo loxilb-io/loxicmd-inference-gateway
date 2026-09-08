@@ -16,10 +16,10 @@
 package set
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -40,7 +40,7 @@ ex)
 	loxicmd set gpu --enable
 	loxicmd set gpu --disable
 	loxicmd set gpu --cleanup --max-age-hours 2`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			n := 0
 			for _, b := range []bool{enable, disable, cleanup} {
 				if b {
@@ -48,8 +48,7 @@ ex)
 				}
 			}
 			if n != 1 {
-				fmt.Printf("Error: specify exactly one of --enable, --disable, or --cleanup\n")
-				return
+				return exitcode.Usagef("specify exactly one of --enable, --disable, or --cleanup")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
@@ -58,18 +57,19 @@ ex)
 			switch {
 			case enable:
 				resp, err := client.GPU().SubResources([]string{"enable"}).Create(ctx, nil)
-				reportPost(resp, err, "GPU-aware load balancing enabled.")
+				return reportPost(resp, err, "GPU-aware load balancing enabled.")
 			case disable:
 				resp, err := client.GPU().SubResources([]string{"disable"}).Create(ctx, nil)
-				reportPost(resp, err, "GPU-aware load balancing disabled.")
+				return reportPost(resp, err, "GPU-aware load balancing disabled.")
 			case cleanup:
 				gpu := client.GPU().SubResources([]string{"conversations", "cleanup"})
 				if cmd.Flags().Changed("max-age-hours") {
 					gpu = gpu.Query(map[string]string{"max_age_hours": strconv.Itoa(maxAgeHours)})
 				}
 				resp, err := gpu.Create(ctx, nil)
-				reportPost(resp, err, "Conversation cleanup completed.")
+				return reportPost(resp, err, "Conversation cleanup completed.")
 			}
+			return nil
 		},
 	}
 	setGPUCmd.Flags().BoolVar(&enable, "enable", false, "Enable GPU-aware load balancing")

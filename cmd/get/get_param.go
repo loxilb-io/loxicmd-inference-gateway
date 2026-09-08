@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -34,7 +35,7 @@ func NewGetLogLevelCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Long:    `It shows log level in the LoxiLB`,
 		Aliases: []string{"loglevel"},
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -44,14 +45,13 @@ func NewGetLogLevelCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Param().Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get log-level: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetLogLevelResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get log-level", resp.StatusCode)
 		},
 	}
 

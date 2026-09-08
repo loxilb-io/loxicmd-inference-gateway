@@ -16,9 +16,8 @@
 package get
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -35,7 +34,7 @@ for all tracked workers with --workers (/config/worker/metrics).
 ex)
 	loxicmd get gpu
 	loxicmd get gpu --workers`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
 			defer cancel()
@@ -43,18 +42,15 @@ ex)
 			if workers {
 				resp, err := client.WorkerMetrics().Get(ctx)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("get gpu: %v", err)
 				}
-				printJSONResponse(resp, "worker metrics")
-				return
+				return printJSONResponse(resp, "worker metrics")
 			}
 			resp, err := client.GPU().SubResources([]string{"status"}).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get gpu: %v", err)
 			}
-			printJSONResponse(resp, "gpu status")
+			return printJSONResponse(resp, "gpu status")
 		},
 	}
 	getGPUCmd.Flags().BoolVar(&workers, "workers", false, "Show per-worker GPU metrics")

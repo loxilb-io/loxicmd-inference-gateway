@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+| PRODUCT | LOXILB VERSION | LOXILB BUILD INFO |
+|---------|----------------|-------------------|
+| loxilb  |                |                   |
+--- stderr ---

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -42,10 +43,9 @@ subscriber has ingested (read-only observability).
 
 ex)
 	loxicmd get kvinventory --service-id=3 --ep-idx=0`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if !cmd.Flags().Changed("service-id") || !epIdxSet {
-				fmt.Printf("Error: --service-id and --ep-idx are required\n")
-				return
+				return exitcode.Usagef("--service-id and --ep-idx are required")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -60,25 +60,29 @@ ex)
 			}
 			resp, err := client.AIKvInventory().Query(q).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get kvinventory: %v", err)
 			}
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				fmt.Printf("Error: %s\n", api.NewAPIError(resp.StatusCode, body).Error())
-				return
+				ce := exitcode.FromHTTPStatus("get kvinventory", resp.StatusCode)
+				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				return ce
 			}
 
 			inv := api.AIKvInventoryResponse{}
 			if err := json.Unmarshal(body, &inv); err != nil {
-				fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
-				return
+				return &exitcode.CLIError{
+					Code:       exitcode.ContractMismatch,
+					Message:    fmt.Sprintf("Failed to unmarshal HTTP response: (%s)", err.Error()),
+					Origin:     "gateway",
+					HTTPStatus: resp.StatusCode,
+				}
 			}
 			if restOptions.PrintOption == "json" {
 				indent, _ := json.MarshalIndent(inv, "", "    ")
 				fmt.Println(string(indent))
-				return
+				return nil
 			}
 			fmt.Printf("service_id=%d ep_idx=%d hash_algo=%s total=%d\n", inv.ServiceID, inv.EpIdx, inv.HashAlgo, inv.Total)
 			table := TableInit()
@@ -88,6 +92,7 @@ ex)
 				data = append(data, []string{fmt.Sprintf("%d", b.BlockIdx), fmt.Sprintf("%d", b.HashUint64)})
 			}
 			TableShow(data, table)
+			return nil
 		},
 	}
 	getKvInventoryCmd.Flags().Int64Var(&serviceID, "service-id", 0, "Service ID (required)")

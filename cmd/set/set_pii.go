@@ -16,9 +16,8 @@
 package set
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -52,7 +51,7 @@ ex)
 	loxicmd set pii --enable
 	loxicmd set pii --configure --mode mask --score-threshold 0.7 --direction both
 	loxicmd set pii --url-patterns --url-mode replace --include /v1/chat/* --exclude /health`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			n := 0
 			for _, b := range []bool{enable, disable, configure, urlPatterns} {
 				if b {
@@ -60,8 +59,7 @@ ex)
 				}
 			}
 			if n != 1 {
-				fmt.Printf("Error: specify exactly one of --enable, --disable, --configure, or --url-patterns\n")
-				return
+				return exitcode.Usagef("specify exactly one of --enable, --disable, --configure, or --url-patterns")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
@@ -72,10 +70,9 @@ ex)
 				req := api.PIIEnableRequest{Enabled: enable}
 				resp, err := client.PII().SubResources([]string{"enable"}).Create(ctx, req)
 				if enable {
-					reportPost(resp, err, "PII detection enabled.")
-				} else {
-					reportPost(resp, err, "PII detection disabled.")
+					return reportPost(resp, err, "PII detection enabled.")
 				}
+				return reportPost(resp, err, "PII detection disabled.")
 			case configure:
 				cfg := api.PIIConfigEntry{}
 				if cmd.Flags().Changed("mode") {
@@ -121,11 +118,10 @@ ex)
 					cfg.BatchSize = &batchSize
 				}
 				resp, err := client.PII().SubResources([]string{"configure"}).Create(ctx, cfg)
-				reportPost(resp, err, "PII configuration updated.")
+				return reportPost(resp, err, "PII configuration updated.")
 			case urlPatterns:
 				if urlMode == "" {
-					fmt.Printf("Error: --url-mode is required with --url-patterns (add, replace, or clear)\n")
-					return
+					return exitcode.Usagef("--url-mode is required with --url-patterns (add, replace, or clear)")
 				}
 				entry := api.PIIURLPatternsEntry{Mode: urlMode}
 				for _, p := range includes {
@@ -135,8 +131,9 @@ ex)
 					entry.Patterns = append(entry.Patterns, api.PIIURLPattern{Pattern: p, IsExclude: true})
 				}
 				resp, err := client.PII().SubResources([]string{"url-patterns"}).Create(ctx, entry)
-				reportPost(resp, err, "PII URL patterns updated.")
+				return reportPost(resp, err, "PII URL patterns updated.")
 			}
+			return nil
 		},
 	}
 	f := setPIICmd.Flags()

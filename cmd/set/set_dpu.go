@@ -19,6 +19,7 @@ import (
 	"fmt"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -40,21 +41,18 @@ Note: this is a raw-middleware endpoint; inspect state with 'get dpu'.
 ex)
 	loxicmd set dpu --action unregister --plugin doca
 	loxicmd set dpu --action cb_force --mode open`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			switch action {
 			case "unregister":
 				if plugin == "" {
-					fmt.Printf("Error: --plugin is required for --action unregister\n")
-					return
+					return exitcode.Usagef("--plugin is required for --action unregister")
 				}
 			case "cb_force":
 				if mode != "open" && mode != "close" {
-					fmt.Printf("Error: --mode must be open or close for --action cb_force\n")
-					return
+					return exitcode.Invalidf("--mode must be open or close for --action cb_force")
 				}
 			default:
-				fmt.Printf("Error: --action must be unregister or cb_force\n")
-				return
+				return exitcode.Usagef("--action must be unregister or cb_force")
 			}
 			req := api.DPUDebugAction{Action: action, Plugin: plugin, Mode: mode}
 			client := api.NewLoxiClient(restOptions)
@@ -62,7 +60,7 @@ ex)
 			defer cancel()
 
 			resp, err := client.DPU().SubResources([]string{"debug"}).Create(ctx, req)
-			reportPost(resp, err, fmt.Sprintf("DPU debug action '%s' executed.", action))
+			return reportPost(resp, err, fmt.Sprintf("DPU debug action '%s' executed.", action))
 		},
 	}
 	setDPUCmd.Flags().StringVar(&action, "action", "", "Debug action: unregister or cb_force (required)")

@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Prometheus metrics enabled.
+--- stderr ---

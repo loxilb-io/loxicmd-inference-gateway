@@ -16,9 +16,8 @@
 package get
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -36,17 +35,16 @@ it with 'delete opa'.
 
 ex)
 	loxicmd get opa`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
 			defer cancel()
 
 			resp, err := client.OPA().Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get opa: %v", err)
 			}
-			printJSONResponse(resp, "opa watcher")
+			return printJSONResponse(resp, "opa watcher")
 		},
 	}
 	return getOPACmd

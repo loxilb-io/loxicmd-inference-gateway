@@ -16,9 +16,8 @@
 package get
 
 import (
-	"fmt"
-
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -36,7 +35,7 @@ func NewGetLlamaFirewallCmd(restOptions *api.RESTOptions) *cobra.Command {
 ex)
 	loxicmd get llamafirewall
 	loxicmd get llamafirewall --stats`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
 			defer cancel()
@@ -49,10 +48,9 @@ ex)
 			}
 			resp, err := client.LlamaFirewall().SubResources([]string{sub}).Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get llamafirewall: %v", err)
 			}
-			printJSONResponse(resp, what)
+			return printJSONResponse(resp, what)
 		},
 	}
 	getCmd.Flags().BoolVar(&stats, "stats", false, "Show scanning statistics instead of status")

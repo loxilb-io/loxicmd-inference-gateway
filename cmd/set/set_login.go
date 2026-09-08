@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"os"
@@ -40,41 +41,38 @@ func NewSetLogInCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "login",
 		Short: "login and set token",
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			o := api.LoginModel{}
 			if SetOptions.Provider == "" {
 				reader := bufio.NewReader(os.Stdin)
 				fmt.Print("Enter ID: ")
 				userID, err := reader.ReadString('\n')
 				if err != nil {
-					fmt.Println("ID error:", err)
-					return
+					return fmt.Errorf("ID error: %w", err)
 				}
 				userID = strings.TrimSpace(userID)
 				fmt.Print("Enter Password: ")
 				bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 				if err != nil {
-					fmt.Println("\nPassword error:", err)
-					return
+					return fmt.Errorf("password error: %w", err)
 				}
 
 				// Make loginModel
 				if err := ReadSetLogInOptions(&o, userID, bytePassword); err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Invalidf("%s", err.Error())
 				} // API Call
 
 				resp, err := LoginAPICall(restOptions, o)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("set login: %v", err)
 				}
 				// Save token
 				// save the token in the file tmp/token.json
 				if resp.StatusCode == http.StatusOK {
 					PrintAndSaveTokenResult(resp, *restOptions)
-					return
+					return nil
 				}
+				return exitcode.FromHTTPStatus("set login", resp.StatusCode)
 			} else if SetOptions.Provider == "google" {
 				// Google Login at first
 				fmt.Printf("This process is how to log in with Google oauth. When you log in to the GUI you can get a token (access token) and a refresh token. After that, it is a registration process.\n")
@@ -82,28 +80,24 @@ func NewSetLogInCmd(restOptions *api.RESTOptions) *cobra.Command {
 				fmt.Print("Enter Access Token: ")
 				AccessToken, err := reader.ReadString('\n')
 				if err != nil {
-					fmt.Println("Access Token error:", err)
-					return
+					return fmt.Errorf("access token error: %w", err)
 				}
 				AccessToken = strings.TrimSpace(AccessToken)
 				fmt.Print("Enter Refresh Token: ")
 				RefreshToken, err := reader.ReadString('\n')
 				if err != nil {
-					fmt.Println("Refresh token error", err)
-					return
+					return fmt.Errorf("refresh token error: %w", err)
 				}
 				RefreshToken = strings.TrimSpace(RefreshToken)
 				tokenFilePath := "/tmp/loxilbtoken"
 				err = os.WriteFile(tokenFilePath, []byte(AccessToken), 0600)
 				if err != nil {
-					fmt.Printf("Error: Failed to write token to file: (%s)\n", err.Error())
-					return
+					return &exitcode.CLIError{Code: exitcode.Failed, Message: fmt.Sprintf("Failed to write token to file: (%s)", err.Error())}
 				}
 				refreshTokenFilePath := "/tmp/loxilbrefreshtoken"
 				err = os.WriteFile(refreshTokenFilePath, []byte(RefreshToken), 0600)
 				if err != nil {
-					fmt.Printf("Error: Failed to write token to file: (%s)\n", err.Error())
-					return
+					return &exitcode.CLIError{Code: exitcode.Failed, Message: fmt.Sprintf("Failed to write token to file: (%s)", err.Error())}
 				}
 				fmt.Println("Login Success")
 
@@ -112,23 +106,20 @@ func NewSetLogInCmd(restOptions *api.RESTOptions) *cobra.Command {
 				fmt.Print("Enter Access Token: ")
 				AccessToken, err := reader.ReadString('\n')
 				if err != nil {
-					fmt.Println("Access Token error:", err)
-					return
+					return fmt.Errorf("access token error: %w", err)
 				}
 				AccessToken = strings.TrimSpace(AccessToken)
 				tokenFilePath := "/tmp/loxilbtoken"
 				err = os.WriteFile(tokenFilePath, []byte(AccessToken), 0600)
 				if err != nil {
-					fmt.Printf("Error: Failed to write token to file: (%s)\n", err.Error())
-					return
+					return &exitcode.CLIError{Code: exitcode.Failed, Message: fmt.Sprintf("Failed to write token to file: (%s)", err.Error())}
 				}
 				fmt.Println("Login Success")
 
 			} else {
-				fmt.Println("Error: Invalid provider name")
-				return
+				return exitcode.Invalidf("Invalid provider name")
 			}
-
+			return nil
 		},
 	}
 	loginCmd.Flags().StringVarP(&SetOptions.Provider, "provider", "", "", "Define the provider name ex) google, manual")
@@ -197,29 +188,28 @@ func NewSetLogOutCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "logout",
 		Short: "logout and remove token",
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if SetOptions.Provider == "" {
 				resp, err := LogOutAPICall(restOptions)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("set logout: %v", err)
 				}
 				// Remove token
 				// Remove the token in the file tmp/token.json
 				if resp.StatusCode == http.StatusOK {
 					PrintAndRemoveTokenResult()
-					return
+					return nil
 				}
+				return exitcode.FromHTTPStatus("set logout", resp.StatusCode)
 			} else if SetOptions.Provider == "google" {
 				PrintAndRemoveRefreshTokenResult()
 				PrintAndRemoveTokenResult()
 			} else if SetOptions.Provider == "manual" {
 				PrintAndRemoveTokenResult()
 			} else {
-				fmt.Println("Error: Invalid provider name")
-				return
+				return exitcode.Invalidf("Invalid provider name")
 			}
-
+			return nil
 		},
 	}
 
@@ -271,21 +261,19 @@ func NewSetRefreshTokenCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Use:   "refresh",
 		Short: "refresh token",
 
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if SetOptions.Provider == "google" {
 				// Get the token from the file /tmp/loxilbtoken
 				tokenFilePath := "/tmp/loxilbtoken"
 				tokenByte, err := os.ReadFile(tokenFilePath)
 				if err != nil {
-					fmt.Printf("Error: Failed to read token file: (%s)\n", err.Error())
-					return
+					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("Failed to read token file: (%s)", err.Error())}
 				}
 				// Get the refresh token from the file /tmp/loxilbrefreshtoken
 				refreshTokenFilePath := "/tmp/loxilbrefreshtoken"
 				refreshTokenByte, err := os.ReadFile(refreshTokenFilePath)
 				if err != nil {
-					fmt.Printf("Error: Failed to read refreshtoken file: (%s)\n", err.Error())
-					return
+					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("Failed to read refreshtoken file: (%s)", err.Error())}
 				}
 				o := api.TokenModel{}
 				o.Token = string(tokenByte)
@@ -293,23 +281,21 @@ func NewSetRefreshTokenCmd(restOptions *api.RESTOptions) *cobra.Command {
 
 				resp, err := RefreshTokenAPICall(restOptions, o)
 				if err != nil {
-					fmt.Printf("Error: %s\n", err.Error())
-					return
+					return exitcode.Unavailablef("set refresh: %v", err)
 				}
 				// Save token
 				// save the token in the file tmp/token.json
 				if resp.StatusCode == http.StatusOK {
 					PrintAndSaveTokenResult(resp, *restOptions)
-					return
-				} else if resp.StatusCode == http.StatusForbidden {
-					fmt.Println("Error: Failed to refresh token. Please login again")
-					return
+					return nil
 				}
-				fmt.Printf("resp.StatusCode: %v\n", resp.StatusCode)
-				fmt.Println("Error: Failed to refresh token")
-				return
+				ce := exitcode.FromHTTPStatus("set refresh", resp.StatusCode)
+				if resp.StatusCode == http.StatusForbidden {
+					ce.Message = "Failed to refresh token. Please login again"
+				}
+				return ce
 			}
-			fmt.Println("Error: Invalid provider name")
+			return exitcode.Invalidf("Invalid provider name")
 		},
 	}
 	loginCmd.Flags().StringVarP(&SetOptions.Provider, "provider", "", "", "Define the provider name ex)google, github, manual")

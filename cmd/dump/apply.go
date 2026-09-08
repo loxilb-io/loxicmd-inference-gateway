@@ -23,6 +23,7 @@ import (
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/create"
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/set"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"os"
 	"os/exec"
 	"strings"
@@ -49,7 +50,7 @@ func ApplyCmd(options *ApplyOptions, restOptions *api.RESTOptions) *cobra.Comman
 		Use:   "apply",
 		Short: "Apply configuration",
 		Long:  `Reads and apply configuration from the text file`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = cmd
 			_ = args
 			if len(options.IpConfigFile) == 0 &&
@@ -60,9 +61,7 @@ func ApplyCmd(options *ApplyOptions, restOptions *api.RESTOptions) *cobra.Comman
 				len(options.Intf) == 0 &&
 				len(options.NormalConfigFile) == 0 &&
 				len(options.BFDConfigFile) == 0 {
-				fmt.Println("Provide valid options")
-				cmd.Help()
-				return
+				return exitcode.Usagef("apply needs at least one configuration option")
 			}
 			if len(options.IpConfigFile) > 0 {
 				ApplyIpConfig(options.IpConfigFile)
@@ -72,7 +71,7 @@ func ApplyCmd(options *ApplyOptions, restOptions *api.RESTOptions) *cobra.Comman
 			if options.Route && len(options.Intf) > 0 {
 				addRoute(options.ConfigPath, options.Intf)
 				fmt.Printf("Route Configuration applied for - %s\n", options.Intf)
-				return
+				return nil
 			}
 			if len(options.Intf) > 0 {
 				ApplyIpConfigPerInterface(options.ConfigPath, options.Intf)
@@ -101,12 +100,11 @@ func ApplyCmd(options *ApplyOptions, restOptions *api.RESTOptions) *cobra.Comman
 			}
 			if len(options.NormalConfigFile) > 0 {
 				if err := ApplyFileConfig(options.NormalConfigFile, restOptions); err != nil {
-					fmt.Printf("Configuration failed - %s\n", options.NormalConfigFile)
-				} else {
-					fmt.Printf("Configuration applied - %s\n", options.NormalConfigFile)
+					return exitcode.Classify(fmt.Errorf("configuration failed - %s: %w", options.NormalConfigFile, err))
 				}
+				fmt.Printf("Configuration applied - %s\n", options.NormalConfigFile)
 			}
-
+			return nil
 		},
 	}
 	// -f filename option

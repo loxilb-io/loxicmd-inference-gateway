@@ -16,10 +16,10 @@
 package set
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -43,7 +43,7 @@ ex)
 	loxicmd set trace --enable
 	loxicmd set trace --disable
 	loxicmd set trace --otlp --otlp-endpoint jaeger.example.com:4317 --otlp-protocol grpc`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			n := 0
 			for _, b := range []bool{enable, disable, otlp} {
 				if b {
@@ -51,8 +51,7 @@ ex)
 				}
 			}
 			if n != 1 {
-				fmt.Printf("Error: specify exactly one of --enable, --disable, or --otlp\n")
-				return
+				return exitcode.Usagef("specify exactly one of --enable, --disable, or --otlp")
 			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := v2Context(restOptions)
@@ -61,14 +60,13 @@ ex)
 			switch {
 			case enable:
 				resp, err := client.Trace().SubResources([]string{"enable"}).Create(ctx, nil)
-				reportPost(resp, err, "HTTP/HTTPS tracing enabled.")
+				return reportPost(resp, err, "HTTP/HTTPS tracing enabled.")
 			case disable:
 				resp, err := client.Trace().SubResources([]string{"disable"}).Create(ctx, nil)
-				reportPost(resp, err, "HTTP/HTTPS tracing disabled.")
+				return reportPost(resp, err, "HTTP/HTTPS tracing disabled.")
 			case otlp:
 				if endpoint == "" || protocol == "" {
-					fmt.Printf("Error: --otlp requires --otlp-endpoint and --otlp-protocol\n")
-					return
+					return exitcode.Usagef("--otlp requires --otlp-endpoint and --otlp-protocol")
 				}
 				cfg := api.TraceOTLPConfig{Endpoint: endpoint, Protocol: protocol}
 				if cmd.Flags().Changed("otlp-use-tls") {
@@ -82,15 +80,15 @@ ex)
 					for _, h := range headers {
 						kv := strings.SplitN(h, "=", 2)
 						if len(kv) != 2 {
-							fmt.Printf("Error: --otlp-header must be key=value, got %q\n", h)
-							return
+							return exitcode.Invalidf("--otlp-header must be key=value, got %q", h)
 						}
 						cfg.Headers[kv[0]] = kv[1]
 					}
 				}
 				resp, err := client.Trace().SubResources([]string{"otlp"}).Create(ctx, cfg)
-				reportPost(resp, err, "OTLP endpoint configured.")
+				return reportPost(resp, err, "OTLP endpoint configured.")
 			}
+			return nil
 		},
 	}
 	f := setTraceCmd.Flags()

@@ -1,0 +1,3 @@
+kind: Vlan
+spec:
+  vid: 100

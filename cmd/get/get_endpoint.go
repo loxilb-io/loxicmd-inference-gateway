@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"os"
@@ -37,7 +38,7 @@ func NewGetEndPointCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Short:   "Get endpoints",
 		Aliases: []string{"endpoint", "ep", "endpoints"},
 		Long:    `It shows End Point Information`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = cmd
 			_ = args
 			client := api.NewLoxiClient(restOptions)
@@ -49,13 +50,13 @@ func NewGetEndPointCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Firewall().SetUrl("/config/endpoint/all").Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get endpoint: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetEPResult(resp, *restOptions)
-				return
+				return nil
 			}
+			return exitcode.FromHTTPStatus("get endpoint", resp.StatusCode)
 		},
 	}
 
@@ -125,8 +126,7 @@ func EPdump(restOptions *api.RESTOptions, path string) (string, error) {
 	file := strings.Join(fileP, t.Local().Format("2006-01-02_15:04:05"))
 	f, err := os.Create(file)
 	if err != nil {
-		fmt.Printf("Can't create dump file\n")
-		os.Exit(1)
+		return "", fmt.Errorf("can't create dump file: %w", err)
 	}
 	defer f.Close()
 

@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
 	"time"
@@ -33,7 +34,7 @@ func NewGetConntrackCmd(restOptions *api.RESTOptions) *cobra.Command {
 		Aliases: []string{"ct", "conntracks", "cts"},
 		Short:   "Get a Conntrack",
 		Long:    `It shows connection track Information`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = cmd
 			_ = args
 			client := api.NewLoxiClient(restOptions)
@@ -45,14 +46,13 @@ func NewGetConntrackCmd(restOptions *api.RESTOptions) *cobra.Command {
 			}
 			resp, err := client.Conntrack().Get(ctx)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("get conntrack: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
 				PrintGetCTResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("get conntrack", resp.StatusCode)
 		},
 	}
 	GetctCmd.Flags().StringVarP(&restOptions.ServiceName, "servName", "", restOptions.ServiceName, "Name for load balancer rule")

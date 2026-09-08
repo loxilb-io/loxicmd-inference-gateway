@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"net"
 	"net/http"
 	"time"
@@ -39,23 +40,22 @@ func NewSetBFDCmd(restOptions *api.RESTOptions) *cobra.Command {
 --retryCount - Maximum number of retry to detect failure`,
 
 		Aliases: []string{"bfd-session"},
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: func(cmd *cobra.Command, args []string) error {
 
 			// Make bfdMod
 			if err := ReadSetBfdOptions(&o, args); err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Invalidf("%s", err.Error())
 			}
 			resp, err := SetBFDAPICall(restOptions, o)
 			if err != nil {
-				fmt.Printf("Error: %s\n", err.Error())
-				return
+				return exitcode.Unavailablef("set bfd: %v", err)
 			}
+			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
 				PrintSetResult(resp, *restOptions)
-				return
+				return nil
 			}
-
+			return exitcode.FromHTTPStatus("set bfd", resp.StatusCode)
 		},
 	}
 	SetBFDCmd.Flags().StringVarP(&o.Instance, "instance", "", "default", "Specify the cluster instance name")

@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Configuration applied - testdata/fixtures/apply-vlan.yaml
+--- stderr ---

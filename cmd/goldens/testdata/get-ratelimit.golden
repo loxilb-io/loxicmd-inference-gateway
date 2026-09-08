@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+| TENANT | RPS | TOKENS/MIN | BURST % | MODELS | UPDATED |
+|--------|-----|------------|---------|--------|---------|
+|        |   0 |          0 |       0 |      0 |         |
+--- stderr ---

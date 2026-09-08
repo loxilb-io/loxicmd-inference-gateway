@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+HTTP/HTTPS tracing enabled.
+--- stderr ---
