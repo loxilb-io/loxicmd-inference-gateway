@@ -38,6 +38,8 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 )
@@ -53,6 +55,14 @@ var executablePath = "/usr/libexec/loxilb-appliance/loxilb-appliance-backend"
 // or cannot be executed — spelled exactly as the invocation contract fixes
 // it.
 const CodeBackendUnavailable = "BACKEND_UNAVAILABLE"
+
+// backendWaitDelay bounds how long cmd.Wait may spend after the process is
+// done waiting on I/O pipes a straggling grandchild still holds. It is a
+// backstop, not a timeout: the process-group kill is what normally closes
+// them, and this only decides how long the CLI tolerates a straggler that
+// escaped it. Generous enough not to truncate a slow final write, short
+// enough that automation never perceives a hang.
+const backendWaitDelay = 2 * time.Second
 
 // contractAPIPrefix and contractMajor pin the handshake major this CLI
 // speaks. A backend advertising any other major is refused before any
@@ -204,7 +214,45 @@ func runWithStdin(ctx context.Context, argv []string, stdin io.Reader) (*Result,
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 
+	// Bounding the invocation takes both of the following, because the
+	// backend is a process TREE, not a process: the real one shells out to
+	// tar, pg_dump, systemctl and journalctl, and every child inherits the
+	// stdout/stderr pipes created for the buffers above.
+	//
+	// 1. Its own process group, killed as a group. exec.CommandContext
+	//    cancels by killing the direct child only; a surviving grandchild
+	//    both holds the pipes open (so cmd.Wait never returns -- see 2) and
+	//    keeps mutating host state after the CLI has already told the caller
+	//    the operation failed. An orphaned tar still writing the archive the
+	//    caller was just told was not written is the worst version of that.
+	// 2. A WaitDelay backstop. cmd.Wait waits for the io-copying goroutines
+	//    as well as the process, and a pipe reaches EOF only once EVERY
+	//    write end is closed. The group kill above should close them, but a
+	//    grandchild that put itself in another group, or one wedged in
+	//    uninterruptible sleep, would otherwise hang the CLI forever. Note
+	//    this case needs no deadline to bite: a backend that merely
+	//    daemonizes a child and exits 0 hangs an invocation that has no
+	//    --timeout at all.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		// Setpgid makes the child a group leader, so its PGID is its PID
+		// and -PID addresses the whole tree it started. ESRCH just means
+		// the tree is already gone, which is the outcome we wanted.
+		if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+			return err
+		}
+		return nil
+	}
+	cmd.WaitDelay = backendWaitDelay
+
 	err := cmd.Run()
+	// ErrWaitDelay means the process finished but its pipes had to be closed
+	// out from under a straggler. Whatever the backend managed to write is in
+	// the buffers and is reported; the invocation itself did not fail because
+	// of it, so it must not be dressed up as a backend error.
+	if errors.Is(err, exec.ErrWaitDelay) {
+		err = nil
+	}
 	res := &Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
 	if err == nil {
 		return res, nil
