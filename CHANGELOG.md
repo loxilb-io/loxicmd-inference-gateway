@@ -56,6 +56,17 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   happens). `--token` and `--token-file` are mutually exclusive.
 
 ### Changed
+- **Envelope warning codes** are now spelled `SCREAMING_SNAKE`
+  (`CONTRACT_LEGACY`, `UNCHECKED_DOCUMENT`) instead of the lowercase-hyphen
+  shape they shipped with. The published envelope schema
+  ([contracts/command-result.schema.json](contracts/command-result.schema.json))
+  has always pinned `warnings[].code` to `^[A-Z][A-Z0-9_]*$`, so the previous
+  values produced a document that schema validation rejects — and they
+  accompanied *successful* commands (`create persist`, `create restore` and
+  `get snapshot` against a gateway on the older response contract), so a
+  conforming consumer would reject a result reporting no problem. Consumers
+  branching on `warnings[].code` string values must update; the lifecycle
+  reason codes in `data.componentCode` are a different field and are unchanged.
 - The session token that `set login` stores on disk is now resolved once at
   startup under the same secret-file rules as `--token-file` (regular file,
   no symlinks, owner-only permissions, non-empty) instead of being read
