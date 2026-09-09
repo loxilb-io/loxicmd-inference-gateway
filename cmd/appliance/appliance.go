@@ -160,6 +160,10 @@ type applianceData struct {
 	Origin        *string         `json:"origin,omitempty"`
 	HTTPStatus    *int            `json:"httpStatus,omitempty"`
 	ComponentCode *string         `json:"componentCode,omitempty"`
+	// OperationID is the handle a caller recovers with. Present exactly
+	// when the outcome is unknown, which is the only time recovery is a
+	// question the caller has to answer.
+	OperationID *string `json:"operationId,omitempty"`
 }
 
 // dispatchReadOnly invokes a read-only backend subcommand and renders the
@@ -172,16 +176,8 @@ func dispatchReadOnly(out io.Writer, restOptions *api.RESTOptions, command, subc
 	defer cancel()
 
 	res, err := backend.Invoke(ctx, subcommand, jsonOut)
-	if err == nil && res.ExitCode != 0 {
-		// The backend ran and refused: its own verdict is preserved
-		// verbatim — the CLI does not reinterpret a failure it cannot
-		// see into, and never converts one into success.
-		err = &exitcode.CLIError{
-			Code:          exitcode.Failed,
-			Message:       backendFailureMessage(subcommand, res),
-			Origin:        "backend",
-			ComponentCode: fmt.Sprintf("backend-exit-%d", res.ExitCode),
-		}
+	if err == nil {
+		err = backendOutcome(subcommand, res, false)
 	}
 	if err != nil {
 		if jsonOut {
@@ -231,9 +227,74 @@ func writeEnvelope(out io.Writer, command string, res *backend.Result, err error
 		}
 		httpStatus, componentCode := ce.HTTPStatus, ce.ComponentCode
 		data.Origin, data.HTTPStatus, data.ComponentCode = &origin, &httpStatus, &componentCode
+		// Only an unknown outcome needs a recovery handle. Publishing one on
+		// every failure would suggest there is something to recover from
+		// when the backend already said there is not.
+		if ce.Code == exitcode.Partial && res != nil {
+			id := res.OperationID()
+			data.OperationID = &id
+		}
 	}
 	result.Data = data
 	_ = result.Write(out)
+}
+
+// backendOutcome turns a completed invocation into a verdict, or nil when the
+// backend exited 0.
+//
+// The split that matters is between a failure the backend DECIDED and one
+// nobody decided. A non-zero exit status is the backend's own verdict:
+// preserved verbatim, classified FAILED, and safe to retry once the cause is
+// addressed. A process that was killed never reported anything -- our own
+// --timeout fired, a signal arrived, the OOM killer chose it -- so what it had
+// done by then is unknown.
+//
+// The exit-code taxonomy resolves that ambiguity downward to safety: an
+// unknown outcome is PARTIAL when a state change may have occurred, and only
+// 5/7 when it is confirmed none did. A mutating subcommand killed mid-flight
+// is the first case exactly, and PARTIAL is the code automation must never
+// retry blindly -- half a backup or half an applied address is what retrying
+// would compound. A read-only subcommand cannot have changed anything, so the
+// same death is reported as the backend being unresponsive, which a bounded
+// retry may legitimately ride out.
+func backendOutcome(subcommand string, res *backend.Result, mutating bool) error {
+	if res.ExitCode == 0 && !res.Signaled {
+		return nil
+	}
+	if !res.Signaled {
+		// The backend ran and refused: its own verdict is preserved
+		// verbatim — the CLI does not reinterpret a failure it cannot
+		// see into, and never converts one into success.
+		return &exitcode.CLIError{
+			Code:          exitcode.Failed,
+			Message:       backendFailureMessage(subcommand, res),
+			Origin:        "backend",
+			ComponentCode: fmt.Sprintf("backend-exit-%d", res.ExitCode),
+		}
+	}
+
+	cause, code := "was killed before it reported an outcome", "backend-killed"
+	if res.TimedOut {
+		cause, code = "did not finish within the timeout and was stopped", "backend-timeout"
+	}
+	if !mutating {
+		return &exitcode.CLIError{
+			Code: exitcode.Unavailable,
+			Message: fmt.Sprintf("the backend's %s %s; it read nothing and changed nothing, so this is safe to retry",
+				subcommand, cause),
+			Origin:        "backend",
+			ComponentCode: code,
+		}
+	}
+	return &exitcode.CLIError{
+		Code: exitcode.Partial,
+		Message: fmt.Sprintf(
+			"the backend's %s %s, so whether it took effect is UNKNOWN; do not retry blindly — "+
+				"determine the host's actual state first, using operation id %s",
+			subcommand, cause, res.OperationID()),
+		Origin:        "backend",
+		ComponentCode: code,
+	}
 }
 
 // backendFailureMessage folds the backend's stderr into the one human line

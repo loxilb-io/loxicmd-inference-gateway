@@ -76,13 +76,10 @@ func dispatchMutating(out io.Writer, restOptions *api.RESTOptions, command strin
 	defer cancel()
 
 	res, err := backend.InvokeMutating(ctx, req)
-	if err == nil && res.ExitCode != 0 {
-		err = &exitcode.CLIError{
-			Code:          exitcode.Failed,
-			Message:       backendFailureMessage(req.Subcommand, res),
-			Origin:        "backend",
-			ComponentCode: fmt.Sprintf("backend-exit-%d", res.ExitCode),
-		}
+	if err == nil {
+		// mutating: a death mid-flight leaves host state unknown, which the
+		// taxonomy reports as PARTIAL rather than as a retryable failure.
+		err = backendOutcome(req.Subcommand, res, true)
 	}
 	if err != nil {
 		if req.JSON {
