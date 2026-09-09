@@ -271,3 +271,30 @@ func TestReadOnlyEntryRefusesMutatingSubcommands(t *testing.T) {
 		t.Fatal("a mutating subcommand spawned through the read-only entry point")
 	}
 }
+
+// TestOperationIDPrefersTheBackendsOwn pins the precedence. The backend's id is
+// the one an operator can look up in the product's own records; the correlation
+// id is the CLI's, guaranteed searchable in the host journal, and stands in only
+// when the backend named none. Getting this backwards would hand back an id
+// that leads nowhere useful while a better one was available.
+func TestOperationIDPrefersTheBackendsOwn(t *testing.T) {
+	withBackendOwn := &Result{
+		Stdout:        []byte(`{"operationId":"op-from-backend"}`),
+		CorrelationID: "cli-fallback",
+	}
+	if got := withBackendOwn.OperationID(); got != "op-from-backend" {
+		t.Errorf("OperationID() = %q, want the backend's own", got)
+	}
+
+	for name, res := range map[string]*Result{
+		"no json":        {Stdout: []byte("plain prose"), CorrelationID: "cli-fallback"},
+		"json no id":     {Stdout: []byte(`{"other":true}`), CorrelationID: "cli-fallback"},
+		"empty id":       {Stdout: []byte(`{"operationId":""}`), CorrelationID: "cli-fallback"},
+		"no stdout":      {CorrelationID: "cli-fallback"},
+		"truncated json": {Stdout: []byte(`{"operationId":`), CorrelationID: "cli-fallback"},
+	} {
+		if got := res.OperationID(); got != "cli-fallback" {
+			t.Errorf("%s: OperationID() = %q, want the correlation id", name, got)
+		}
+	}
+}

@@ -67,6 +67,23 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   conforming consumer would reject a result reporting no problem. Consumers
   branching on `warnings[].code` string values must update; the lifecycle
   reason codes in `data.componentCode` are a different field and are unchanged.
+- **Appliance outcome classification.** A backend killed before it could report
+  anything — by the invocation's `--timeout`, by a signal, by the OOM killer —
+  is no longer reported as a plain failure. For a *mutating* subcommand the
+  outcome is unknown, so it now exits `8` (`PARTIAL`) with a recovery handle in
+  `data.operationId`, per
+  [contracts/exit-codes.md](contracts/exit-codes.md) rule 5; automation must not
+  retry `8` blindly. For a *read-only* subcommand nothing can have changed, so it
+  exits `5` (`UNAVAILABLE`) instead. A backend that exits non-zero on its own has
+  decided something and still exits `7` (`FAILED`) with its exit status preserved.
+  The malformed `backend-exit--1` component code is replaced by `backend-timeout`
+  and `backend-killed`.
+- **A backend present but not executable** by the caller now exits `3` (`AUTH`,
+  the row the taxonomy defines for insufficient OS privilege) with
+  `componentCode: BACKEND_FORBIDDEN` and `origin: os`, instead of `5`
+  (`UNAVAILABLE`). Exit `5` invites a bounded retry, which can never succeed for
+  an under-privileged caller. An *absent* backend still exits `5` — that one can
+  resolve itself once a package finishes installing.
 - The session token that `set login` stores on disk is now resolved once at
   startup under the same secret-file rules as `--token-file` (regular file,
   no symlinks, owner-only permissions, non-empty) instead of being read

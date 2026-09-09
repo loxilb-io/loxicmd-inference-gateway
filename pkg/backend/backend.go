@@ -35,6 +35,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -55,6 +56,11 @@ var executablePath = "/usr/libexec/loxilb-appliance/loxilb-appliance-backend"
 // or cannot be executed — spelled exactly as the invocation contract fixes
 // it.
 const CodeBackendUnavailable = "BACKEND_UNAVAILABLE"
+
+// CodeBackendForbidden is the componentCode for a backend present but not
+// executable by the caller. Distinct from BACKEND_UNAVAILABLE because the
+// remedy is: absent may resolve itself, forbidden never does.
+const CodeBackendForbidden = "BACKEND_FORBIDDEN"
 
 // backendWaitDelay bounds how long cmd.Wait may spend after the process is
 // done waiting on I/O pipes a straggling grandchild still holds. It is a
@@ -176,6 +182,31 @@ type Result struct {
 	Stderr        []byte
 	ExitCode      int
 	CorrelationID string
+	// Signaled reports that the process was killed rather than exiting on
+	// its own. The distinction is what separates a definite failure from an
+	// unknown outcome: a backend that exits 3 has decided something, a
+	// backend that dies mid-write has not.
+	Signaled bool
+	// TimedOut reports that the invocation's context expired, i.e. the kill
+	// was ours. Callers need this to tell "the operator's --timeout bounded
+	// a slow operation" from "the backend died on its own".
+	TimedOut bool
+}
+
+// OperationID is the identifier a caller can recover with. The backend's own
+// id wins when it reported one in its JSON document; otherwise the correlation
+// id stands in, which the invocation contract requires to be searchable in the
+// host journal and is therefore the handle an operator actually needs. The
+// distinction matters enough not to blur: this never claims a CLI-side id came
+// from the backend, it just guarantees the field is useful when it is set.
+func (r *Result) OperationID() string {
+	var doc struct {
+		OperationID string `json:"operationId"`
+	}
+	if json.Unmarshal(r.Stdout, &doc) == nil && doc.OperationID != "" {
+		return doc.OperationID
+	}
+	return r.CorrelationID
 }
 
 var (
@@ -253,16 +284,38 @@ func runWithStdin(ctx context.Context, argv []string, stdin io.Reader) (*Result,
 	if errors.Is(err, exec.ErrWaitDelay) {
 		err = nil
 	}
-	res := &Result{Stdout: stdout.Bytes(), Stderr: stderr.Bytes()}
+	res := &Result{
+		Stdout:   stdout.Bytes(),
+		Stderr:   stderr.Bytes(),
+		TimedOut: ctx.Err() != nil,
+	}
 	if err == nil {
 		return res, nil
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
 		res.ExitCode = exitErr.ExitCode()
+		// ExitCode reports -1 for a process that never exited normally --
+		// killed by our cancel, by a signal, or by the OOM killer. That is
+		// not an exit status the backend chose, so it must not be reported
+		// as one.
+		res.Signaled = exitErr.ExitCode() < 0
 		return res, nil
 	}
-	// The process never ran: absent binary, permission, or context death.
+	// The process never ran. Absent and unexecutable are different failures
+	// with different remedies: an absent backend may appear when the package
+	// finishes installing, so bounded retry is sensible; a backend this
+	// caller may not execute will answer the same way forever, and the
+	// operator has to change who they are, not wait.
+	if errors.Is(err, fs.ErrPermission) {
+		return nil, &exitcode.CLIError{
+			Code: exitcode.Auth,
+			Message: fmt.Sprintf(
+				"the host lifecycle backend cannot be executed by this user: %v; appliance commands run as root", err),
+			Origin:        "os",
+			ComponentCode: CodeBackendForbidden,
+		}
+	}
 	return nil, &exitcode.CLIError{
 		Code:          exitcode.Unavailable,
 		Message:       fmt.Sprintf("the host lifecycle backend could not be executed: %v", err),
