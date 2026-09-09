@@ -81,16 +81,23 @@ func readBody(r io.Reader, what string) ([]byte, error) {
 
 // Notes a command records instead of claiming something the gateway never
 // reported. They surface as envelope warnings under -o json and are printed
-// after the human summary otherwise. The codes are a stable surface: they
-// identify the condition class, never the wording.
+// after the human summary otherwise.
+//
+// The codes are a stable surface -- they identify the condition class, never
+// the wording -- and a schema-constrained one: contracts/command-result.schema.json
+// pins warnings[].code to ^[A-Z][A-Z0-9_]*$. They are therefore spelled in that
+// shape, NOT in the lowercase-hyphen shape of the lifecycle reason codes
+// (api.Reason*), which travel in data.componentCode: a different field, with a
+// different contract, documented in docs/COMMANDS.md. The two happening to
+// describe the same condition does not make them the same string.
 var (
 	legacyContractNote = api.Note{
-		Code: "contract-legacy",
+		Code: "CONTRACT_LEGACY",
 		Message: "this gateway answers with the older response contract; " +
 			"the document's identity and coverage were not reported and are not claimed here",
 	}
 	uncheckedDocumentNote = api.Note{
-		Code:    "unchecked-document",
+		Code:    "UNCHECKED_DOCUMENT",
 		Message: "this document carries no checksum, so its integrity was not verified",
 	}
 )
