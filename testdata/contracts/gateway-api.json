@@ -1,7 +1,7 @@
 {
   "source": {
-    "swagger_sha256": "3184bca396dbc42f99bcadc50b25e2acf855e2a0421c135003ee64425c585d48",
-    "swagger_extras_sha256": "d0837dd58d05007b740b61e49914831c1fd55d44826fd756a709cd8f7a1307bc"
+    "swagger_sha256": "8a22e2d566e5d37b7771b850a80d54c211c4aef4ab5543106ea1f06eeb146763",
+    "swagger_extras_sha256": "4e602fc9652f481e48ede784e51d462300940b1995cb2cd19473fe840e6e0efb"
   },
   "operations": [
     {"spec": "swagger.yml", "path": "/config/loadbalancer", "methods": ["post"]},
@@ -22,7 +22,7 @@
     {"spec": "swagger-extras.yml", "path": "/config/opa/watcher", "methods": ["delete", "get", "post"]}
   ],
   "fields": [
-    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "api_key_auth"], "type": "string", "enum": ["disabled", "required"]},
+    {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "api_key_auth"], "type": "string", "enum": ["disabled", "required", "jwt", "apikey-or-jwt"]},
     {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "cb_enable"], "type": "boolean"},
     {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "pdBootstrapPort"], "type": "integer"},
     {"spec": "swagger.yml", "definition": "LoadbalanceEntry", "property_path": ["serviceArguments", "security"], "type": "integer", "enum": ["0", "1", "2"]},
