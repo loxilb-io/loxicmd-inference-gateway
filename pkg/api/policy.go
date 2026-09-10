@@ -45,6 +45,11 @@ type PolMod struct {
 	Ident  string  `json:"policyIdent" yaml:"policyIdent"`
 	Info   PolInfo `json:"policyInfo" yaml:"policyInfo"`
 	Target PolObj  `json:"targetObject" yaml:"targetObject"`
+	// Attached is read-only on GET: true when the policer and all of its
+	// attachment points are programmed in the datapath, false while an
+	// attachment is still pending (its target does not exist yet). A nil
+	// value means the gateway predates the field. Never sent on create.
+	Attached *bool `json:"attached,omitempty" yaml:"attached,omitempty"`
 }
 type ConfigurationPolicyFile struct {
 	TypeMeta   `yaml:",inline"`

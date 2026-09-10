@@ -32,7 +32,7 @@ var (
 	PORT_TITLE              = []string{"index", "portname", "MAC", "link/state", "L3Info", "L2Info"}
 	ULCL_TITLE              = []string{"ident", "ulcl IP", "qfi"}
 	POLICY_TITLE            = []string{"Ident", "peakInfoRate", "committedInfoRate"}
-	POLICY_WIDE_TITLE       = []string{"Ident", "peakInfoRate", "committedInfoRate", "excessBlkSize", "committedBlkSize", "policyType", "ColorAware", "polObjName", "attachment"}
+	POLICY_WIDE_TITLE       = []string{"Ident", "peakInfoRate", "committedInfoRate", "excessBlkSize", "committedBlkSize", "policyType", "ColorAware", "polObjName", "attachment", "attached"}
 	ROUTE_TITLE             = []string{"destinationIPNet", "gateway", "flag"}
 	ROUTE_WIDE_TITLE        = []string{"destinationIPNet", "gateway", "flag", "HardwareMark", "packets", "bytes"}
 	IP_TITLE                = []string{"Device Name", "IP Address"}
