@@ -93,10 +93,21 @@ func PrintGetPolResult(resp *http.Response, o api.RESTOptions) {
 	for _, Pol := range Polresp.PolModInfo {
 		if o.PrintOption == "wide" {
 			table.SetHeader(POLICY_WIDE_TITLE)
+			// The datapath truth, not the create-time answer: "pending"
+			// means the target does not exist yet and the policer shapes
+			// nothing. A gateway that predates the field reports "-".
+			attached := "-"
+			if Pol.Attached != nil {
+				if *Pol.Attached {
+					attached = "yes"
+				} else {
+					attached = "pending"
+				}
+			}
 			data = append(data, []string{Pol.Ident, fmt.Sprintf("%d", Pol.Info.PeakInfoRate), fmt.Sprintf("%d", Pol.Info.CommittedInfoRate),
 				fmt.Sprintf("%d", Pol.Info.ExcessBlkSize), fmt.Sprintf("%d", Pol.Info.CommittedBlkSize),
 				fmt.Sprintf("%d", Pol.Info.PolType), fmt.Sprintf("%t", Pol.Info.ColorAware),
-				Pol.Target.PolObjName, fmt.Sprintf("%d", Pol.Target.AttachMent)})
+				Pol.Target.PolObjName, fmt.Sprintf("%d", Pol.Target.AttachMent), attached})
 		} else {
 			table.SetHeader(POLICY_TITLE)
 			data = append(data, []string{Pol.Ident, fmt.Sprintf("%d", Pol.Info.PeakInfoRate), fmt.Sprintf("%d", Pol.Info.CommittedInfoRate)})
