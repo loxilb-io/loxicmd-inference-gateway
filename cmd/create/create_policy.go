@@ -177,7 +177,7 @@ Ex) loxicmd create policy pol-rule --rate=100:100 --target=192.0.2.10:443:tcp:ru
     loxicmd create policy pol-port --rate=100:100 --target=eth0:port --block-size=12000:6000
     loxicmd create policy pol-egress --rate=100:100 --target=eth0:egress-port --color --pol-type=0
 
-rate unit : Mbps
+rate unit : Mbps, minimum 8 (peak may also be 0 to use the committed rate alone)
 block-size unit : bps
 Policy type(pol-type) 0 : TrTCM,  1 : SrTCM
 
