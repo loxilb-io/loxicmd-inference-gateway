@@ -80,7 +80,28 @@ func TestClassicLB_NoAIKeys(t *testing.T) {
 		"model_name", "sse_mode", "api_key_auth", "kvExactMode", "kvBlockSize", "kvHashAlgo",
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
-		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType")
+		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType", "sockMapMode")
+}
+
+func TestSockMapModeServiceArguments(t *testing.T) {
+	t.Run("both", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{
+			ExternalIP: "192.0.2.21", Mode: "fullproxy", SockMapMode: "both",
+		})
+		assertKey(t, m, "sockMapMode", "both")
+	})
+	t.Run("off", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{
+			ExternalIP: "192.0.2.22", Mode: "fullproxy", SockMapMode: "off",
+		})
+		assertKey(t, m, "sockMapMode", "off")
+	})
+	t.Run("unset omitted", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{
+			ExternalIP: "192.0.2.23", Mode: "fullproxy",
+		})
+		assertAbsent(t, m, "sockMapMode")
+	})
 }
 
 func TestResilienceAndBootstrapServiceArguments(t *testing.T) {
@@ -357,6 +378,20 @@ func TestValidateAPIKeyAuth(t *testing.T) {
 		t.Fatal("expected closed-enum rejection")
 	}
 	if err := validateLBAIOptions(&CreateLoadBalancerOptions{APIKeyAuth: "required", Mode: "onearm"}); err == nil {
+		t.Fatal("expected fullproxy requirement")
+	}
+}
+
+func TestValidateSockMapMode(t *testing.T) {
+	for _, mode := range []string{"off", "request", "response", "both"} {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{SockMapMode: mode, Mode: "fullproxy"}); err != nil {
+			t.Fatalf("mode %q rejected: %v", mode, err)
+		}
+	}
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{SockMapMode: "invalid", Mode: "fullproxy"}); err == nil {
+		t.Fatal("expected enum rejection")
+	}
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{SockMapMode: "both", Mode: "onearm"}); err == nil {
 		t.Fatal("expected fullproxy requirement")
 	}
 }
