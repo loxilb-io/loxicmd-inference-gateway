@@ -79,6 +79,7 @@ type LoadBalancerService struct {
 	SessionHdrName  string `json:"session_header_name,omitempty" yaml:"session_header_name,omitempty"`
 	TraceType       string `json:"trace_type,omitempty"          yaml:"trace_type,omitempty"`
 	BackendProtocol string `json:"backend_protocol,omitempty"    yaml:"backend_protocol,omitempty"`
+	SockMapMode     string `json:"sockMapMode,omitempty"         yaml:"sockMapMode,omitempty"`
 
 	// SSE streaming.
 	SseMode              bool   `json:"sse_mode,omitempty"                       yaml:"sse_mode,omitempty"`

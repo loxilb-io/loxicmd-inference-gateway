@@ -64,6 +64,10 @@ loxicmd create lb 192.0.2.11 --tcp=2020:8000 --mode=fullproxy \
   --sse-mode --max-stream-duration=120 --backend-keepalive-interval=30 --cb-enable \
   --endpoints=203.0.113.1:1
 
+# Directional sockmap acceleration
+loxicmd create lb 192.0.2.21 --tcp=2020:8000 --mode=fullproxy \
+  --sockmap-mode=both --endpoints=203.0.113.1:1
+
 # CHWBL prefix-hash routing  (cicd: vllm-fullproxy)
 loxicmd create lb 192.0.2.12 --tcp=2020:8000 --mode=fullproxy --select=chwbl \
   --chwbl-hash-level=2 --chwbl-load-factor=125 --chwbl-replication=100 \
@@ -110,6 +114,7 @@ loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
 |-------|-------|
 | Mode / algo | `--mode fullproxy`, `--select chwbl\|chwbl-wrr\|gpuaware\|persist`, `--security plain\|https\|e2ehttps` |
 | Model routing | `--model-name`, `--path-prefix`, `--path-match-mode disabled\|prefix\|exact`, `--backend-protocol http1\|http2\|both`, `--session-header-name`, `--trace-type` |
+| Sockmap | `--sockmap-mode off\|request\|response\|both` |
 | Access / resilience | `--api-key-auth disabled\|required`, `--cb-enable` |
 | SSE | `--sse-mode`, `--max-stream-duration`, `--backend-keepalive-interval` |
 | CHWBL | `--chwbl-hash-level 1\|2\|3`, `--chwbl-load-factor`, `--chwbl-replication` |
