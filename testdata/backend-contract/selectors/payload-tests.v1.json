@@ -30,6 +30,14 @@
       ]
     },
     {
+      "name": "status-contract",
+      "tests": [
+        "TestCLIWP05StatusCanonicalFixtureIncludesProductFacts",
+        "TestCLIWP05StatusAcceptsAdditiveOptionalLegacyPayload",
+        "TestCLIWP05StatusRejectsFieldRedTwins"
+      ]
+    },
+    {
       "name": "parity",
       "tests": [
         "TestCLIWP02ParityMatchesSchemasFixturesAndRegistry",

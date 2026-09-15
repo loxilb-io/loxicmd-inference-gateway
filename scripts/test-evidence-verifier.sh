@@ -235,6 +235,15 @@ for command, fixture in positive_by_command.items():
         document, raw = apply_operation(fixture["document"], spec, sentinel)
         expect_schema(f"payload.{slug}.{mutation['name']}", schema, document, False, raw=raw)
 
+status_schema = schemas["contracts/backend-payloads/v1/status.schema.json"]
+for fixture in fixtures["statusContract"]["positive"]:
+    expect_schema(fixture["id"], status_schema, fixture["document"], True)
+for fixture in fixtures["statusContract"]["negative"]:
+    if fixture["twin"] != positive_by_command["status"]["id"]:
+        fail(f"status red twin does not name the canonical positive: {fixture['id']}")
+    document, raw = apply_operation(positive_by_command["status"]["document"], fixture, sentinel)
+    expect_schema(fixture["id"], status_schema, document, False, raw=raw)
+
 def run_fixture_group(group_name, schema_path):
     group = fixtures[group_name]
     positives = {item["id"]: item["document"] for item in group["positive"]}
@@ -340,6 +349,20 @@ operation_error_digest = "sha256:" + hashlib.sha256((root / "contracts/backend-e
 if manifest["contract"]["operationErrorSchemaSha256"] != operation_error_digest:
     fail("operation error schema digest mismatch")
 
+fixture_counts = {
+    "payloadPositive": len(fixtures["payloads"]["positive"]),
+    "payloadNegative": len(fixtures["payloads"]["positive"]) * len(fixtures["payloads"]["negativeMutationClasses"]),
+    "statusContract": len(fixtures["statusContract"]["positive"]) + len(fixtures["statusContract"]["negative"]),
+    "backendContractError": len(fixtures["backendContractErrors"]["positive"]) + len(fixtures["backendContractErrors"]["negative"]),
+    "operationError": len(fixtures["operationErrors"]["positive"]) + len(fixtures["operationErrors"]["negative"]),
+    "operationReceipt": len(fixtures["operationReceipts"]["positive"]) + len(fixtures["operationReceipts"]["negative"]),
+}
+if manifest["contract"]["fixtureCounts"] != fixture_counts:
+    fail("manifest fixture counts differ from exact fixture cardinalities")
+selector_digest = "sha256:" + hashlib.sha256((root / "testdata/backend-contract/selectors/contract-meta-tests.v1.json").read_bytes()).hexdigest()
+if manifest["contract"]["selectorSha256"] != selector_digest:
+    fail("contract meta selector digest mismatch")
+
 def expand_selector(document):
     result = []
     for suite in document["suites"]:
@@ -356,6 +379,8 @@ def expand_selector(document):
 declared = expand_selector(selector)
 if len(declared) != selector["expectedExpandedCaseCount"]:
     fail("expanded selector count differs from exact expected count")
+if manifest["contract"]["selectorCaseCount"] != len(declared):
+    fail("manifest selector count differs from exact expanded count")
 
 mutant_paths = {path.stem: path for path in (root / "testdata/backend-contract/selectors/mutants").glob("*.json")}
 if set(mutant_paths) != set(selector["requiredSelectorMutants"]):
@@ -414,7 +439,7 @@ summary = {
     "schemaVersion": "cli-wp00-local-meta-validation/v1",
     "result": "PASS",
     "commands": {"metadata": 10, "successfulJsonSchemas": 9},
-    "fixtures": {"payloadPositive": 9, "payloadNegative": 72, "backendContractError": 10, "operationError": 18, "operationReceipt": 9},
+    "fixtures": fixture_counts,
     "selector": {"caseCount": len(canonical_set), "mutantsKilled": ["zero", "missing", "extra", "renamed"]},
     "accounting": {name: len(value) for name, value in accounting.items()},
     "bundleDigest": manifest["bundle"]["aggregateSha256"],

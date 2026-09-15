@@ -32,9 +32,10 @@ import (
 )
 
 const (
-	approvedCLIWP00Aggregate           = "sha256:648eaabb50fdaa4531de2cbb1e7a0419ba838f5d4216bddba40d79b1903d19cd"
-	approvedFixtureDigest              = "sha256:94816b637095ff1a544881875cfc08ac41207af213ed6218b982a41197b9d4df"
-	approvedSchemaSetDigest            = "sha256:7b740bd6fd63c9b3d29a5f02b769f5bdc8cf0e12a7322d0d5cb4422189ec2780"
+	approvedCPCLIAggregate             = "sha256:eb6c0d40639ce4a73726101ffc27e378c755c308056708c03972d48cbbbb50ea"
+	approvedFixtureDigest              = "sha256:8bd40ec15ee013e00611d2c6ba6bbcd11f8e1aa3308b27e602fb20dfa6e47acc"
+	approvedSelectorDigest             = "sha256:a51a342515460a3c22091b7fc23374b055ce093efd18eb6f0153f78b009671b0"
+	approvedSchemaSetDigest            = "sha256:67837a0262cebc43a159c7d3a2b60190e04a8ca282629549f73daa9e06103af1"
 	approvedOperationErrorSchemaDigest = "sha256:137b12626e5736a9b2da71730dc8221acde06731b927a16d720c7ec18d9615cc"
 )
 
@@ -60,6 +61,10 @@ type wp02Fixtures struct {
 		Positive []wp02PositiveFixture `json:"positive"`
 		Negative []wp02MutationFixture `json:"negative"`
 	} `json:"operationErrors"`
+	StatusContract struct {
+		Positive []wp02PositiveFixture `json:"positive"`
+		Negative []wp02MutationFixture `json:"negative"`
+	} `json:"statusContract"`
 }
 
 type wp02MutationFixture struct {
@@ -81,9 +86,12 @@ type wp02Manifest struct {
 		BaseRevision string `json:"baseRevision"`
 	} `json:"cliSource"`
 	Contract struct {
-		FixtureSHA256              string `json:"fixtureSha256"`
-		PayloadSchemaSetSHA256     string `json:"payloadSchemaSetSha256"`
-		OperationErrorSchemaSHA256 string `json:"operationErrorSchemaSha256"`
+		FixtureSHA256              string         `json:"fixtureSha256"`
+		SelectorSHA256             string         `json:"selectorSha256"`
+		SelectorCaseCount          int            `json:"selectorCaseCount"`
+		FixtureCounts              map[string]int `json:"fixtureCounts"`
+		PayloadSchemaSetSHA256     string         `json:"payloadSchemaSetSha256"`
+		OperationErrorSchemaSHA256 string         `json:"operationErrorSchemaSha256"`
 	} `json:"contract"`
 	Bundle struct {
 		AggregateSHA256 string `json:"aggregateSha256"`
@@ -174,16 +182,26 @@ func validateWP02Manifest(root string, manifest wp02Manifest, fixtureRaw []byte)
 	if manifest.SchemaVersion != "cli-appliance-contract-candidate/v1" || manifest.VerificationStatus != "DEVELOPMENT_UNVERIFIED" {
 		return errors.New("manifest identity is invalid")
 	}
-	if manifest.CLISource.BaseRevision != "89da23cfdab0fbcba104b16db340fd1b6cae8763" {
+	if manifest.CLISource.BaseRevision != "847055d5b04c65aa574bb815bf61f7eab235af4d" {
 		return errors.New("CLI source identity differs")
 	}
 	if manifest.ApprovalInputs.CLIA0 != "sha256:a6a71470e77b4487598679d45255830e4e64a2b51064a808b741a1de93ab7a1f" {
 		return errors.New("approval identity differs")
 	}
-	if manifest.Bundle.AggregateSHA256 != approvedCLIWP00Aggregate || manifest.Contract.FixtureSHA256 != approvedFixtureDigest ||
+	if manifest.Bundle.AggregateSHA256 != approvedCPCLIAggregate || manifest.Contract.FixtureSHA256 != approvedFixtureDigest ||
+		manifest.Contract.SelectorSHA256 != approvedSelectorDigest || manifest.Contract.SelectorCaseCount != 143 ||
 		manifest.Contract.PayloadSchemaSetSHA256 != approvedSchemaSetDigest ||
 		manifest.Contract.OperationErrorSchemaSHA256 != approvedOperationErrorSchemaDigest {
 		return errors.New("approved bundle or fixture identity differs")
+	}
+	wantCounts := map[string]int{"payloadPositive": 9, "payloadNegative": 72, "statusContract": 9, "backendContractError": 10, "operationError": 18, "operationReceipt": 9}
+	if len(manifest.Contract.FixtureCounts) != len(wantCounts) {
+		return errors.New("fixture count key set differs")
+	}
+	for name, want := range wantCounts {
+		if manifest.Contract.FixtureCounts[name] != want {
+			return fmt.Errorf("fixture count %q differs", name)
+		}
 	}
 	if digestBytes(fixtureRaw) != manifest.Contract.FixtureSHA256 {
 		return errors.New("fixture bytes differ from manifest")
@@ -233,11 +251,14 @@ func TestCLIWP02ManifestPreservesApprovedSchemaAndFixtureDigests(t *testing.T) {
 func TestCLIWP02ManifestDetectsIdentityMutants(t *testing.T) {
 	_, fixtureRaw := loadWP02Fixtures(t)
 	for name, mutate := range map[string]func(*wp02Manifest){
-		"wrong CLI source": func(m *wp02Manifest) { m.CLISource.BaseRevision = strings.Repeat("0", 40) },
-		"wrong approval":   func(m *wp02Manifest) { m.ApprovalInputs.CLIA0 = "sha256:" + strings.Repeat("0", 64) },
-		"wrong aggregate":  func(m *wp02Manifest) { m.Bundle.AggregateSHA256 = "sha256:" + strings.Repeat("0", 64) },
-		"wrong fixture":    func(m *wp02Manifest) { m.Contract.FixtureSHA256 = "sha256:" + strings.Repeat("0", 64) },
-		"wrong schema set": func(m *wp02Manifest) { m.Contract.PayloadSchemaSetSHA256 = "sha256:" + strings.Repeat("0", 64) },
+		"wrong CLI source":     func(m *wp02Manifest) { m.CLISource.BaseRevision = strings.Repeat("0", 40) },
+		"wrong approval":       func(m *wp02Manifest) { m.ApprovalInputs.CLIA0 = "sha256:" + strings.Repeat("0", 64) },
+		"wrong aggregate":      func(m *wp02Manifest) { m.Bundle.AggregateSHA256 = "sha256:" + strings.Repeat("0", 64) },
+		"wrong fixture":        func(m *wp02Manifest) { m.Contract.FixtureSHA256 = "sha256:" + strings.Repeat("0", 64) },
+		"wrong selector":       func(m *wp02Manifest) { m.Contract.SelectorSHA256 = "sha256:" + strings.Repeat("0", 64) },
+		"wrong selector count": func(m *wp02Manifest) { m.Contract.SelectorCaseCount-- },
+		"wrong fixture count":  func(m *wp02Manifest) { m.Contract.FixtureCounts["statusContract"]-- },
+		"wrong schema set":     func(m *wp02Manifest) { m.Contract.PayloadSchemaSetSHA256 = "sha256:" + strings.Repeat("0", 64) },
 		"wrong operation error schema": func(m *wp02Manifest) {
 			m.Contract.OperationErrorSchemaSHA256 = "sha256:" + strings.Repeat("0", 64)
 		},
@@ -357,6 +378,108 @@ func TestCLIWP02ValidatorsAcceptNinePositiveFixtures(t *testing.T) {
 	}
 	if len(seen) != 9 {
 		t.Fatalf("unique positive commands = %d", len(seen))
+	}
+}
+
+func statusFixture(t *testing.T, fixtures wp02Fixtures) wp02PositiveFixture {
+	t.Helper()
+	for _, fixture := range fixtures.Payloads.Positive {
+		if fixture.Command == "status" {
+			return fixture
+		}
+	}
+	t.Fatal("canonical status fixture is missing")
+	return wp02PositiveFixture{}
+}
+
+func TestCLIWP05StatusCanonicalFixtureIncludesProductFacts(t *testing.T) {
+	fixtures, _ := loadWP02Fixtures(t)
+	document := statusFixture(t, fixtures).Document
+	if document["reasonCode"] != "DATAPLANE_DEGRADED" {
+		t.Fatalf("top-level reasonCode = %#v", document["reasonCode"])
+	}
+	planeValues, ok := document["planes"].([]any)
+	if !ok || len(planeValues) != 3 {
+		t.Fatalf("planes = %#v, want exact state/dataplane/management set", document["planes"])
+	}
+	wantNames := []string{"state", "dataplane", "management"}
+	for i, wantName := range wantNames {
+		plane, ok := planeValues[i].(map[string]any)
+		if !ok || plane["name"] != wantName || plane["status"] == nil || plane["observedAt"] == nil {
+			t.Fatalf("plane %d = %#v", i, planeValues[i])
+		}
+	}
+	tls, ok := document["publicAddressTls"].(map[string]any)
+	if !ok || tls["configured"] != true || len(tls) != 1 {
+		t.Fatalf("publicAddressTls = %#v", document["publicAddressTls"])
+	}
+}
+
+func TestCLIWP05StatusAcceptsAdditiveOptionalLegacyPayload(t *testing.T) {
+	fixtures, _ := loadWP02Fixtures(t)
+	if len(fixtures.StatusContract.Positive) != 1 {
+		t.Fatalf("status compatibility positives = %d", len(fixtures.StatusContract.Positive))
+	}
+	fixture := fixtures.StatusContract.Positive[0]
+	if _, err := ValidatePayload(tupleForCommand("status"), fixtureRaw(t, fixture)); err != nil {
+		t.Fatalf("v1 payload without CLI-WP05 optional fields was rejected: %v", err)
+	}
+}
+
+func applyStatusMutation(t *testing.T, document map[string]any, mutation wp02MutationFixture, sentinel string) []byte {
+	t.Helper()
+	value := mutation.Value
+	if mutation.ValueFrom == "syntheticSecretSentinel" {
+		value = sentinel
+	}
+	var parent map[string]any
+	var key string
+	switch mutation.Path {
+	case "/planes/0/status":
+		parent, key = document["planes"].([]any)[0].(map[string]any), "status"
+	case "/planes/0/observedAt":
+		parent, key = document["planes"].([]any)[0].(map[string]any), "observedAt"
+	case "/reasonCode":
+		parent, key = document, "reasonCode"
+	case "/publicAddressTls/configured":
+		parent, key = document["publicAddressTls"].(map[string]any), "configured"
+	case "/publicAddressTls/certificate":
+		parent, key = document["publicAddressTls"].(map[string]any), "certificate"
+	case "/publicAddressTls/privateKey":
+		parent, key = document["publicAddressTls"].(map[string]any), "privateKey"
+	default:
+		t.Fatalf("unsupported status mutation path %q", mutation.Path)
+	}
+	if mutation.Operation == "remove" {
+		delete(parent, key)
+	} else {
+		parent[key] = value
+	}
+	raw, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
+}
+
+func TestCLIWP05StatusRejectsFieldRedTwins(t *testing.T) {
+	fixtures, _ := loadWP02Fixtures(t)
+	canonical := statusFixture(t, fixtures)
+	if len(fixtures.StatusContract.Negative) != 8 {
+		t.Fatalf("status negative red twins = %d", len(fixtures.StatusContract.Negative))
+	}
+	for _, mutation := range fixtures.StatusContract.Negative {
+		t.Run(mutation.ID, func(t *testing.T) {
+			if mutation.Twin != canonical.ID {
+				t.Fatalf("twin = %q, want %q", mutation.Twin, canonical.ID)
+			}
+			raw := applyStatusMutation(t, cloneDocument(t, canonical.Document), mutation, fixtures.SyntheticSecretSentinel)
+			validated, err := ValidatePayload(tupleForCommand("status"), raw)
+			if validated != nil {
+				t.Fatalf("status red twin escaped validation: %s", validated.Document)
+			}
+			requirePayloadValidationError(t, err)
+		})
 	}
 }
 
@@ -634,8 +757,9 @@ func validateSchemaAgainstSpec(raw []byte, spec payloadSpec) error {
 	if strings.Join(schema.Required, "\x00") != strings.Join(spec.RequiredKeys, "\x00") {
 		return errors.New("schema required order differs")
 	}
-	if len(schema.Properties) != len(spec.RequiredKeys) {
-		return errors.New("schema properties are not the exact required set")
+	allowed := stringSet(append(append([]string(nil), spec.RequiredKeys...), spec.OptionalKeys...))
+	if len(schema.Properties) != len(allowed) {
+		return errors.New("schema properties are not the exact required and optional set")
 	}
 	var schemaVersion, command struct {
 		Const string `json:"const"`
@@ -647,8 +771,16 @@ func validateSchemaAgainstSpec(raw []byte, spec payloadSpec) error {
 		return errors.New("command const differs")
 	}
 	for key := range schema.Properties {
+		if _, ok := allowed[key]; !ok {
+			return fmt.Errorf("schema exposes unknown property %q", key)
+		}
 		if isProhibitedPayloadKey(key) {
 			return fmt.Errorf("schema exposes prohibited key %q", key)
+		}
+	}
+	for _, key := range spec.OptionalKeys {
+		if _, ok := schema.Properties[key]; !ok {
+			return fmt.Errorf("schema optional property %q is missing", key)
 		}
 	}
 	return nil

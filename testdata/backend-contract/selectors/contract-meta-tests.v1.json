@@ -48,6 +48,20 @@
       ]
     },
     {
+      "name": "status-contract",
+      "caseIds": [
+        "status.legacy-optional.accept",
+        "status.plane-status-invalid.reject",
+        "status.plane-observed-at-malformed.reject",
+        "status.plane-observed-at-non-utc.reject",
+        "status.reason-code-malformed.reject",
+        "status.public-address-tls-type.reject",
+        "status.public-address-tls-missing-configured.reject",
+        "status.public-address-tls-unknown-field.reject",
+        "status.public-address-tls-secret-field.reject"
+      ]
+    },
+    {
       "name": "backend-operation-error",
       "caseIds": [
         "operation-error.status.positive",
@@ -93,6 +107,6 @@
       "caseIds": ["selector.zero.reject", "selector.missing.reject", "selector.extra.reject", "selector.renamed.reject"]
     }
   ],
-  "expectedExpandedCaseCount": 134,
+  "expectedExpandedCaseCount": 143,
   "requiredSelectorMutants": ["zero", "missing", "extra", "renamed"]
 }

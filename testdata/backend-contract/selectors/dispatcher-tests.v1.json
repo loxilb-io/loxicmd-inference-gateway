@@ -24,6 +24,13 @@
         "TestCLIWP04DiagnosticsOutputComposition",
         "TestCLIWP04SuccessfulBackendStderrSeparation"
       ]
+    },
+    {
+      "name": "status-contract",
+      "tests": [
+        "TestCLIWP05DispatcherPreservesStatusFacts",
+        "TestCLIWP05DispatcherRejectsInvalidStatusFacts"
+      ]
     }
   ],
   "accounting": {

@@ -71,7 +71,7 @@ func runAppliance(t *testing.T, binary string, args ...string) (int, string, str
 
 const validApplianceBackendContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract","backendVersion":"fake-1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":"appliance-backend-payload/v1","commands":[{"name":"status","readOnly":true,"capabilities":["json-output"]},{"name":"network validate","readOnly":true,"capabilities":["json-output"]},{"name":"public-address configure","readOnly":false,"capabilities":["json-output","no-restart","operation-receipt"]},{"name":"gateway register-local","readOnly":false,"capabilities":["json-output","secret-stdin","operation-receipt"]},{"name":"credentials bootstrap","readOnly":false,"capabilities":["console-only"]},{"name":"diagnostics create","readOnly":false,"capabilities":["json-output","redaction","explicit-output","operation-receipt"]},{"name":"logs","readOnly":false,"capabilities":["json-output","redaction","bounded-window"]},{"name":"backup key-create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},{"name":"backup create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},{"name":"backup verify","readOnly":false,"capabilities":["json-output","key-file"]}]}`
 
-const validStatusPayload = `{"schemaVersion":"appliance-backend-payload/v1","command":"status","overallStatus":"DEGRADED","productRelease":"v0.9.8.9-rc.1","initialized":true,"planes":[{"name":"gateway","live":true,"ready":false,"reasonCode":"DEPENDENCY_PENDING"}],"networkProfile":{"name":"dual-nic","configured":true},"activeOperations":[],"localGatewayRegistration":{"registered":true,"installationId":"install-01","instanceId":"gateway-01"},"observedAt":"2026-09-15T00:00:00Z"}`
+const validStatusPayload = `{"schemaVersion":"appliance-backend-payload/v1","command":"status","overallStatus":"DEGRADED","reasonCode":"DATAPLANE_DEGRADED","productRelease":"v0.9.8.9-rc.1","initialized":true,"planes":[{"name":"state","live":true,"ready":true,"reasonCode":"STATE_READY","status":"READY","observedAt":"2026-09-15T00:00:00Z"},{"name":"dataplane","live":true,"ready":false,"reasonCode":"DEPENDENCY_PENDING","status":"DEGRADED","observedAt":"2026-09-15T00:00:01Z"},{"name":"management","live":true,"ready":true,"reasonCode":"MANAGEMENT_READY","status":"READY","observedAt":"2026-09-15T00:00:02Z"}],"networkProfile":{"name":"dual-nic","configured":true},"activeOperations":[],"localGatewayRegistration":{"registered":true,"installationId":"install-01","instanceId":"gateway-01"},"publicAddressTls":{"configured":true},"observedAt":"2026-09-15T00:00:03Z"}`
 
 const validNetworkPayload = `{"schemaVersion":"appliance-backend-payload/v1","command":"network validate","valid":true,"profile":"dual-nic","interfaces":[{"role":"frontend","name":"eth0","exists":true,"address":"192.0.2.10/24","mtu":1500}],"errors":[],"warnings":[{"code":"RP_FILTER_REVIEW","remediation":"Confirm the approved asymmetric-routing profile."}],"observedAt":"2026-09-15T00:00:00Z"}`
 
@@ -119,6 +119,15 @@ esac`))
 			Data          struct {
 				Backend struct {
 					ProductRelease string `json:"productRelease"`
+					ReasonCode     string `json:"reasonCode"`
+					Planes         []struct {
+						Name       string `json:"name"`
+						Status     string `json:"status"`
+						ObservedAt string `json:"observedAt"`
+					} `json:"planes"`
+					PublicAddressTLS struct {
+						Configured bool `json:"configured"`
+					} `json:"publicAddressTls"`
 				} `json:"backend"`
 			} `json:"data"`
 		}
@@ -126,7 +135,10 @@ esac`))
 			t.Fatalf("stdout is not the envelope (%v): %s", err, stdout)
 		}
 		if doc.Kind != "CommandResult" || !doc.Success || doc.Command != "appliance.status" ||
-			doc.Data.Backend.ProductRelease != "v0.9.8.9-rc.1" {
+			doc.Data.Backend.ProductRelease != "v0.9.8.9-rc.1" || doc.Data.Backend.ReasonCode != "DATAPLANE_DEGRADED" ||
+			len(doc.Data.Backend.Planes) != 3 || doc.Data.Backend.Planes[1].Name != "dataplane" ||
+			doc.Data.Backend.Planes[1].Status != "DEGRADED" || doc.Data.Backend.Planes[1].ObservedAt != "2026-09-15T00:00:01Z" ||
+			!doc.Data.Backend.PublicAddressTLS.Configured {
 			t.Fatalf("unexpected envelope: %s", stdout)
 		}
 		if !strings.HasPrefix(doc.CorrelationID, "cli-") {
