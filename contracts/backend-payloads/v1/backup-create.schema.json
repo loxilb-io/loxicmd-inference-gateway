@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/backup-create.schema.json",
+  "title": "backup create payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "operationId", "archivePath", "sha256", "sizeBytes", "encrypted", "manifestSchema", "componentChecksums", "consistency"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "backup create"},
+    "result": {"enum": ["CREATED", "PARTIAL"]},
+    "operationId": {"type": "string", "minLength": 1},
+    "archivePath": {"type": "string", "pattern": "^/[^\\u0000]+$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sizeBytes": {"type": "integer", "minimum": 1},
+    "encrypted": {"const": true},
+    "manifestSchema": {"type": "string", "minLength": 1},
+    "componentChecksums": {"type": "object", "minProperties": 1, "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"}, "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "consistency": {"enum": ["APPLICATION_CONSISTENT", "INCOMPLETE"]}
+  },
+  "allOf": [
+    {"if": {"properties": {"result": {"const": "CREATED"}}, "required": ["result"]}, "then": {"properties": {"consistency": {"const": "APPLICATION_CONSISTENT"}}}},
+    {"if": {"properties": {"result": {"const": "PARTIAL"}}, "required": ["result"]}, "then": {"properties": {"consistency": {"const": "INCOMPLETE"}}}}
+  ]
+}

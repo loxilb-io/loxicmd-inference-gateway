@@ -14,7 +14,7 @@ Usage:
 
 Flags:
   -h, --help            help for create
-      --output string   Absolute path for the archive (default: the backend's support directory)
+  -o, --output string   CLI format (json, wide, or table), or an absolute archive path
       --redact          Required: produce the redacted archive (the only kind there is)
 
 Global Flags:

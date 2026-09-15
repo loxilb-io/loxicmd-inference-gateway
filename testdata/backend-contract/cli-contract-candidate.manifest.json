@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "cli-appliance-contract-candidate/v1",
+  "status": "CP_CLI_REVIEW_REQUIRED",
+  "verificationStatus": "DEVELOPMENT_UNVERIFIED",
+  "generatedAt": "2026-09-15",
+  "approvalInputs": {
+    "cliA0ApprovalSha256": "sha256:a6a71470e77b4487598679d45255830e4e64a2b51064a808b741a1de93ab7a1f",
+    "integrationPlanSha256": "sha256:097915729b96eb7c721764b015064751b3af9bdba328a2bdfb522eda4ce27301",
+    "implementationAuthorizationReviewSha256": "sha256:dfd70b261e7cc32483e5ed044b47407cb0e07ed32467c723e59db8d704ff329d"
+  },
+  "cliSource": {
+    "baseRevision": "847055d5b04c65aa574bb815bf61f7eab235af4d",
+    "candidateContainsUncommittedFiles": false,
+    "semanticVersionIsIdentity": false
+  },
+  "contract": {
+    "contractMajor": 1,
+    "payloadSchemaVersion": "appliance-backend-payload/v1",
+    "effectPolicy": "CONSERVATIVE_V1",
+    "commandMetadataCount": 10,
+    "successfulJsonPayloadSchemaCount": 9,
+    "fixtureCounts": {
+      "payloadPositive": 9,
+      "payloadNegative": 72,
+      "statusContract": 9,
+      "backendContractError": 10,
+      "operationError": 18,
+      "operationReceipt": 9
+    },
+    "selectorCaseCount": 143,
+    "fixtureSha256": "sha256:8bd40ec15ee013e00611d2c6ba6bbcd11f8e1aa3308b27e602fb20dfa6e47acc",
+    "selectorSha256": "sha256:a51a342515460a3c22091b7fc23374b055ce093efd18eb6f0153f78b009671b0",
+    "payloadSchemaSetSha256": "sha256:67837a0262cebc43a159c7d3a2b60190e04a8ca282629549f73daa9e06103af1",
+    "operationErrorSchemaSha256": "sha256:137b12626e5736a9b2da71730dc8221acde06731b927a16d720c7ec18d9615cc"
+  },
+  "bundle": {
+    "canonicalOrder": "lexicographic repository-relative UTF-8 path order",
+    "aggregateAlgorithm": "sha256(concat(path_utf8 + NUL + sha256_colon_hex + LF)) over files in lexicographic path order",
+    "files": [
+      {"path": "contracts/backend-contract.schema.json", "sha256": "sha256:ed0136263a5b30114f31508cd41b97771739eeb8f2db13df830ffc4753af504a"},
+      {"path": "contracts/backend-errors/v1/backend-contract-error.schema.json", "sha256": "sha256:082148c82d49a08bb19ae804e8e3f892665719fe94c28675af1f9a52cb17d7dc"},
+      {"path": "contracts/backend-errors/v1/backend-operation-error.schema.json", "sha256": "sha256:137b12626e5736a9b2da71730dc8221acde06731b927a16d720c7ec18d9615cc"},
+      {"path": "contracts/backend-payloads/v1/backup-create.schema.json", "sha256": "sha256:7daa28912c4a4647ef09bff02dd871cb2df92900162753e6088cb05bbd0a1f49"},
+      {"path": "contracts/backend-payloads/v1/backup-key-create.schema.json", "sha256": "sha256:1a009fc96a1bb3970feaa43c02f61262c1a8a5ca106ac92a7de9ec08c6b65029"},
+      {"path": "contracts/backend-payloads/v1/backup-verify.schema.json", "sha256": "sha256:130cc9f0796f0038969f2c7c100471055c676b36d93017ee57eedb89786044d1"},
+      {"path": "contracts/backend-payloads/v1/command-metadata.v1.json", "sha256": "sha256:6ea1f850bc734a84159dcc33a78e7a25af2dc8439cef37d9aaef89e50f615b9a"},
+      {"path": "contracts/backend-payloads/v1/diagnostics-create.schema.json", "sha256": "sha256:ee0fc2960c5e2187f42a3a78ab3bddd847cadd6d22f1f22efe89cd161ed27534"},
+      {"path": "contracts/backend-payloads/v1/gateway-register-local.schema.json", "sha256": "sha256:a4170fd085ba8aaf69098420fa582c4d3beb64051666b16df49919d5bdd4dda1"},
+      {"path": "contracts/backend-payloads/v1/logs.schema.json", "sha256": "sha256:ca69e7f60ad214b7a87c8f8188b61cbd045679a0fc951280eed2d559f8af8e56"},
+      {"path": "contracts/backend-payloads/v1/network-validate.schema.json", "sha256": "sha256:96812acb43cd5f35973f39e73c144e41e56da6d7207d029b17f295962362fe28"},
+      {"path": "contracts/backend-payloads/v1/public-address-configure.schema.json", "sha256": "sha256:355b736195de0454a464351a72ee506454562f3ff029265f1e01850f903cf9a0"},
+      {"path": "contracts/backend-payloads/v1/status.schema.json", "sha256": "sha256:d9f41634e33f9c2b2e8fa18b8aa91af8197a8637b8af2636fd48697f07fb0642"},
+      {"path": "contracts/backend-receipts/v1/operation-receipt.schema.json", "sha256": "sha256:ee630dccedd2f30921c2c4421e7e75b185188835ca086328f1e6ba52c37b7962"},
+      {"path": "scripts/run-go-selector.sh", "sha256": "sha256:ece7cd587b3c1da1a6cdca692bdb025477d3dca0a27845d95d3bd5bbe9b22118"},
+      {"path": "scripts/test-evidence-verifier.sh", "sha256": "sha256:d323bc2274fdd258bfde86bbe31affd0447ee99fd9b83f870e7501fd08da2a9b"},
+      {"path": "testdata/backend-contract/fixtures.json", "sha256": "sha256:8bd40ec15ee013e00611d2c6ba6bbcd11f8e1aa3308b27e602fb20dfa6e47acc"},
+      {"path": "testdata/backend-contract/selectors/contract-meta-tests.v1.json", "sha256": "sha256:a51a342515460a3c22091b7fc23374b055ce093efd18eb6f0153f78b009671b0"},
+      {"path": "testdata/backend-contract/selectors/dispatcher-tests.v1.json", "sha256": "sha256:abce2bbafb52f5af590c194daac113d717535e43d3259d9467bdf5cd61bce04a"},
+      {"path": "testdata/backend-contract/selectors/handshake-tests.v1.json", "sha256": "sha256:01cb023e2d7a718a24c97431ea75c8ee2b18b885bbcbd5b21527ee4d87f61130"},
+      {"path": "testdata/backend-contract/selectors/mutants/extra.json", "sha256": "sha256:38b2570455c7f94bd3f4fc17b08e5c24176d97e4f73d289eebccf543b1cf4452"},
+      {"path": "testdata/backend-contract/selectors/mutants/missing.json", "sha256": "sha256:a8010c22737f30fd4b2558dd270b6600344c778449f298f7f831e282871eab62"},
+      {"path": "testdata/backend-contract/selectors/mutants/renamed.json", "sha256": "sha256:6e8c92bbc7f4ccabb599b0c7516b82e9f66d33e44c04b52daac6c91149159464"},
+      {"path": "testdata/backend-contract/selectors/mutants/zero.json", "sha256": "sha256:cc63d7ce6572043f35768dbb637226b7f9daf6b47c3f18be2c888d496b6aeba8"},
+      {"path": "testdata/backend-contract/selectors/payload-tests.v1.json", "sha256": "sha256:4c6f776c2977aa7e06914a4f6760d1fbea5097507bd558acd113e0cdf1e485ae"}
+    ],
+    "aggregateSha256": "sha256:eb6c0d40639ce4a73726101ffc27e378c755c308056708c03972d48cbbbb50ea"
+  },
+  "nonProof": [
+    "CLI dispatcher behavior is proven only against fake backends; no Product-owned installed backend is implemented or proven.",
+    "No GitHub workflow, installed Product-backend Linux runtime, loxilb-app deployment, or installed-host result is proven.",
+    "No Product, Gateway, OAM, UI, or eBPF implementation or paired integration is proven.",
+    "No Product packaging, CP-1D, ProductLock, release or tag, clean-host, G7 trust, signing, or provenance is proven.",
+    "DEVELOPMENT_UNVERIFIED means local candidate bytes and meta-validation only; CP-CLI approval is still required."
+  ]
+}

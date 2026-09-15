@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "cli-go-test-selector/v1",
+  "selectorId": "CLI-WP04-DISPATCHER-INTEGRATION",
+  "package": "./cmd/appliance",
+  "suites": [
+    {
+      "name": "composition",
+      "tests": [
+        "TestCLIWP03DispatcherPreservesStructuredTaxonomy",
+        "TestCLIWP03DispatcherRejectsOutcomeMismatches"
+      ]
+    },
+    {
+      "name": "active-path",
+      "tests": [
+        "TestCLIWP03DispatcherActivePathRejectsSchemaInvalidDocument",
+        "TestCLIWP03DispatcherActivePathPreservesStructuredError",
+        "TestCLIWP03MutatingDispatcherPreservesPartialOperationID"
+      ]
+    },
+    {
+      "name": "output-streams",
+      "tests": [
+        "TestCLIWP04DiagnosticsOutputComposition",
+        "TestCLIWP04SuccessfulBackendStderrSeparation"
+      ]
+    },
+    {
+      "name": "status-contract",
+      "tests": [
+        "TestCLIWP05DispatcherPreservesStatusFacts",
+        "TestCLIWP05DispatcherRejectsInvalidStatusFacts"
+      ]
+    }
+  ],
+  "accounting": {
+    "requiredSetEquality": ["declared", "discovered", "selected", "started", "terminal", "executed"],
+    "allowedFailed": 0,
+    "allowedSkipped": 0,
+    "allowedOmitted": 0
+  },
+  "requiredSelectorMutants": ["zero", "missing", "extra", "renamed"]
+}

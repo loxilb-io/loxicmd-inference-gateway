@@ -1,0 +1,140 @@
+{
+  "schemaVersion": "cli-appliance-contract-fixtures/v1",
+  "syntheticSecretSentinel": "CLI_WP00_SYNTHETIC_SECRET_DO_NOT_EMIT",
+  "payloads": {
+    "positive": [
+      {
+        "id": "payload.status.positive",
+        "command": "status",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "status", "overallStatus": "DEGRADED", "reasonCode": "DATAPLANE_DEGRADED", "productRelease": "v0.9.8.9-rc.1", "initialized": true, "planes": [{"name": "state", "live": true, "ready": true, "reasonCode": "STATE_READY", "status": "READY", "observedAt": "2026-09-15T00:00:00Z"}, {"name": "dataplane", "live": true, "ready": false, "reasonCode": "DEPENDENCY_PENDING", "status": "DEGRADED", "observedAt": "2026-09-15T00:00:01Z"}, {"name": "management", "live": true, "ready": true, "reasonCode": "MANAGEMENT_READY", "status": "READY", "observedAt": "2026-09-15T00:00:02Z"}], "networkProfile": {"name": "dual-nic", "configured": true}, "activeOperations": [], "localGatewayRegistration": {"registered": true, "installationId": "install-01", "instanceId": "gateway-01"}, "publicAddressTls": {"configured": true}, "observedAt": "2026-09-15T00:00:03Z"}
+      },
+      {
+        "id": "payload.network-validate.positive",
+        "command": "network validate",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "network validate", "valid": true, "profile": "dual-nic", "interfaces": [{"role": "frontend", "name": "eth0", "exists": true, "address": "192.0.2.10/24", "mtu": 1500}], "errors": [], "warnings": [{"code": "RP_FILTER_REVIEW", "remediation": "Confirm the approved asymmetric-routing profile."}], "observedAt": "2026-09-15T00:00:00Z"}
+      },
+      {
+        "id": "payload.public-address-configure.positive",
+        "command": "public-address configure",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "public-address configure", "result": "PENDING_RESTART", "operationId": "op-public-01", "publicAddress": "203.0.113.10", "privateAddressPreserved": true, "certificate": {"fingerprintSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "sans": ["203.0.113.10", "192.0.2.10"]}, "restart": "PENDING", "readiness": "PENDING_RESTART"}
+      },
+      {
+        "id": "payload.gateway-register-local.positive",
+        "command": "gateway register-local",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "gateway register-local", "result": "UNCHANGED", "operationId": "op-register-01", "installationId": "install-01", "instanceId": "gateway-01", "endpoint": "https://127.0.0.1:11111", "gatewayIdentity": {"name": "local-gateway", "address": "192.0.2.10"}, "verified": true, "markerUpdated": false}
+      },
+      {
+        "id": "payload.diagnostics-create.positive",
+        "command": "diagnostics create",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "diagnostics create", "result": "CREATED", "operationId": "op-diagnostics-01", "archivePath": "/var/lib/loxilb-appliance/diagnostics/support-01.tar.zst", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "sizeBytes": 4096, "mode": "0600", "redactionProfile": "strict-v1", "includedFiles": ["/var/log/loxilb/gateway.log"], "secretScan": {"result": "PASS", "hits": 0}, "expiresAt": "2026-09-16T00:00:00Z"}
+      },
+      {
+        "id": "payload.logs.positive",
+        "command": "logs",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "logs", "component": "gateway", "redacted": true, "window": {"since": "1h", "lines": 200}, "entries": [{"timestamp": "2026-09-15T00:00:00Z", "severity": "INFO", "correlationOrOperationId": "cli-01", "message": "gateway is ready"}], "truncated": false, "observedAt": "2026-09-15T00:00:01Z"}
+      },
+      {
+        "id": "payload.backup-key-create.positive",
+        "command": "backup key-create",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "backup key-create", "result": "CREATED", "operationId": "op-key-01", "keyPath": "/var/lib/loxilb-appliance/keys/backup.agekey", "keyId": "backup-key-01", "fingerprint": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "mode": "0600"}
+      },
+      {
+        "id": "payload.backup-create.positive",
+        "command": "backup create",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "backup create", "result": "CREATED", "operationId": "op-backup-01", "archivePath": "/var/lib/loxilb-appliance/backups/backup-01.tar.age", "sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "sizeBytes": 8192, "encrypted": true, "manifestSchema": "appliance-backup-manifest/v1", "componentChecksums": {"gateway": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "consistency": "APPLICATION_CONSISTENT"}
+      },
+      {
+        "id": "payload.backup-verify.positive",
+        "command": "backup verify",
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "backup verify", "result": "VERIFIED", "archivePath": "/var/lib/loxilb-appliance/backups/backup-01.tar.age", "authenticated": true, "checksumValid": true, "keyMatch": true, "manifestSchema": "appliance-backup-manifest/v1", "releaseCompatibility": "COMPATIBLE", "componentChecksums": {"gateway": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"}, "observedAt": "2026-09-15T00:00:02Z"}
+      }
+    ],
+    "negativeMutationClasses": [
+      {"name": "wrong-command", "operation": "replace", "path": "/command", "value": "renamed command"},
+      {"name": "missing-required", "operation": "remove-command-specific-required"},
+      {"name": "unknown-key", "operation": "add", "path": "/unexpected", "value": true},
+      {"name": "wrong-type-or-enum", "operation": "replace-command-specific-invalid"},
+      {"name": "null-value", "operation": "replace-command-specific-null"},
+      {"name": "second-json-document", "operation": "append-json-document", "value": {}},
+      {"name": "nested-command-result", "operation": "wrap-command-result"},
+      {"name": "secret-bearing-key", "operation": "add", "path": "/password", "valueFrom": "syntheticSecretSentinel"}
+    ],
+    "negativeFixtureExpansion": {
+      "idTemplate": "payload.{schemaSlug}.{mutationClass}",
+      "twinIdTemplate": "payload.{schemaSlug}.positive",
+      "commands": ["status", "network-validate", "public-address-configure", "gateway-register-local", "diagnostics-create", "logs", "backup-key-create", "backup-create", "backup-verify"],
+      "cardinality": 72
+    },
+    "twoSidedRule": "Every expanded command and negativeMutationClass pair names payload.{schemaSlug}.positive as its valid twin."
+  },
+  "statusContract": {
+    "positive": [
+      {"id": "status.legacy-optional.accept", "command": "status", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "status", "overallStatus": "NOT_READY", "productRelease": "v0.9.8.9-rc.1", "initialized": true, "planes": [{"name": "gateway", "live": false, "ready": false, "reasonCode": "GATEWAY_DOWN"}], "networkProfile": {"name": "dual-nic", "configured": true}, "activeOperations": [], "localGatewayRegistration": {"registered": true, "installationId": "install-01", "instanceId": "gateway-01"}, "observedAt": "2026-09-15T00:00:00Z"}}
+    ],
+    "negative": [
+      {"id": "status.plane-status-invalid.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/planes/0/status", "value": "HEALTHY"},
+      {"id": "status.plane-observed-at-malformed.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/planes/0/observedAt", "value": "not-a-time"},
+      {"id": "status.plane-observed-at-non-utc.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/planes/0/observedAt", "value": "2026-09-15T09:00:00+09:00"},
+      {"id": "status.reason-code-malformed.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/reasonCode", "value": "bad"},
+      {"id": "status.public-address-tls-type.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/publicAddressTls/configured", "value": "yes"},
+      {"id": "status.public-address-tls-missing-configured.reject", "twin": "payload.status.positive", "operation": "remove", "path": "/publicAddressTls/configured"},
+      {"id": "status.public-address-tls-unknown-field.reject", "twin": "payload.status.positive", "operation": "add", "path": "/publicAddressTls/certificate", "value": "forbidden"},
+      {"id": "status.public-address-tls-secret-field.reject", "twin": "payload.status.positive", "operation": "add", "path": "/publicAddressTls/privateKey", "valueFrom": "syntheticSecretSentinel"}
+    ]
+  },
+  "operationErrors": {
+    "positive": [
+      {"id": "operation-error.status.positive", "command": "status", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "status", "result": "ERROR", "exit": 5, "code": "UNAVAILABLE", "origin": "backend", "componentCode": "STATUS_DEPENDENCY_UNAVAILABLE", "retryable": true, "message": "A required status dependency is unavailable.", "correlationId": "cli-status-01"}},
+      {"id": "operation-error.network-validate.positive", "command": "network validate", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "network validate", "result": "ERROR", "exit": 4, "code": "PRECONDITION", "origin": "backend", "componentCode": "NETWORK_PROFILE_MISSING", "retryable": false}},
+      {"id": "operation-error.public-address-configure.positive", "command": "public-address configure", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "public-address configure", "result": "PARTIAL", "exit": 8, "code": "PARTIAL", "origin": "backend", "componentCode": "PUBLIC_ADDRESS_RECOVERY_REQUIRED", "retryable": false, "correlationId": "cli-public-01", "operationId": "op-public-partial-01", "recoveryGuidance": "Inspect the operation state before retrying."}},
+      {"id": "operation-error.gateway-register-local.positive", "command": "gateway register-local", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "gateway register-local", "result": "ERROR", "exit": 3, "code": "AUTH", "origin": "backend", "componentCode": "GATEWAY_REGISTRATION_FORBIDDEN", "retryable": false}},
+      {"id": "operation-error.diagnostics-create.positive", "command": "diagnostics create", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "diagnostics create", "result": "ERROR", "exit": 7, "code": "FAILED", "origin": "backend", "componentCode": "DIAGNOSTICS_ARCHIVE_FAILED", "retryable": false, "operationId": "op-diagnostics-failed-01"}},
+      {"id": "operation-error.logs.positive", "command": "logs", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "logs", "result": "ERROR", "exit": 2, "code": "INVALID_ARGUMENT", "origin": "backend", "componentCode": "LOG_WINDOW_INVALID", "retryable": false}},
+      {"id": "operation-error.backup-key-create.positive", "command": "backup key-create", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "backup key-create", "result": "PARTIAL", "exit": 8, "code": "PARTIAL", "origin": "backend", "componentCode": "BACKUP_KEY_CLEANUP_REQUIRED", "retryable": false, "operationId": "op-key-partial-01", "recoveryGuidance": "Remove the incomplete key artifact after verifying its path."}},
+      {"id": "operation-error.backup-create.positive", "command": "backup create", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "backup create", "result": "PARTIAL", "exit": 8, "code": "PARTIAL", "origin": "backend", "componentCode": "BACKUP_ARCHIVE_INCOMPLETE", "retryable": false, "operationId": "op-backup-partial-01", "recoveryGuidance": "Inspect and remove the incomplete archive before retrying."}},
+      {"id": "operation-error.backup-verify.positive", "command": "backup verify", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "backup verify", "result": "ERROR", "exit": 6, "code": "CONTRACT_MISMATCH", "origin": "backend", "componentCode": "BACKUP_MANIFEST_UNSUPPORTED", "retryable": false}}
+    ],
+    "negative": [
+      {"id": "operation-error.status.wrong-command", "twin": "operation-error.status.positive", "operation": "replace", "path": "/command", "value": "logs"},
+      {"id": "operation-error.network-validate.wrong-code", "twin": "operation-error.network-validate.positive", "operation": "replace", "path": "/code", "value": "FAILED"},
+      {"id": "operation-error.gateway-register-local.wrong-retry", "twin": "operation-error.gateway-register-local.positive", "operation": "replace", "path": "/retryable", "value": true},
+      {"id": "operation-error.diagnostics-create.missing-component", "twin": "operation-error.diagnostics-create.positive", "operation": "remove", "path": "/componentCode"},
+      {"id": "operation-error.logs.unknown-key", "twin": "operation-error.logs.positive", "operation": "add", "path": "/detail", "value": "not allowed"},
+      {"id": "operation-error.backup-verify.control-character", "twin": "operation-error.backup-verify.positive", "operation": "add", "path": "/message", "value": "bad\nmessage"},
+      {"id": "operation-error.status.secret", "twin": "operation-error.status.positive", "operation": "add", "path": "/password", "valueFrom": "syntheticSecretSentinel"},
+      {"id": "operation-error.public-address-configure.missing-guidance", "twin": "operation-error.public-address-configure.positive", "operation": "remove", "path": "/recoveryGuidance"},
+      {"id": "operation-error.backup-create.second-json-document", "twin": "operation-error.backup-create.positive", "operation": "append-json-document", "value": {}}
+    ]
+  },
+  "backendContractErrors": {
+    "positive": [
+      {"id": "error.release-marker-missing.positive", "document": {"schemaVersion": "backend-contract-error/v1", "exit": 4, "code": "PRECONDITION", "componentCode": "BACKEND_RELEASE_MARKER_MISSING", "retryable": false, "message": "The product release marker is missing."}},
+      {"id": "error.release-marker-invalid.positive", "document": {"schemaVersion": "backend-contract-error/v1", "exit": 6, "code": "CONTRACT_MISMATCH", "componentCode": "BACKEND_RELEASE_MARKER_INVALID", "retryable": false}},
+      {"id": "error.contract-invalid.positive", "document": {"schemaVersion": "backend-contract-error/v1", "exit": 6, "code": "CONTRACT_MISMATCH", "componentCode": "BACKEND_CONTRACT_INVALID", "retryable": false}},
+      {"id": "error.dependency-unavailable.positive", "document": {"schemaVersion": "backend-contract-error/v1", "exit": 5, "code": "UNAVAILABLE", "componentCode": "BACKEND_HANDSHAKE_UNAVAILABLE", "retryable": true}}
+    ],
+    "negative": [
+      {"id": "error.release-marker-missing.wrong-tuple", "twin": "error.release-marker-missing.positive", "operation": "replace", "path": "/exit", "value": 6},
+      {"id": "error.release-marker-invalid.extra", "twin": "error.release-marker-invalid.positive", "operation": "add", "path": "/detail", "value": "not allowed"},
+      {"id": "error.contract-invalid.control-character", "twin": "error.contract-invalid.positive", "operation": "add", "path": "/message", "value": "bad\nmessage"},
+      {"id": "error.contract-invalid.credential-pattern", "twin": "error.contract-invalid.positive", "operation": "add", "path": "/message", "value": "token=example"},
+      {"id": "error.dependency-unavailable.secret", "twin": "error.dependency-unavailable.positive", "operation": "add", "path": "/message", "valueFrom": "syntheticSecretSentinel"},
+      {"id": "error.dependency-unavailable.second-json-document", "twin": "error.dependency-unavailable.positive", "operation": "append-json-document", "value": {}}
+    ]
+  },
+  "operationReceipts": {
+    "positive": [
+      {"id": "receipt.applied.positive", "document": {"schemaVersion": "appliance-backend-operation-receipt/v1", "operationId": "op-01", "correlationId": "cli-01", "command": "public-address configure", "effect": "APPLIED", "startedAt": "2026-09-15T00:00:00Z", "finishedAt": "2026-09-15T00:00:01Z", "result": "PASS", "stateEvidence": {"oracle": "HOST_STATE", "beforeDigest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "afterDigest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "delta": 1}}},
+      {"id": "receipt.unchanged.positive", "document": {"schemaVersion": "appliance-backend-operation-receipt/v1", "operationId": "op-02", "correlationId": "cli-02", "command": "gateway register-local", "effect": "UNCHANGED", "startedAt": "2026-09-15T00:00:00Z", "finishedAt": "2026-09-15T00:00:01Z", "result": "PASS", "stateEvidence": {"oracle": "OAM_READBACK", "beforeDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "afterDigest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "delta": 0}}},
+      {"id": "receipt.partial.positive", "document": {"schemaVersion": "appliance-backend-operation-receipt/v1", "operationId": "op-03", "correlationId": "cli-03", "command": "backup create", "effect": "PARTIAL", "startedAt": "2026-09-15T00:00:00Z", "finishedAt": "2026-09-15T00:00:01Z", "result": "PARTIAL", "stateEvidence": {"oracle": "ARTIFACT", "beforeDigest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "afterDigest": "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "delta": 1, "artifactPath": "/var/lib/loxilb-appliance/backups/partial.tmp"}, "recoveryGuidance": "Inspect the operation by ID and do not retry automatically."}}
+    ],
+    "negative": [
+      {"id": "receipt.applied.zero-delta", "twin": "receipt.applied.positive", "operation": "replace", "path": "/stateEvidence/delta", "value": 0},
+      {"id": "receipt.unchanged.nonzero-delta", "twin": "receipt.unchanged.positive", "operation": "replace", "path": "/stateEvidence/delta", "value": 1},
+      {"id": "receipt.partial.missing-guidance", "twin": "receipt.partial.positive", "operation": "remove", "path": "/recoveryGuidance"},
+      {"id": "receipt.partial.bad-time", "twin": "receipt.partial.positive", "operation": "replace", "path": "/finishedAt", "value": "2026-09-15 00:00:01"},
+      {"id": "receipt.applied.secret", "twin": "receipt.applied.positive", "operation": "add", "path": "/password", "valueFrom": "syntheticSecretSentinel"},
+      {"id": "receipt.applied.second-json-document", "twin": "receipt.applied.positive", "operation": "append-json-document", "value": {}}
+    ]
+  }
+}

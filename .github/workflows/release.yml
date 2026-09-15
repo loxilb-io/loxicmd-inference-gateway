@@ -1,6 +1,8 @@
 name: Release
 
-# Tag-triggered release. Versions follow loxilb-io/loxilb-inference-gateway —
+# Tag-triggered release, with a guarded manual recovery path for an immutable
+# tag whose original run failed before publishing any assets. Versions follow
+# loxilb-io/loxilb-inference-gateway —
 # vMAJOR.MINOR.PATCH with an optional build component (v0.9.8.6), or a
 # -rc./-alpha./-beta. suffix for a prerelease; the tag is validated below and
 # stamped into the binary. Produces a linux/amd64 + linux/arm64 binary tarball,
@@ -8,25 +10,40 @@ name: Release
 # release metadata attached to a GitHub Release.
 #
 # Release-input rules enforced here:
-#   - only an annotated v* tag reaches this workflow, so the input is an
-#     immutable ref by construction; the resolved commit is still recorded and
-#     re-verified from inside the built binary
+#   - only an annotated v* tag reaches the build; both the normal push path and
+#     manual recovery path verify the tag object and exact peeled commit
+#     without coupling the GitHub-hosted runner to any external key or server
+#   - manual recovery requires the expected full source SHA and rejects the
+#     build if the immutable tag resolves anywhere else
+#   - the resolved commit is recorded and re-verified from inside the binary
 #   - a dirty tree, or generated files modified by the build, fail the job
 #   - each binary is built twice from identical inputs; a differing pair is a
 #     reproducibility failure that blocks the release
 #
-# AUTHORIZATION: this job targets the `release` Environment, which should be
-# configured with required reviewers and a deployment branch policy allowing
-# only `v*` tags — so a tag alone cannot ship a release.
+# AUTHORIZATION: this job targets the `release` Environment with required
+# reviewers. Both tag pushes and manual runs therefore require an independent
+# environment approval; the actor cannot self-approve the deployment. A manual
+# dispatch from a non-main branch is a non-publishing dry run for validating a
+# workflow change before its PR is approved.
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated release tag to recover
+        required: true
+        type: string
+      expected_source_revision:
+        description: Full 40-character commit SHA the tag must resolve to
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -34,18 +51,26 @@ jobs:
     name: Release
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: release
+    environment:
+      name: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' && 'release-preflight' || 'release' }}
+      deployment: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
     permissions:
       contents: write # create the GitHub Release
       id-token: write # sign build provenance
       attestations: write # store build provenance
+      artifact-metadata: write # associate attestations with release assets
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Resolve version
         id: ver
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: |
-          VERSION="${GITHUB_REF_NAME}"
+          VERSION="${RELEASE_TAG}"
           # Lockstep with loxilb-inference-gateway: vMAJOR.MINOR.PATCH with an
           # optional fourth build component, plus an optional -rc/-alpha/-beta
           # prerelease suffix. Reject anything else so a stray tag cannot
@@ -63,12 +88,27 @@ jobs:
 
       - name: Resolve and verify build inputs
         id: inputs
+        env:
+          EXPECTED_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_source_revision || github.sha }}
+          RELEASE_TAG: ${{ steps.ver.outputs.version }}
         run: |
-          # The commit the tag resolved to is the one identity every later
-          # step verifies against.
-          REV="$(git rev-parse HEAD)"
-          if [ "$REV" != "${GITHUB_SHA}" ]; then
-            echo "::error::checked-out commit ${REV} does not match the triggering commit ${GITHUB_SHA}"
+          if ! echo "$EXPECTED_SOURCE" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::expected source revision must be a full lowercase 40-character SHA"
+            exit 1
+          fi
+
+          TAG_REF="refs/tags/${RELEASE_TAG}"
+          if [ "$(git cat-file -t "$TAG_REF")" != "tag" ]; then
+            echo "::error::${RELEASE_TAG} is not an annotated tag object"
+            exit 1
+          fi
+
+          # The commit the annotated tag resolved to is the one identity every
+          # later step verifies against. A moving or mismatched ref is fatal.
+          REV="$(git rev-parse "${TAG_REF}^{}")"
+          HEAD_REV="$(git rev-parse HEAD)"
+          if [ "$REV" != "$EXPECTED_SOURCE" ] || [ "$HEAD_REV" != "$REV" ]; then
+            echo "::error::tag=${REV} checkout=${HEAD_REV} expected=${EXPECTED_SOURCE}"
             exit 1
           fi
           # A release builds a committed tree, nothing else.
@@ -77,7 +117,7 @@ jobs:
             echo "::error::working tree is dirty; a release builds only committed sources"
             exit 1
           fi
-          if [ -n "$(git submodule status --recursive 2>/dev/null | grep -E '^[+U-]')" ]; then
+          if git submodule status --recursive 2>/dev/null | grep -Eq '^[+U-]'; then
             echo "::error::unexpected submodule state"
             exit 1
           fi
@@ -92,16 +132,54 @@ jobs:
           fi
           {
             echo "revision=${REV}"
+            echo "tag_object=$(git rev-parse "$TAG_REF")"
             echo "sde=${SDE}"
             echo "contract=${CONTRACT}"
             echo "workflow=${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Refuse to replace an existing release
+        if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          BODY="${RUNNER_TEMP}/existing-release.json"
+          HTTP_STATUS="$(curl --silent --show-error --location \
+            --output "$BODY" --write-out '%{http_code}' \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/releases/tags/${VERSION}")"
+          case "$HTTP_STATUS" in
+            404) ;;
+            200)
+              echo "::error::release ${VERSION} already exists; refusing to replace or update it"
+              exit 1
+              ;;
+            *)
+              echo "::error::could not prove release absence (HTTP ${HTTP_STATUS})"
+              exit 1
+              ;;
+          esac
+          DRAFT_IDS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft == true and .tag_name == \"${VERSION}\") | .id")"
+          if [ -n "$DRAFT_IDS" ]; then
+            echo "::error::draft release ${VERSION} already exists (id ${DRAFT_IDS//$'\n'/,}); refusing to replace or update it"
+            exit 1
+          fi
+
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 'stable'
+          go-version: '1.25.0'
           cache: true
+
+      - name: Verify release toolchain
+        run: |
+          go version
+          test "$(go env GOVERSION)" = "go1.25.0"
 
       - name: Build binaries (twice, proving reproducibility)
         env:
@@ -114,7 +192,10 @@ jobs:
         run: |
           BUILDINFO="$(date -u -d "@${SDE}" '+%Y_%m_%d')-release-$(git rev-parse --short HEAD)"
           MOD="github.com/loxilb-io/loxicmd-inference-gateway/cmd"
-          LDFLAGS="-X '${MOD}.Version=${VERSION}' \
+          # Release identity is injected explicitly below. Omit Go's implicit
+          # linker build ID so cold-cache and warm-cache links are byte-identical.
+          LDFLAGS="-buildid= \
+                   -X '${MOD}.Version=${VERSION}' \
                    -X '${MOD}.BuildInfo=${BUILDINFO}' \
                    -X '${MOD}.SourceRevision=${REV}' \
                    -X '${MOD}.GatewayContract=${CONTRACT}' \
@@ -122,7 +203,9 @@ jobs:
                    -X '${MOD}.SourceDateEpoch=${SDE}'"
           for arch in amd64 arm64; do
             for round in 1 2; do
-              GOOS=linux GOARCH="$arch" go build -trimpath \
+              # REV above is the verified, explicitly embedded source identity;
+              # do not add runner-local VCS state to the binary.
+              GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
                 -ldflags "$LDFLAGS" -o "loxicmd_${arch}.round${round}"
             done
             if ! cmp -s "loxicmd_${arch}.round1" "loxicmd_${arch}.round2"; then
@@ -234,20 +317,191 @@ jobs:
           cat "dist/release-metadata_${VERSION}.json"
 
       - name: Attest build provenance
+        if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+        id: build_attestation
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
             dist/*.tar.gz
+            dist/SHA256SUMS
+            dist/*.spdx.json
             dist/release-metadata_*.json
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - name: Preserve build provenance bundle
+        if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          BUNDLE: ${{ steps.build_attestation.outputs.bundle-path }}
+        run: cp "$BUNDLE" "dist/build-provenance_${VERSION}.sigstore.json"
+
+      - name: Write recovery release predicate
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          REV: ${{ steps.inputs.outputs.revision }}
+          CONTRACT: ${{ steps.inputs.outputs.contract }}
+          WORKFLOW: ${{ steps.inputs.outputs.workflow }}
+          SDE: ${{ steps.inputs.outputs.sde }}
+          BUILDER_WORKFLOW_REVISION: ${{ github.sha }}
+        run: |
+          jq -n \
+            --arg repository "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --arg ref "refs/tags/${VERSION}" \
+            --arg revision "$REV" \
+            --arg contract "$CONTRACT" \
+            --arg workflow "$WORKFLOW" \
+            --arg builderRevision "$BUILDER_WORKFLOW_REVISION" \
+            --arg go "$(go env GOVERSION)" \
+            --arg sde "$SDE" \
+            '{
+              purl: ("pkg:github/loxilb-io/loxicmd-inference-gateway@" + $revision),
+              source: {
+                repository: $repository,
+                ref: $ref,
+                artifactSourceRevision: $revision,
+                annotatedTagObjectVerified: true
+              },
+              build: {
+                gatewayContract: $contract,
+                workflow: $workflow,
+                builderWorkflowRevision: $builderRevision,
+                goVersion: $go,
+                sourceDateEpoch: $sde,
+                reproducibilityRounds: 2
+              }
+            }' > dist/release-predicate.json
+
+      - name: Attest recovered release inputs
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+        id: recovery_attestation
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
         with:
-          tag_name: ${{ steps.ver.outputs.version }}
-          prerelease: ${{ steps.ver.outputs.prerelease }}
-          generate_release_notes: true
-          files: |
+          subject-path: |
             dist/*.tar.gz
             dist/SHA256SUMS
             dist/*.spdx.json
             dist/release-metadata_*.json
+            dist/build-provenance_*.sigstore.json
+          predicate-type: https://in-toto.io/attestation/release/v0.1
+          predicate-path: dist/release-predicate.json
+
+      - name: Preserve recovery attestation bundle
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+          BUNDLE: ${{ steps.recovery_attestation.outputs.bundle-path }}
+        run: cp "$BUNDLE" "dist/release-attestation_${VERSION}.sigstore.json"
+
+      - name: Re-verify remote tag immediately before publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          REV: ${{ steps.inputs.outputs.revision }}
+          LOCAL_TAG_OBJECT: ${{ steps.inputs.outputs.tag_object }}
+        run: |
+          REF_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}")"
+          REMOTE_TYPE="$(jq -r '.object.type' <<<"$REF_JSON")"
+          REMOTE_TAG_OBJECT="$(jq -r '.object.sha' <<<"$REF_JSON")"
+          if [ "$REMOTE_TYPE" != "tag" ] || [ "$REMOTE_TAG_OBJECT" != "$LOCAL_TAG_OBJECT" ]; then
+            echo "::error::remote tag object changed after checkout"
+            exit 1
+          fi
+
+          TAG_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${REMOTE_TAG_OBJECT}")"
+          REMOTE_TARGET="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+          if [ "$REMOTE_TARGET" != "$REV" ]; then
+            echo "::error::remote tag target ${REMOTE_TARGET} does not match ${REV}"
+            exit 1
+          fi
+
+      - name: Create, verify, and publish complete release
+        if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          PRERELEASE: ${{ steps.ver.outputs.prerelease }}
+          REV: ${{ steps.inputs.outputs.revision }}
+          LOCAL_TAG_OBJECT: ${{ steps.inputs.outputs.tag_object }}
+        run: |
+          ASSETS=(
+            dist/*.tar.gz
+            dist/SHA256SUMS
+            dist/*.spdx.json
+            dist/release-metadata_*.json
+            dist/build-provenance_*.sigstore.json
+          )
+          if compgen -G 'dist/release-attestation_*.sigstore.json' >/dev/null; then
+            ASSETS+=(dist/release-attestation_*.sigstore.json)
+          fi
+
+          CREATE_ARGS=(--draft --generate-notes --verify-tag)
+          if [ "$PRERELEASE" = true ]; then
+            CREATE_ARGS+=(--prerelease)
+          fi
+          gh release create "$VERSION" "${ASSETS[@]}" "${CREATE_ARGS[@]}" \
+            --repo "$GITHUB_REPOSITORY"
+
+          # GitHub intentionally returns 404 from /releases/tags/{tag} for a
+          # draft. Resolve the one draft by tag, then use its immutable API ID
+          # for verification and the publish transition.
+          DRAFT_ID="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft == true and .tag_name == \"${VERSION}\") | .id")"
+          if ! [[ "$DRAFT_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::expected exactly one draft release for ${VERSION}; got ${DRAFT_ID//$'\n'/,}"
+            exit 1
+          fi
+          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${DRAFT_ID}")"
+          if [ "$(jq -r '.draft' <<<"$RELEASE_JSON")" != true ]; then
+            echo "::error::release must remain a draft until every uploaded asset is verified"
+            exit 1
+          fi
+          if [ "$(jq '.assets | length' <<<"$RELEASE_JSON")" -ne "${#ASSETS[@]}" ]; then
+            echo "::error::draft asset count does not match the complete local set"
+            exit 1
+          fi
+
+          for file in "${ASSETS[@]}"; do
+            name="$(basename "$file")"
+            local_digest="sha256:$(sha256sum "$file" | awk '{print $1}')"
+            remote_digest="$(jq -r --arg name "$name" \
+              '.assets[] | select(.name == $name) | .digest' <<<"$RELEASE_JSON")"
+            if [ "$remote_digest" != "$local_digest" ]; then
+              echo "::error::uploaded digest mismatch for ${name}: ${remote_digest} != ${local_digest}"
+              exit 1
+            fi
+          done
+
+          # Asset upload can take long enough for an unprotected ref to move.
+          # Re-read both the tag object and its peeled commit before the draft
+          # becomes public.
+          REF_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}")"
+          REMOTE_TAG_OBJECT="$(jq -r '.object.sha' <<<"$REF_JSON")"
+          TAG_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/git/tags/${REMOTE_TAG_OBJECT}")"
+          REMOTE_TARGET="$(jq -r '.object.sha' <<<"$TAG_JSON")"
+          if [ "$(jq -r '.object.type' <<<"$REF_JSON")" != tag ] || \
+             [ "$REMOTE_TAG_OBJECT" != "$LOCAL_TAG_OBJECT" ] || \
+             [ "$REMOTE_TARGET" != "$REV" ]; then
+            echo "::error::remote tag changed while the release draft was being assembled"
+            exit 1
+          fi
+
+          gh api --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${DRAFT_ID}" \
+            -F draft=false -f make_latest=false >/dev/null
+          PUBLISHED_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${DRAFT_ID}")"
+          if [ "$(jq -r '.draft' <<<"$PUBLISHED_JSON")" != false ] || \
+             [ "$(jq -r '.immutable' <<<"$PUBLISHED_JSON")" != true ]; then
+            echo "::error::published release is not confirmed immutable"
+            exit 1
+          fi
+
+      - name: Summarize non-publishing branch dry run
+        if: ${{ github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main' }}
+        run: |
+          test -f dist/SHA256SUMS
+          test -f dist/release-metadata_${{ steps.ver.outputs.version }}.json
+          ( cd dist && sha256sum --check SHA256SUMS )
+          echo "GitHub-hosted dry run passed for ${{ steps.ver.outputs.version }}"
+          echo "Source revision: ${{ steps.inputs.outputs.revision }}"
+          cat dist/SHA256SUMS

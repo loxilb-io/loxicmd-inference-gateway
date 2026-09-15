@@ -24,6 +24,7 @@ package appliance
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -89,7 +90,7 @@ Examples:
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return dispatchReadOnly(cmd.OutOrStdout(), restOptions, "appliance.status", "status")
+			return dispatchReadOnly(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.status", "status")
 		},
 	}
 }
@@ -120,7 +121,7 @@ Examples:
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return dispatchReadOnly(cmd.OutOrStdout(), restOptions, "appliance.network.validate", "network validate")
+			return dispatchReadOnly(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.network.validate", "network validate")
 		},
 	})
 	return networkCmd
@@ -145,7 +146,7 @@ func unavailableCmd(restOptions *api.RESTOptions, use, what string) *cobra.Comma
 				ComponentCode: "command-unavailable",
 			}
 			if restOptions.PrintOption == "json" {
-				writeEnvelope(cmd.OutOrStdout(), "appliance."+use, nil, err)
+				writeEnvelope(cmd.OutOrStdout(), "appliance."+use, nil, nil, err)
 			}
 			return err
 		},
@@ -167,22 +168,25 @@ type applianceData struct {
 }
 
 // dispatchReadOnly invokes a read-only backend subcommand and renders the
-// outcome. Read-only commands skip the contract-version handshake (it is
-// required before mutating calls only): the invocation itself is the
-// availability probe, and an absent backend classifies as unavailable.
-func dispatchReadOnly(out io.Writer, restOptions *api.RESTOptions, command, subcommand string) error {
+// outcome. The backend package performs the contract-version handshake first;
+// only a typed degraded-handshake class may continue to one best-effort read.
+func dispatchReadOnly(out, errOut io.Writer, restOptions *api.RESTOptions, command, subcommand string) error {
 	jsonOut := restOptions.PrintOption == "json"
 	ctx, cancel := requestContext(restOptions)
 	defer cancel()
 
 	res, err := backend.Invoke(ctx, subcommand, jsonOut)
+	var validated *backend.ValidatedPayload
 	if err == nil {
-		err = backendOutcome(subcommand, res, false)
+		validated, err = resolveBackendOutcome(subcommand, res, false, jsonOut)
 	}
 	if err != nil {
 		if jsonOut {
-			writeEnvelope(out, command, res, err)
+			writeEnvelope(out, command, res, validated, err)
 		}
+		return err
+	}
+	if _, err := errOut.Write(res.Stderr); err != nil {
 		return err
 	}
 	if !jsonOut {
@@ -190,33 +194,21 @@ func dispatchReadOnly(out io.Writer, restOptions *api.RESTOptions, command, subc
 		_, werr := out.Write(res.Stdout)
 		return werr
 	}
-	// JSON mode: the backend emits exactly one JSON document, which
-	// becomes the envelope's data payload. A backend answering -o json
-	// with something else broke the invocation contract; that is a
-	// contract error, never silently-wrapped prose.
-	if !json.Valid(res.Stdout) {
-		err = &exitcode.CLIError{
-			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("the backend's %s output is not a JSON document", subcommand),
-			Origin:        "backend",
-			ComponentCode: "contract-invalid",
-		}
-		writeEnvelope(out, command, res, err)
-		return err
-	}
-	writeEnvelope(out, command, res, nil)
+	writeEnvelope(out, command, res, validated, nil)
 	return nil
 }
 
 // writeEnvelope emits the CommandResult document for a dispatched command.
-func writeEnvelope(out io.Writer, command string, res *backend.Result, err error) {
+// Backend bytes enter data.backend only through ValidatedPayload; json.Valid
+// alone is deliberately not an authorization boundary.
+func writeEnvelope(out io.Writer, command string, res *backend.Result, validated *backend.ValidatedPayload, err error) {
 	result := envelope.New(command)
 	data := &applianceData{}
 	if res != nil {
 		result.CorrelationID = res.CorrelationID
-		if json.Valid(res.Stdout) {
-			data.Backend = json.RawMessage(res.Stdout)
-		}
+	}
+	if validated != nil {
+		data.Backend = append(json.RawMessage(nil), validated.Document...)
 	}
 	if err != nil {
 		ce := exitcode.Classify(err)
@@ -231,7 +223,12 @@ func writeEnvelope(out io.Writer, command string, res *backend.Result, err error
 		// every failure would suggest there is something to recover from
 		// when the backend already said there is not.
 		if ce.Code == exitcode.Partial && res != nil {
-			id := res.OperationID()
+			// A signal-death path has no validated document, so its
+			// correlation ID is the only trustworthy recovery handle.
+			id := res.CorrelationID
+			if validated != nil && validated.OperationID != "" {
+				id = validated.OperationID
+			}
 			data.OperationID = &id
 		}
 	}
@@ -239,13 +236,81 @@ func writeEnvelope(out io.Writer, command string, res *backend.Result, err error
 	_ = result.Write(out)
 }
 
+// resolveBackendOutcome is the CLI-WP03 dispatcher boundary. In JSON mode,
+// every normally completed public-taxonomy outcome is validated against the
+// exact command tuple before any backend bytes are exposed. Signal deaths are
+// classified from execution context because their stdout may be truncated.
+// Legacy/out-of-taxonomy normal exits keep the existing FAILED fallback.
+func resolveBackendOutcome(subcommand string, res *backend.Result, mutating, jsonOut bool) (*backend.ValidatedPayload, error) {
+	if jsonOut && !res.Signaled && (res.ExitCode == 0 || (res.ExitCode >= 2 && res.ExitCode <= 8)) {
+		return validateJSONOutcome(subcommand, res)
+	}
+	return nil, backendOutcome(subcommand, res, mutating)
+}
+
+func validateJSONOutcome(subcommand string, res *backend.Result) (*backend.ValidatedPayload, error) {
+	selected, ok := backend.PayloadTupleForCommand(subcommand)
+	if !ok {
+		return nil, payloadExecutionError(backend.PayloadTuple{Command: subcommand}, subcommand,
+			"the command has no registered JSON payload tuple", res, "")
+	}
+	validated, err := backend.ValidatePayload(selected, res.Stdout)
+	if err != nil {
+		var payloadErr *backend.PayloadValidationError
+		if errors.As(err, &payloadErr) {
+			return nil, payloadErr.WithExecutionEvidence(res.ExitCode, res.CorrelationID, "")
+		}
+		return nil, err
+	}
+
+	if res.ExitCode == 0 {
+		if validated.OperationError != nil {
+			return nil, payloadExecutionError(validated.Tuple, validated.Command,
+				"an operation-error document accompanied process exit 0", res, validated.OperationID)
+		}
+		return validated, nil
+	}
+	if validated.OperationError == nil {
+		return nil, payloadExecutionError(validated.Tuple, validated.Command,
+			fmt.Sprintf("a success document accompanied process exit %d", res.ExitCode), res, validated.OperationID)
+	}
+	opErr := validated.OperationError
+	if opErr.Exit != res.ExitCode {
+		return nil, payloadExecutionError(validated.Tuple, validated.Command,
+			fmt.Sprintf("document exit %d differs from process exit %d", opErr.Exit, res.ExitCode), res, validated.OperationID)
+	}
+	if opErr.CorrelationID != "" && opErr.CorrelationID != res.CorrelationID {
+		return nil, payloadExecutionError(validated.Tuple, validated.Command,
+			"document correlationId differs from the invocation correlationId", res, validated.OperationID)
+	}
+	message := opErr.Message
+	if message == "" {
+		message = backendFailureMessage(subcommand, res)
+	}
+	return validated, &exitcode.CLIError{
+		Code:          exitcode.Code(opErr.Exit),
+		Message:       message,
+		Origin:        opErr.Origin,
+		ComponentCode: opErr.ComponentCode,
+	}
+}
+
+func payloadExecutionError(tuple backend.PayloadTuple, command, reason string, res *backend.Result, operationID string) error {
+	return (&backend.PayloadValidationError{
+		Tuple:   tuple,
+		Command: command,
+		Reason:  reason,
+	}).WithExecutionEvidence(res.ExitCode, res.CorrelationID, operationID)
+}
+
 // backendOutcome turns a completed invocation into a verdict, or nil when the
 // backend exited 0.
 //
 // The split that matters is between a failure the backend DECIDED and one
-// nobody decided. A non-zero exit status is the backend's own verdict:
-// preserved verbatim, classified FAILED, and safe to retry once the cause is
-// addressed. A process that was killed never reported anything -- our own
+// nobody decided. A public-taxonomy exit status is preserved even in human
+// mode; JSON mode reaches this function only for signal deaths or
+// out-of-taxonomy legacy exits, because structured outcomes are handled by
+// resolveBackendOutcome. A process that was killed never reported anything -- our own
 // --timeout fired, a signal arrived, the OOM killer chose it -- so what it had
 // done by then is unknown.
 //
@@ -262,11 +327,12 @@ func backendOutcome(subcommand string, res *backend.Result, mutating bool) error
 		return nil
 	}
 	if !res.Signaled {
-		// The backend ran and refused: its own verdict is preserved
-		// verbatim — the CLI does not reinterpret a failure it cannot
-		// see into, and never converts one into success.
+		code := exitcode.Failed
+		if res.ExitCode >= 2 && res.ExitCode <= 8 {
+			code = exitcode.Code(res.ExitCode)
+		}
 		return &exitcode.CLIError{
-			Code:          exitcode.Failed,
+			Code:          code,
 			Message:       backendFailureMessage(subcommand, res),
 			Origin:        "backend",
 			ComponentCode: fmt.Sprintf("backend-exit-%d", res.ExitCode),

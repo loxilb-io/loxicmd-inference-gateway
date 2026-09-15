@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/logs.schema.json",
+  "title": "logs payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "component", "redacted", "window", "entries", "truncated", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "logs"},
+    "component": {"enum": ["gateway", "oam", "ui", "caddy", "postgres", "state", "dataplane", "management"]},
+    "redacted": {"const": true},
+    "window": {"type": "object", "additionalProperties": false, "required": ["since", "lines"], "properties": {"since": {"type": "string", "pattern": "^[1-9][0-9]*(s|m|h)$"}, "lines": {"type": "integer", "minimum": 1, "maximum": 10000}}},
+    "entries": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["timestamp", "severity", "correlationOrOperationId", "message"], "properties": {"timestamp": {"type": "string", "format": "date-time", "pattern": "Z$"}, "severity": {"enum": ["DEBUG", "INFO", "WARN", "ERROR"]}, "correlationOrOperationId": {"type": "string"}, "message": {"type": "string"}}}},
+    "truncated": {"type": "boolean"},
+    "observedAt": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

@@ -1,67 +1,56 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://loxilb.io/schemas/appliance-backend/v1/backend-contract.schema.json",
-  "title": "BackendContract",
-  "description": "Response of `loxilb-appliance-backend contract-version --json`. The CLI validates this before any mutating appliance subcommand. Keys follow the same stability rules as the CommandResult envelope: always present, never null, secret material prohibited.",
+  "title": "BackendContract CLI-WP00 candidate",
+  "description": "Exact CONSERVATIVE_V1 handshake candidate. Command order, readOnly values, and capability arrays are contract data, not hints.",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "apiVersion",
-    "kind",
-    "backendVersion",
-    "productRelease",
-    "schemaVersion",
-    "commands"
-  ],
+  "required": ["apiVersion", "kind", "backendVersion", "productRelease", "schemaVersion", "commands"],
   "properties": {
-    "apiVersion": {
-      "type": "string",
-      "pattern": "^loxilb\\.io/appliance-backend/v[0-9]+$",
-      "description": "Backend contract version. The CLI refuses a major it does not know."
-    },
-    "kind": {
-      "const": "BackendContract"
-    },
-    "backendVersion": {
-      "type": "string",
-      "description": "The backend implementation's own version string."
-    },
-    "productRelease": {
-      "type": "string",
-      "description": "The installed product release this backend shipped with."
-    },
-    "schemaVersion": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Version of the per-command JSON payload schemas this backend emits."
-    },
+    "apiVersion": {"const": "loxilb.io/appliance-backend/v1"},
+    "kind": {"const": "BackendContract"},
+    "backendVersion": {"type": "string", "minLength": 1},
+    "productRelease": {"type": "string", "minLength": 1},
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
     "commands": {
       "type": "array",
-      "description": "Every subcommand this backend supports. A subcommand absent from this list is unavailable regardless of what the CLI build knows about.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["name", "readOnly", "capabilities"],
-        "properties": {
-          "name": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9-]*( [a-z][a-z0-9-]*)*$",
-            "description": "Backend subcommand, e.g. \"status\", \"backup create\"."
-          },
-          "readOnly": {
-            "type": "boolean",
-            "description": "True when the subcommand changes no host state under any input."
-          },
-          "capabilities": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9-]*$"
-            },
-            "description": "Feature markers within the subcommand (e.g. \"json-output\", \"redaction\"). The CLI requires a capability before exposing the dependent flag or behavior."
-          }
-        }
-      }
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {"$ref": "#/$defs/status"},
+        {"$ref": "#/$defs/networkValidate"},
+        {"$ref": "#/$defs/publicAddressConfigure"},
+        {"$ref": "#/$defs/gatewayRegisterLocal"},
+        {"$ref": "#/$defs/credentialsBootstrap"},
+        {"$ref": "#/$defs/diagnosticsCreate"},
+        {"$ref": "#/$defs/logs"},
+        {"$ref": "#/$defs/backupKeyCreate"},
+        {"$ref": "#/$defs/backupCreate"},
+        {"$ref": "#/$defs/backupVerify"}
+      ],
+      "items": false
     }
+  },
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "readOnly", "capabilities"],
+      "properties": {
+        "name": {"type": "string"},
+        "readOnly": {"type": "boolean"},
+        "capabilities": {"type": "array", "uniqueItems": true, "items": {"enum": ["json-output", "no-restart", "secret-stdin", "redaction", "explicit-output", "bounded-window", "key-file", "operation-receipt", "console-only"]}}
+      }
+    },
+    "status": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "status"}, "readOnly": {"const": true}, "capabilities": {"const": ["json-output"]}}}]},
+    "networkValidate": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "network validate"}, "readOnly": {"const": true}, "capabilities": {"const": ["json-output"]}}}]},
+    "publicAddressConfigure": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "public-address configure"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "no-restart", "operation-receipt"]}}}]},
+    "gatewayRegisterLocal": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "gateway register-local"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "secret-stdin", "operation-receipt"]}}}]},
+    "credentialsBootstrap": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "credentials bootstrap"}, "readOnly": {"const": false}, "capabilities": {"const": ["console-only"]}}}]},
+    "diagnosticsCreate": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "diagnostics create"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "redaction", "explicit-output", "operation-receipt"]}}}]},
+    "logs": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "logs"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "redaction", "bounded-window"]}}}]},
+    "backupKeyCreate": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "backup key-create"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "key-file", "operation-receipt"]}}}]},
+    "backupCreate": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "backup create"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "key-file", "operation-receipt"]}}}]},
+    "backupVerify": {"allOf": [{"$ref": "#/$defs/command"}, {"properties": {"name": {"const": "backup verify"}, "readOnly": {"const": false}, "capabilities": {"const": ["json-output", "key-file"]}}}]}
   }
 }
