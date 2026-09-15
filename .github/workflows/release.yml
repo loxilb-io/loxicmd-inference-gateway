@@ -180,7 +180,10 @@ jobs:
         run: |
           BUILDINFO="$(date -u -d "@${SDE}" '+%Y_%m_%d')-release-$(git rev-parse --short HEAD)"
           MOD="github.com/loxilb-io/loxicmd-inference-gateway/cmd"
-          LDFLAGS="-X '${MOD}.Version=${VERSION}' \
+          # Release identity is injected explicitly below. Omit Go's implicit
+          # linker build ID so cold-cache and warm-cache links are byte-identical.
+          LDFLAGS="-buildid= \
+                   -X '${MOD}.Version=${VERSION}' \
                    -X '${MOD}.BuildInfo=${BUILDINFO}' \
                    -X '${MOD}.SourceRevision=${REV}' \
                    -X '${MOD}.GatewayContract=${CONTRACT}' \
@@ -188,7 +191,9 @@ jobs:
                    -X '${MOD}.SourceDateEpoch=${SDE}'"
           for arch in amd64 arm64; do
             for round in 1 2; do
-              GOOS=linux GOARCH="$arch" go build -trimpath \
+              # REV above is the verified, explicitly embedded source identity;
+              # do not add runner-local VCS state to the binary.
+              GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
                 -ldflags "$LDFLAGS" -o "loxicmd_${arch}.round${round}"
             done
             if ! cmp -s "loxicmd_${arch}.round1" "loxicmd_${arch}.round2"; then
