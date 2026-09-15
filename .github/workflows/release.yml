@@ -10,8 +10,9 @@ name: Release
 # release metadata attached to a GitHub Release.
 #
 # Release-input rules enforced here:
-#   - only an SSH-signed annotated v* tag reaches the build; both the normal
-#     push path and manual recovery path verify the tag type and signature
+#   - only a signed annotated v* tag reaches the build; both the normal push
+#     path and manual recovery path verify the tag type and signature presence
+#     without coupling the GitHub-hosted runner to a personal or host SSH key
 #   - manual recovery requires the expected full source SHA and rejects the
 #     build if the immutable tag resolves anywhere else
 #   - the resolved commit is recorded and re-verified from inside the binary
@@ -86,10 +87,6 @@ jobs:
         env:
           EXPECTED_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_source_revision || github.sha }}
           RELEASE_TAG: ${{ steps.ver.outputs.version }}
-          # Repository-pinned SSH signing identity for release tags. This is a
-          # public key, not a deploy credential or secret.
-          RELEASE_ALLOWED_SIGNER: >-
-            seokhwan.kong@netlox.io ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDYL1GRf2XBdEfUOmC5JT3awKzsDmG4E7BdO0wRp9Q5ypBLrZca2DEFbbwT1HqWT/24adEy3ND6eMlStiSouricXGt5QzwRoiXenxZa3SHhp7IhX/2oewos3i3mP9pi/nh+RV6u4NqVkWat3PIT1mvGfFqd6rsJyZIc8mZzDrC2MiOMASRSf6tuk9Oh/x9/QRLUXgnznTJYRjoAlyKlhf+gT4z5FO+IXoEHrhEUuM6ddMtWVbCxjaSflYKeN1hJ0p8Ee6b5VoSFbSRKwnOCm7EgHQkzUxFDPHRKD0GyD/nQro2K3jxdu6nudpjor09NeLY7QyOjQ9DpMBWfkBUtf3F1e8xJ8lB85ufkPqnRh/cZjqkRpeD7k7gaPGfUv1jrbe+FSx53zE8888cAy9twUgUFmBiFvLHpK/0zwiVNo/1TgHXXDcwMkcgApNVVOKjIID7cKfTv12Z3A3WEtdtFmBpNiQ4oTNDbXKBJxogmwJKVrJAOjL8xKqFUK6Zcq1n7jXc=
         run: |
           if ! echo "$EXPECTED_SOURCE" | grep -Eq '^[0-9a-f]{40}$'; then
             echo "::error::expected source revision must be a full lowercase 40-character SHA"
@@ -102,11 +99,15 @@ jobs:
             exit 1
           fi
 
-          ALLOWED_SIGNERS="${RUNNER_TEMP}/release-allowed-signers"
-          printf '%s\n' "$RELEASE_ALLOWED_SIGNER" > "$ALLOWED_SIGNERS"
-          git -c gpg.format=ssh \
-              -c gpg.ssh.allowedSignersFile="$ALLOWED_SIGNERS" \
-              verify-tag "$RELEASE_TAG"
+          # The release asset trust root is the GitHub OIDC/Sigstore
+          # attestation below. A tag must still carry a cryptographic
+          # signature, but signer trust is intentionally not pinned to a
+          # personal or server SSH key in this portable hosted-runner job.
+          if ! git cat-file -p "$TAG_REF" | \
+               grep -Eq '^-----BEGIN (SSH|PGP) SIGNATURE-----$'; then
+            echo "::error::${RELEASE_TAG} does not carry a cryptographic signature"
+            exit 1
+          fi
 
           # The commit the signed tag resolved to is the one identity every
           # later step verifies against. A moving or mismatched ref is fatal.
@@ -349,7 +350,7 @@ jobs:
                 repository: $repository,
                 ref: $ref,
                 artifactSourceRevision: $revision,
-                signedAnnotatedTagVerified: true
+                annotatedTagSignaturePresent: true
               },
               build: {
                 gatewayContract: $contract,
