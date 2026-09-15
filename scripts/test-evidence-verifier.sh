@@ -286,6 +286,7 @@ eligible = {
     metadata_path,
     "testdata/backend-contract/fixtures.json",
     "testdata/backend-contract/selectors/contract-meta-tests.v1.json",
+    "testdata/backend-contract/selectors/dispatcher-tests.v1.json",
     "testdata/backend-contract/selectors/handshake-tests.v1.json",
     "testdata/backend-contract/selectors/payload-tests.v1.json",
     "scripts/run-go-selector.sh",

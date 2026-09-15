@@ -51,9 +51,10 @@
       {"path": "contracts/backend-payloads/v1/status.schema.json", "sha256": "sha256:0f073acc350e667a2c738940a9c2db220c8254c71f9f1e31be80ec9e21e35262"},
       {"path": "contracts/backend-receipts/v1/operation-receipt.schema.json", "sha256": "sha256:ee630dccedd2f30921c2c4421e7e75b185188835ca086328f1e6ba52c37b7962"},
       {"path": "scripts/run-go-selector.sh", "sha256": "sha256:ece7cd587b3c1da1a6cdca692bdb025477d3dca0a27845d95d3bd5bbe9b22118"},
-      {"path": "scripts/test-evidence-verifier.sh", "sha256": "sha256:e680e9a7991c2c924ccc3184c31cb7bcc580f7dcccc772de10aa37818f8b4a49"},
+      {"path": "scripts/test-evidence-verifier.sh", "sha256": "sha256:653eac55a5b574a2032338f318df27a671958dae56983d36b7e1877a09662dbe"},
       {"path": "testdata/backend-contract/fixtures.json", "sha256": "sha256:94816b637095ff1a544881875cfc08ac41207af213ed6218b982a41197b9d4df"},
       {"path": "testdata/backend-contract/selectors/contract-meta-tests.v1.json", "sha256": "sha256:e61da3f93415fe79f66e939e78e352b5c2918e350bc5771275c4b268c7e90685"},
+      {"path": "testdata/backend-contract/selectors/dispatcher-tests.v1.json", "sha256": "sha256:79fda7e3c5bbaec8dad4ac090bafa21018fc0ae1309eab6294d1f8c1dac648d6"},
       {"path": "testdata/backend-contract/selectors/handshake-tests.v1.json", "sha256": "sha256:01cb023e2d7a718a24c97431ea75c8ee2b18b885bbcbd5b21527ee4d87f61130"},
       {"path": "testdata/backend-contract/selectors/mutants/extra.json", "sha256": "sha256:38b2570455c7f94bd3f4fc17b08e5c24176d97e4f73d289eebccf543b1cf4452"},
       {"path": "testdata/backend-contract/selectors/mutants/missing.json", "sha256": "sha256:a8010c22737f30fd4b2558dd270b6600344c778449f298f7f831e282871eab62"},
@@ -61,11 +62,11 @@
       {"path": "testdata/backend-contract/selectors/mutants/zero.json", "sha256": "sha256:cc63d7ce6572043f35768dbb637226b7f9daf6b47c3f18be2c888d496b6aeba8"},
       {"path": "testdata/backend-contract/selectors/payload-tests.v1.json", "sha256": "sha256:30e9e67672178df5fa23d230180f27415c673f32fdbbeab4d56b7c1f51f3c58d"}
     ],
-    "aggregateSha256": "sha256:d43966da29de7eeee7c944414139ffb1431d5ef560cdde15cf2c90f98070d59a"
+    "aggregateSha256": "sha256:df777da68ef3174e96cd7509e06efeae3b750e25d5dc67a19d07390d0e14a3bd"
   },
   "nonProof": [
-    "No CLI runtime consumer or dispatcher behavior is implemented or proven.",
-    "No GitHub workflow, Linux runtime, loxilb-app deployment, or installed-host result is proven.",
+    "CLI dispatcher behavior is proven only against fake backends; no Product-owned installed backend is implemented or proven.",
+    "No GitHub workflow, installed Product-backend Linux runtime, loxilb-app deployment, or installed-host result is proven.",
     "No Product, Gateway, OAM, UI, or eBPF implementation or paired integration is proven.",
     "No Product packaging, CP-1D, ProductLock, release or tag, clean-host, G7 trust, signing, or provenance is proven.",
     "DEVELOPMENT_UNVERIFIED means local candidate bytes and meta-validation only; CP-CLI approval is still required."

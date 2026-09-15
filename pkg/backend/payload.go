@@ -119,6 +119,15 @@ func tuple(command string) PayloadTuple {
 	return PayloadTuple{ContractMajor: contractMajor, SchemaVersion: payloadSchema, Command: command}
 }
 
+// PayloadTupleForCommand returns the exact contract tuple pinned by the
+// handshake for one JSON-capable operation. Keeping tuple construction in the
+// backend package prevents the command layer from duplicating version values.
+func PayloadTupleForCommand(command string) (PayloadTuple, bool) {
+	selected := tuple(command)
+	_, ok := payloadRegistry[selected]
+	return selected, ok
+}
+
 var payloadRegistry = map[PayloadTuple]payloadSpec{
 	tuple("status"): {
 		Tuple:        tuple("status"),

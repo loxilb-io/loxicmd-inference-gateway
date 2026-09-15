@@ -23,6 +23,8 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/backend"
 )
 
 // buildCLIWithBackend builds the packaged binary with the backend path
@@ -69,6 +71,12 @@ func runAppliance(t *testing.T, binary string, args ...string) (int, string, str
 
 const validApplianceBackendContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract","backendVersion":"fake-1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":"appliance-backend-payload/v1","commands":[{"name":"status","readOnly":true,"capabilities":["json-output"]},{"name":"network validate","readOnly":true,"capabilities":["json-output"]},{"name":"public-address configure","readOnly":false,"capabilities":["json-output","no-restart","operation-receipt"]},{"name":"gateway register-local","readOnly":false,"capabilities":["json-output","secret-stdin","operation-receipt"]},{"name":"credentials bootstrap","readOnly":false,"capabilities":["console-only"]},{"name":"diagnostics create","readOnly":false,"capabilities":["json-output","redaction","explicit-output","operation-receipt"]},{"name":"logs","readOnly":false,"capabilities":["json-output","redaction","bounded-window"]},{"name":"backup key-create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},{"name":"backup create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},{"name":"backup verify","readOnly":false,"capabilities":["json-output","key-file"]}]}`
 
+const validStatusPayload = `{"schemaVersion":"appliance-backend-payload/v1","command":"status","overallStatus":"DEGRADED","productRelease":"v0.9.8.9-rc.1","initialized":true,"planes":[{"name":"gateway","live":true,"ready":false,"reasonCode":"DEPENDENCY_PENDING"}],"networkProfile":{"name":"dual-nic","configured":true},"activeOperations":[],"localGatewayRegistration":{"registered":true,"installationId":"install-01","instanceId":"gateway-01"},"observedAt":"2026-09-15T00:00:00Z"}`
+
+const validNetworkPayload = `{"schemaVersion":"appliance-backend-payload/v1","command":"network validate","valid":true,"profile":"dual-nic","interfaces":[{"role":"frontend","name":"eth0","exists":true,"address":"192.0.2.10/24","mtu":1500}],"errors":[],"warnings":[{"code":"RP_FILTER_REVIEW","remediation":"Confirm the approved asymmetric-routing profile."}],"observedAt":"2026-09-15T00:00:00Z"}`
+
+const validGatewayRegistrationPayload = `{"schemaVersion":"appliance-backend-payload/v1","command":"gateway register-local","result":"UNCHANGED","operationId":"op-register-01","installationId":"install-01","instanceId":"gateway-01","endpoint":"https://127.0.0.1:11111","gatewayIdentity":{"name":"local-gateway","address":"192.0.2.10"},"verified":true,"markerUpdated":false}`
+
 func withValidHandshake(operationScript string) string {
 	return `if [ "$1" = "contract-version" ]; then
 cat <<'JSON'
@@ -85,8 +93,8 @@ fi
 func TestApplianceDispatch(t *testing.T) {
 	binary, _ := buildCLIWithBackend(t, withValidHandshake(
 		`case "$1" in
-status) if [ "$4" = "--json" ]; then echo '{"release":"v0.9.8.9-rc.1","planes":{"data":"READY"}}'; else echo "Appliance: READY"; fi ;;
-network) echo '{"profile":"single-arm","errors":[]}' ;;
+status) if [ "$4" = "--json" ]; then echo '`+validStatusPayload+`'; else echo "Appliance: READY"; fi ;;
+network) echo '`+validNetworkPayload+`' ;;
 *) echo "unknown" >&2; exit 64 ;;
 esac`))
 
@@ -110,7 +118,7 @@ esac`))
 			CorrelationID string `json:"correlationId"`
 			Data          struct {
 				Backend struct {
-					Release string `json:"release"`
+					ProductRelease string `json:"productRelease"`
 				} `json:"backend"`
 			} `json:"data"`
 		}
@@ -118,7 +126,7 @@ esac`))
 			t.Fatalf("stdout is not the envelope (%v): %s", err, stdout)
 		}
 		if doc.Kind != "CommandResult" || !doc.Success || doc.Command != "appliance.status" ||
-			doc.Data.Backend.Release != "v0.9.8.9-rc.1" {
+			doc.Data.Backend.ProductRelease != "v0.9.8.9-rc.1" {
 			t.Fatalf("unexpected envelope: %s", stdout)
 		}
 		if !strings.HasPrefix(doc.CorrelationID, "cli-") {
@@ -140,7 +148,7 @@ esac`))
 			t.Fatalf("stdout is not the envelope (%v): %s", err, stdout)
 		}
 		if status != 0 || doc.Command != "appliance.network.validate" ||
-			doc.Data.Backend.Profile != "single-arm" {
+			doc.Data.Backend.Profile != "dual-nic" {
 			t.Fatalf("status=%d stdout=%q", status, stdout)
 		}
 	})
@@ -209,8 +217,8 @@ func TestApplianceBackendFailures(t *testing.T) {
 	t.Run("non-json backend answer in json mode is a contract error", func(t *testing.T) {
 		binary, _ := buildCLIWithBackend(t, withValidHandshake("echo this is prose"))
 		status, stdout, _ := runAppliance(t, binary, "appliance", "status", "-o", "json")
-		if status != 6 || !strings.Contains(stdout, "contract-invalid") {
-			t.Fatalf("status=%d stdout=%q, want 6 + contract-invalid", status, stdout)
+		if status != 6 || !strings.Contains(stdout, backend.CodeBackendPayloadInvalid) {
+			t.Fatalf("status=%d stdout=%q, want 6 + %s", status, stdout, backend.CodeBackendPayloadInvalid)
 		}
 	})
 }
@@ -221,7 +229,7 @@ var mutatingFakeScript = withValidHandshake(`mkdir -p "$RECDIR" 2>/dev/null
 printf '%s\n' "$@" > "$RECDIR/argv"
 env > "$RECDIR/env"
 cat > "$RECDIR/stdin"
-echo '{"done":true}'`)
+echo '` + validGatewayRegistrationPayload + `'`)
 
 // TestApplianceMutatingDispatch proves the mutating path end to end: the
 // handshake gate, the secret's stdin-only travel, and the CLI-side

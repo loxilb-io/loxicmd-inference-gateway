@@ -57,6 +57,13 @@ and validates the response against `backend-contract.schema.json`. The rules:
 
 ## Result mapping
 
+- In JSON mode, the CLI selects the exact
+  `{contractMajor, schemaVersion, canonicalCommand}` payload tuple and exposes
+  backend bytes in `data.backend` only after strict validation. `json.Valid`
+  alone is not sufficient.
+- Exit `0` accepts only the selected command's success payload. Normal exits
+  `2`–`8` accept only a `BackendOperationError` whose command and exit match
+  the invocation; any supplied correlation ID must match as well.
 - Backend exit codes and error origins map onto the public exit-code
   taxonomy (`exit-codes.md`) without loss: the backend's own code is
   preserved verbatim in `data.componentCode` with `data.origin` = `backend`.
