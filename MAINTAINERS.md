@@ -11,6 +11,7 @@ one.
 | <img width="30px" src="https://avatars.githubusercontent.com/u/88170638">  | [Baekgyun Jung](https://github.com/backguynn)        |  Netlox   |
 | <img width="30px" src="https://avatars.githubusercontent.com/u/75723069">  | [Inho Gog (Renhao Chu)](https://github.com/inhogog2) |  Netlox   |
 | <img width="30px" src="https://avatars.githubusercontent.com/u/76096751">  | [SeokHwan Kong](https://github.com/NLX-SeokHwanKong)  |  Netlox   |
+| <img width="30px" src="https://avatars.githubusercontent.com/u/328939390"> | [loxilb-devel](https://github.com/loxilb-devel)      |  Netlox   |
 
 <!--
   Keep this list in sync with .github/CODEOWNERS. When adding or removing a maintainer, update both
