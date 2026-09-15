@@ -157,6 +157,13 @@ jobs:
               exit 1
               ;;
           esac
+          DRAFT_IDS="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft == true and .tag_name == \"${VERSION}\") | .id")"
+          if [ -n "$DRAFT_IDS" ]; then
+            echo "::error::draft release ${VERSION} already exists (id ${DRAFT_IDS//$'\n'/,}); refusing to replace or update it"
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -426,7 +433,17 @@ jobs:
           gh release create "$VERSION" "${ASSETS[@]}" "${CREATE_ARGS[@]}" \
             --repo "$GITHUB_REPOSITORY"
 
-          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${VERSION}")"
+          # GitHub intentionally returns 404 from /releases/tags/{tag} for a
+          # draft. Resolve the one draft by tag, then use its immutable API ID
+          # for verification and the publish transition.
+          DRAFT_ID="$(gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq ".[] | select(.draft == true and .tag_name == \"${VERSION}\") | .id")"
+          if ! [[ "$DRAFT_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::expected exactly one draft release for ${VERSION}; got ${DRAFT_ID//$'\n'/,}"
+            exit 1
+          fi
+          RELEASE_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${DRAFT_ID}")"
           if [ "$(jq -r '.draft' <<<"$RELEASE_JSON")" != true ]; then
             echo "::error::release must remain a draft until every uploaded asset is verified"
             exit 1
@@ -461,9 +478,10 @@ jobs:
             exit 1
           fi
 
-          gh release edit "$VERSION" --draft=false --latest=false \
-            --repo "$GITHUB_REPOSITORY"
-          PUBLISHED_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${VERSION}")"
+          gh api --method PATCH \
+            "repos/${GITHUB_REPOSITORY}/releases/${DRAFT_ID}" \
+            -F draft=false -f make_latest=false >/dev/null
+          PUBLISHED_JSON="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${DRAFT_ID}")"
           if [ "$(jq -r '.draft' <<<"$PUBLISHED_JSON")" != false ] || \
              [ "$(jq -r '.immutable' <<<"$PUBLISHED_JSON")" != true ]; then
             echo "::error::published release is not confirmed immutable"
