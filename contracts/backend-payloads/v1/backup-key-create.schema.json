@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/backup-key-create.schema.json",
+  "title": "backup key-create payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "operationId", "keyPath", "keyId", "fingerprint", "mode"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "backup key-create"},
+    "result": {"const": "CREATED"},
+    "operationId": {"type": "string", "minLength": 1},
+    "keyPath": {"type": "string", "pattern": "^/[^\\u0000]+$"},
+    "keyId": {"type": "string", "minLength": 1},
+    "fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mode": {"const": "0600"}
+  }
+}

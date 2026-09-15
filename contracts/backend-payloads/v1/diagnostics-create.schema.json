@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/diagnostics-create.schema.json",
+  "title": "diagnostics create payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "operationId", "archivePath", "sha256", "sizeBytes", "mode", "redactionProfile", "includedFiles", "secretScan", "expiresAt"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "diagnostics create"},
+    "result": {"const": "CREATED"},
+    "operationId": {"type": "string", "minLength": 1},
+    "archivePath": {"type": "string", "pattern": "^/[^\\u0000]+$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "sizeBytes": {"type": "integer", "minimum": 1},
+    "mode": {"const": "0600"},
+    "redactionProfile": {"type": "string", "minLength": 1},
+    "includedFiles": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^/[^\\u0000]+$"}},
+    "secretScan": {"type": "object", "additionalProperties": false, "required": ["result", "hits"], "properties": {"result": {"const": "PASS"}, "hits": {"const": 0}}},
+    "expiresAt": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "cli-appliance-command-metadata/v1",
+  "contractMajor": 1,
+  "payloadSchemaVersion": "appliance-backend-payload/v1",
+  "effectPolicy": "CONSERVATIVE_V1",
+  "capabilityVocabulary": ["json-output", "no-restart", "secret-stdin", "redaction", "explicit-output", "bounded-window", "key-file", "operation-receipt", "console-only"],
+  "commands": [
+    {"canonicalCommand": "status", "cliCommand": "appliance status", "readOnly": true, "successfulJsonTarget": true, "requiredCapabilities": ["json-output"], "payloadSchema": "contracts/backend-payloads/v1/status.schema.json"},
+    {"canonicalCommand": "network validate", "cliCommand": "appliance network validate", "readOnly": true, "successfulJsonTarget": true, "requiredCapabilities": ["json-output"], "payloadSchema": "contracts/backend-payloads/v1/network-validate.schema.json"},
+    {"canonicalCommand": "public-address configure", "cliCommand": "appliance public-address configure IPV4 [--no-restart]", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "no-restart", "operation-receipt"], "payloadSchema": "contracts/backend-payloads/v1/public-address-configure.schema.json"},
+    {"canonicalCommand": "gateway register-local", "cliCommand": "appliance gateway register-local --username NAME --password-file PATH", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "secret-stdin", "operation-receipt"], "payloadSchema": "contracts/backend-payloads/v1/gateway-register-local.schema.json"},
+    {"canonicalCommand": "credentials bootstrap", "cliCommand": "appliance credentials bootstrap", "readOnly": false, "successfulJsonTarget": false, "requiredCapabilities": ["console-only"], "payloadSchema": null},
+    {"canonicalCommand": "diagnostics create", "cliCommand": "appliance diagnostics create --redact [--output PATH]", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "redaction", "explicit-output", "operation-receipt"], "payloadSchema": "contracts/backend-payloads/v1/diagnostics-create.schema.json"},
+    {"canonicalCommand": "logs", "cliCommand": "appliance logs COMPONENT --redact [--since DURATION] [--lines N]", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "redaction", "bounded-window"], "payloadSchema": "contracts/backend-payloads/v1/logs.schema.json"},
+    {"canonicalCommand": "backup key-create", "cliCommand": "appliance backup key-create --key-file PATH", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "key-file", "operation-receipt"], "payloadSchema": "contracts/backend-payloads/v1/backup-key-create.schema.json"},
+    {"canonicalCommand": "backup create", "cliCommand": "appliance backup create ARCHIVE --key-file PATH", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "key-file", "operation-receipt"], "payloadSchema": "contracts/backend-payloads/v1/backup-create.schema.json"},
+    {"canonicalCommand": "backup verify", "cliCommand": "appliance backup verify ARCHIVE --key-file PATH", "readOnly": false, "successfulJsonTarget": true, "requiredCapabilities": ["json-output", "key-file"], "payloadSchema": "contracts/backend-payloads/v1/backup-verify.schema.json"}
+  ]
+}

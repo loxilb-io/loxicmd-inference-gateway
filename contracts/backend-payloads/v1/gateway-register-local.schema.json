@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/gateway-register-local.schema.json",
+  "title": "gateway register-local payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "operationId", "installationId", "instanceId", "endpoint", "gatewayIdentity", "verified", "markerUpdated"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "gateway register-local"},
+    "result": {"enum": ["CREATED", "UPDATED", "UNCHANGED"]},
+    "operationId": {"type": "string", "minLength": 1},
+    "installationId": {"type": "string", "minLength": 1},
+    "instanceId": {"type": "string", "minLength": 1},
+    "endpoint": {"type": "string", "format": "uri", "pattern": "^https://"},
+    "gatewayIdentity": {"type": "object", "additionalProperties": false, "required": ["name", "address"], "properties": {"name": {"type": "string", "minLength": 1}, "address": {"type": "string", "format": "ipv4"}}},
+    "verified": {"const": true},
+    "markerUpdated": {"type": "boolean"}
+  }
+}

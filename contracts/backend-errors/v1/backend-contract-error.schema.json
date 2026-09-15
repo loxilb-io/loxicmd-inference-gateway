@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/backend-contract-error.schema.json",
+  "title": "BackendContractError CLI-WP00 candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "exit", "code", "componentCode", "retryable"],
+  "properties": {
+    "schemaVersion": {"const": "backend-contract-error/v1"},
+    "exit": {"enum": [4, 5, 6]},
+    "code": {"enum": ["PRECONDITION", "UNAVAILABLE", "CONTRACT_MISMATCH"]},
+    "componentCode": {"enum": ["BACKEND_RELEASE_MARKER_MISSING", "BACKEND_RELEASE_MARKER_INVALID", "BACKEND_CONTRACT_INVALID", "BACKEND_HANDSHAKE_UNAVAILABLE"]},
+    "retryable": {"type": "boolean"},
+    "message": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000-\\u001F\\u007F]+$"}
+  },
+  "oneOf": [
+    {"properties": {"exit": {"const": 4}, "code": {"const": "PRECONDITION"}, "componentCode": {"const": "BACKEND_RELEASE_MARKER_MISSING"}, "retryable": {"const": false}}},
+    {"properties": {"exit": {"const": 6}, "code": {"const": "CONTRACT_MISMATCH"}, "componentCode": {"const": "BACKEND_RELEASE_MARKER_INVALID"}, "retryable": {"const": false}}},
+    {"properties": {"exit": {"const": 6}, "code": {"const": "CONTRACT_MISMATCH"}, "componentCode": {"const": "BACKEND_CONTRACT_INVALID"}, "retryable": {"const": false}}},
+    {"properties": {"exit": {"const": 5}, "code": {"const": "UNAVAILABLE"}, "componentCode": {"const": "BACKEND_HANDSHAKE_UNAVAILABLE"}, "retryable": {"const": true}}}
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/status.schema.json",
+  "title": "status payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "overallStatus", "productRelease", "initialized", "planes", "networkProfile", "activeOperations", "localGatewayRegistration", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "status"},
+    "overallStatus": {"enum": ["READY", "DEGRADED", "NOT_READY", "UNKNOWN"]},
+    "productRelease": {"type": "string", "minLength": 1},
+    "initialized": {"type": "boolean"},
+    "planes": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["name", "live", "ready", "reasonCode"], "properties": {"name": {"type": "string", "minLength": 1}, "live": {"type": "boolean"}, "ready": {"type": "boolean"}, "reasonCode": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}}}},
+    "networkProfile": {"type": "object", "additionalProperties": false, "required": ["name", "configured"], "properties": {"name": {"type": "string", "minLength": 1}, "configured": {"type": "boolean"}}},
+    "activeOperations": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "localGatewayRegistration": {"type": "object", "additionalProperties": false, "required": ["registered", "installationId", "instanceId"], "properties": {"registered": {"type": "boolean"}, "installationId": {"type": "string"}, "instanceId": {"type": "string"}}},
+    "observedAt": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

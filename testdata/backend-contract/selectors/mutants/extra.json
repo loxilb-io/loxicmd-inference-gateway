@@ -1,0 +1,6 @@
+{
+  "schemaVersion": "cli-wp00-selector-mutant/v1",
+  "mutant": "extra",
+  "operation": "add",
+  "caseId": "payload.restore.positive"
+}

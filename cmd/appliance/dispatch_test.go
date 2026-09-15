@@ -67,16 +67,28 @@ func runAppliance(t *testing.T, binary string, args ...string) (int, string, str
 	return status, stdout.String(), stderr.String()
 }
 
+const validApplianceBackendContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract","backendVersion":"fake-1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":"appliance-backend-payload/v1","commands":[{"name":"status","readOnly":true,"capabilities":["json-output"]},{"name":"network validate","readOnly":true,"capabilities":["json-output"]},{"name":"public-address configure","readOnly":false,"capabilities":["json-output","no-restart","operation-receipt"]},{"name":"gateway register-local","readOnly":false,"capabilities":["json-output","secret-stdin","operation-receipt"]},{"name":"credentials bootstrap","readOnly":false,"capabilities":["console-only"]},{"name":"diagnostics create","readOnly":false,"capabilities":["json-output","redaction","explicit-output","operation-receipt"]},{"name":"logs","readOnly":false,"capabilities":["json-output","redaction","bounded-window"]},{"name":"backup key-create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},{"name":"backup create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},{"name":"backup verify","readOnly":false,"capabilities":["json-output","key-file"]}]}`
+
+func withValidHandshake(operationScript string) string {
+	return `if [ "$1" = "contract-version" ]; then
+cat <<'JSON'
+` + validApplianceBackendContract + `
+JSON
+exit 0
+fi
+` + operationScript
+}
+
 // TestApplianceDispatch proves the family end to end through the packaged
 // binary: no gateway is running anywhere in this test, which is itself a
 // contract clause — appliance commands must work with the gateway down.
 func TestApplianceDispatch(t *testing.T) {
-	binary, _ := buildCLIWithBackend(t,
+	binary, _ := buildCLIWithBackend(t, withValidHandshake(
 		`case "$1" in
 status) if [ "$4" = "--json" ]; then echo '{"release":"v0.9.8.9-rc.1","planes":{"data":"READY"}}'; else echo "Appliance: READY"; fi ;;
 network) echo '{"profile":"single-arm","errors":[]}' ;;
 *) echo "unknown" >&2; exit 64 ;;
-esac`)
+esac`))
 
 	t.Run("status human passthrough exits 0", func(t *testing.T) {
 		status, stdout, stderr := runAppliance(t, binary, "appliance", "status")
@@ -164,7 +176,7 @@ esac`)
 // taxonomy with the backend's own signal preserved.
 func TestApplianceBackendFailures(t *testing.T) {
 	t.Run("backend refusal exits 7 with its code preserved", func(t *testing.T) {
-		binary, _ := buildCLIWithBackend(t, "echo broken-state >&2\nexit 12")
+		binary, _ := buildCLIWithBackend(t, withValidHandshake("echo broken-state >&2\nexit 12"))
 		status, stdout, stderr := runAppliance(t, binary, "appliance", "status", "-o", "json")
 		if status != 7 {
 			t.Fatalf("status=%d, want 7\nstderr=%q", status, stderr)
@@ -195,7 +207,7 @@ func TestApplianceBackendFailures(t *testing.T) {
 	})
 
 	t.Run("non-json backend answer in json mode is a contract error", func(t *testing.T) {
-		binary, _ := buildCLIWithBackend(t, "echo this is prose")
+		binary, _ := buildCLIWithBackend(t, withValidHandshake("echo this is prose"))
 		status, stdout, _ := runAppliance(t, binary, "appliance", "status", "-o", "json")
 		if status != 6 || !strings.Contains(stdout, "contract-invalid") {
 			t.Fatalf("status=%d stdout=%q, want 6 + contract-invalid", status, stdout)
@@ -203,17 +215,13 @@ func TestApplianceBackendFailures(t *testing.T) {
 	})
 }
 
-// mutatingFake answers the handshake advertising the full mutating slice
+// mutatingFake answers the handshake advertising the full approved slice
 // and records what reaches each channel.
-const mutatingFakeScript = `mkdir -p "$RECDIR" 2>/dev/null
+var mutatingFakeScript = withValidHandshake(`mkdir -p "$RECDIR" 2>/dev/null
 printf '%s\n' "$@" > "$RECDIR/argv"
 env > "$RECDIR/env"
 cat > "$RECDIR/stdin"
-if [ "$1" = "contract-version" ]; then
-  echo '{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract","backendVersion":"0.1.0","productRelease":"rc","schemaVersion":1,"commands":[{"name":"gateway register-local","readOnly":false,"capabilities":[]},{"name":"logs","readOnly":false,"capabilities":[]}]}'
-else
-  echo '{"done":true}'
-fi`
+echo '{"done":true}'`)
 
 // TestApplianceMutatingDispatch proves the mutating path end to end: the
 // handshake gate, the secret's stdin-only travel, and the CLI-side
@@ -260,11 +268,11 @@ func TestApplianceMutatingDispatch(t *testing.T) {
 		}
 	})
 
-	t.Run("unadvertised mutating command exits 6 after the handshake", func(t *testing.T) {
+	t.Run("advertised public-address command dispatches after the handshake", func(t *testing.T) {
 		status, _, stderr := runAppliance(t, binary,
 			"appliance", "public-address", "configure", "203.0.113.10")
-		if status != 6 || !strings.Contains(stderr, "does not provide") {
-			t.Fatalf("status=%d stderr=%q, want 6 + the unadvertised refusal", status, stderr)
+		if status != 0 {
+			t.Fatalf("status=%d stderr=%q, want successful dispatch", status, stderr)
 		}
 	})
 

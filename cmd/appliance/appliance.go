@@ -167,9 +167,8 @@ type applianceData struct {
 }
 
 // dispatchReadOnly invokes a read-only backend subcommand and renders the
-// outcome. Read-only commands skip the contract-version handshake (it is
-// required before mutating calls only): the invocation itself is the
-// availability probe, and an absent backend classifies as unavailable.
+// outcome. The backend package performs the contract-version handshake first;
+// only a typed degraded-handshake class may continue to one best-effort read.
 func dispatchReadOnly(out io.Writer, restOptions *api.RESTOptions, command, subcommand string) error {
 	jsonOut := restOptions.PrintOption == "json"
 	ctx, cancel := requestContext(restOptions)

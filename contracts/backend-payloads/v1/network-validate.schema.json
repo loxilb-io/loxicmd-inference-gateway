@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/network-validate.schema.json",
+  "title": "network validate payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "valid", "profile", "interfaces", "errors", "warnings", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "network validate"},
+    "valid": {"type": "boolean"},
+    "profile": {"type": "string", "minLength": 1},
+    "interfaces": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["role", "name", "exists", "address", "mtu"], "properties": {"role": {"enum": ["frontend", "backend", "management"]}, "name": {"type": "string", "minLength": 1}, "exists": {"type": "boolean"}, "address": {"type": "string"}, "mtu": {"type": "integer", "minimum": 576, "maximum": 9216}}}},
+    "errors": {"$ref": "#/$defs/findings"},
+    "warnings": {"$ref": "#/$defs/findings"},
+    "observedAt": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  },
+  "$defs": {"findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["code", "remediation"], "properties": {"code": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}, "remediation": {"type": "string", "minLength": 1}}}}}
+}

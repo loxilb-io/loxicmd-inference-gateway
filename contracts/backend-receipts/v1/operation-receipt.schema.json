@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/operation-receipt.schema.json",
+  "title": "OperationReceipt CLI-WP00 candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "operationId", "correlationId", "command", "effect", "startedAt", "finishedAt", "result", "stateEvidence"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-operation-receipt/v1"},
+    "operationId": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._:-]+$"},
+    "correlationId": {"type": "string", "minLength": 1, "pattern": "^[A-Za-z0-9._:-]+$"},
+    "command": {"enum": ["public-address configure", "gateway register-local", "diagnostics create", "backup key-create", "backup create"]},
+    "effect": {"enum": ["NONE", "APPLIED", "CREATED", "UPDATED", "UNCHANGED", "PENDING_RESTART", "VERIFIED", "PARTIAL"]},
+    "startedAt": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "finishedAt": {"type": "string", "format": "date-time", "pattern": "Z$"},
+    "result": {"enum": ["PASS", "PARTIAL", "FAIL"]},
+    "stateEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["oracle", "beforeDigest", "afterDigest", "delta"],
+      "properties": {
+        "oracle": {"enum": ["HOST_STATE", "OAM_READBACK", "ARTIFACT", "ARCHIVE_AUTHENTICATION"]},
+        "beforeDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "afterDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "delta": {"type": "integer", "minimum": 0, "maximum": 1},
+        "artifactPath": {"type": "string", "pattern": "^/[^\\u0000]+$"}
+      }
+    },
+    "recoveryGuidance": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000-\\u001F\\u007F]+$"}
+  },
+  "allOf": [
+    {"if": {"properties": {"effect": {"const": "PARTIAL"}}, "required": ["effect"]}, "then": {"properties": {"result": {"const": "PARTIAL"}}, "required": ["recoveryGuidance"]}},
+    {"if": {"properties": {"result": {"const": "PARTIAL"}}, "required": ["result"]}, "then": {"properties": {"effect": {"const": "PARTIAL"}}, "required": ["recoveryGuidance"]}},
+    {"if": {"properties": {"effect": {"enum": ["APPLIED", "CREATED", "UPDATED", "PENDING_RESTART"]}}, "required": ["effect"]}, "then": {"properties": {"stateEvidence": {"properties": {"delta": {"const": 1}}}}}},
+    {"if": {"properties": {"effect": {"enum": ["NONE", "UNCHANGED", "VERIFIED"]}}, "required": ["effect"]}, "then": {"properties": {"stateEvidence": {"properties": {"delta": {"const": 0}}}}}}
+  ]
+}

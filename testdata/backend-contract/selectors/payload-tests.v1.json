@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "cli-go-test-selector/v1",
+  "selectorId": "CLI-WP02-PAYLOAD-VALIDATION",
+  "package": "./pkg/backend",
+  "suites": [
+    {
+      "name": "manifest",
+      "tests": [
+        "TestCLIWP02ManifestPreservesApprovedSchemaAndFixtureDigests",
+        "TestCLIWP02ManifestDetectsIdentityMutants"
+      ]
+    },
+    {
+      "name": "decoder",
+      "tests": [
+        "TestCLIWP02DecoderAcceptsExactPositiveDocument",
+        "TestCLIWP02DecoderRejectsStructuralMutants",
+        "TestCLIWP02DecoderPreservesTypedEvidence"
+      ]
+    },
+    {
+      "name": "validators",
+      "tests": [
+        "TestCLIWP02ValidatorsAcceptNinePositiveFixtures",
+        "TestCLIWP02ValidatorsRejectExpandedSemanticMutants",
+        "TestCLIWP02ValidatorsAcceptSchemaDefinedPartial",
+        "TestCLIWP02ValidatorsAcceptOperationErrorFixtures",
+        "TestCLIWP02ValidatorsRejectOperationErrorMutants",
+        "TestCLIWP02ValidatorsRejectSchemaSemantics"
+      ]
+    },
+    {
+      "name": "parity",
+      "tests": [
+        "TestCLIWP02ParityMatchesSchemasFixturesAndRegistry",
+        "TestCLIWP02ParityRejectsOneSidedDrift"
+      ]
+    }
+  ],
+  "accounting": {
+    "requiredSetEquality": ["declared", "discovered", "selected", "started", "terminal", "executed"],
+    "allowedFailed": 0,
+    "allowedSkipped": 0,
+    "allowedOmitted": 0
+  },
+  "requiredSelectorMutants": ["zero", "missing", "extra", "renamed"]
+}

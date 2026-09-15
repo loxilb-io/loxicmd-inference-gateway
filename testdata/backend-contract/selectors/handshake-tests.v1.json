@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "cli-go-test-selector/v1",
+  "selectorId": "CLI-WP01-HANDSHAKE-METADATA",
+  "package": "./pkg/backend",
+  "suites": [
+    {
+      "name": "handshake",
+      "tests": [
+        "TestCLIWP01HandshakeAcceptsExactContract",
+        "TestCLIWP01HandshakeApprovedFixtureIdentity",
+        "TestCLIWP01HandshakeRejectsDocumentShapeMutants",
+        "TestCLIWP01HandshakeMapsTypedFailures",
+        "TestCLIWP01HandshakeRejectsTypedFailureMutants",
+        "TestCLIWP01HandshakeIgnoresStderrMutation"
+      ]
+    },
+    {
+      "name": "capability",
+      "tests": [
+        "TestCLIWP01CapabilityAllowsExactMetadata",
+        "TestCLIWP01CapabilityRejectsMetadataMutantsWithoutOperationSpawn",
+        "TestCLIWP01CapabilityRejectsInvalidArgvWithoutOperationSpawn",
+        "TestCLIWP01CapabilityRejectsSecretMismatchWithoutOperationSpawn"
+      ]
+    },
+    {
+      "name": "degraded",
+      "tests": [
+        "TestCLIWP01DegradedRunsReadOnlyOnceAndDiscardsJSON",
+        "TestCLIWP01DegradedDoesNotRunWhenExecutableUnavailableOrForbidden",
+        "TestCLIWP01DegradedPreservesTypedHandshakeStatus",
+        "TestCLIWP01DegradedAcceptsGatewayNotReadyObservation"
+      ]
+    }
+  ],
+  "accounting": {
+    "requiredSetEquality": ["declared", "discovered", "selected", "started", "terminal", "executed"],
+    "allowedFailed": 0,
+    "allowedSkipped": 0,
+    "allowedOmitted": 0
+  },
+  "requiredSelectorMutants": ["zero", "missing", "extra", "renamed"]
+}
