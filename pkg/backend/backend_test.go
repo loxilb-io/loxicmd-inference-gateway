@@ -29,9 +29,18 @@ import (
 
 // validContract is a handshake document that satisfies every schema rule.
 const validContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract",` +
-	`"backendVersion":"0.1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":1,` +
-	`"commands":[{"name":"status","readOnly":true,"capabilities":["json-output"]},` +
-	`{"name":"network validate","readOnly":true,"capabilities":[]}]}`
+	`"backendVersion":"0.1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":"appliance-backend-payload/v1",` +
+	`"commands":[` +
+	`{"name":"status","readOnly":true,"capabilities":["json-output"]},` +
+	`{"name":"network validate","readOnly":true,"capabilities":["json-output"]},` +
+	`{"name":"public-address configure","readOnly":false,"capabilities":["json-output","no-restart","operation-receipt"]},` +
+	`{"name":"gateway register-local","readOnly":false,"capabilities":["json-output","secret-stdin","operation-receipt"]},` +
+	`{"name":"credentials bootstrap","readOnly":false,"capabilities":["console-only"]},` +
+	`{"name":"diagnostics create","readOnly":false,"capabilities":["json-output","redaction","explicit-output","operation-receipt"]},` +
+	`{"name":"logs","readOnly":false,"capabilities":["json-output","redaction","bounded-window"]},` +
+	`{"name":"backup key-create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},` +
+	`{"name":"backup create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},` +
+	`{"name":"backup verify","readOnly":false,"capabilities":["json-output","key-file"]}]}`
 
 // fakeBackend writes an executable script standing in for the host backend
 // and points the adapter at it. The script records its argv and environment
@@ -77,7 +86,7 @@ func TestAbsentBackendIsUnavailable(t *testing.T) {
 }
 
 func TestInvokeSpawnsAllowlistedArgvWithScrubbedEnv(t *testing.T) {
-	dir := fakeBackend(t, `echo '{"ok":true}'`)
+	dir := fakeBackend(t, contractThenEcho(validContract))
 	// A canary in the caller's environment must never reach the child:
 	// the invocation contract fixes the child environment CLI-side.
 	t.Setenv("LOXICMD_TEST_CANARY", "must-not-be-forwarded")
@@ -111,7 +120,10 @@ func TestInvokeRejectsUnlistedSubcommandBeforeSpawn(t *testing.T) {
 }
 
 func TestInvokePreservesStreamsAndExit(t *testing.T) {
-	fakeBackend(t, "echo partial-out\necho boom >&2\nexit 3")
+	fakeBackend(t, `if [ "$1" = "contract-version" ]; then echo '`+validContract+`'; exit 0; fi
+echo partial-out
+echo boom >&2
+exit 3`)
 	res, err := Invoke(context.Background(), "status", false)
 	if err != nil {
 		t.Fatalf("a backend refusal must be a result, not an exec error: %v", err)
@@ -128,14 +140,14 @@ func TestHandshakeAcceptsAValidContract(t *testing.T) {
 	if err != nil {
 		t.Fatalf("handshake failed: %v", err)
 	}
-	if contract.BackendVersion != "0.1.0" || contract.SchemaVersion != 1 {
+	if contract.BackendVersion != "0.1.0" || contract.SchemaVersion != payloadSchema {
 		t.Fatalf("contract fields lost: %+v", contract)
 	}
 	if !contract.Supports("status") || !contract.Supports("network validate") {
 		t.Fatalf("advertised commands lost: %+v", contract.Commands)
 	}
-	if contract.Supports("backup create") {
-		t.Fatal("an unadvertised command reported as supported")
+	if !contract.Supports("backup create") || contract.Supports("restore") {
+		t.Fatal("exact command availability was not preserved")
 	}
 }
 
@@ -144,15 +156,15 @@ func TestHandshakeRefusesContractViolations(t *testing.T) {
 		document      string
 		componentCode string
 	}{
-		"not json": {"contract says hello", "contract-invalid"},
+		"not json": {"contract says hello", codeBackendContractInvalid},
 		"wrong kind": {strings.Replace(validContract, `"BackendContract"`, `"SomethingElse"`, 1),
-			"contract-invalid"},
-		"unknown field": {strings.Replace(validContract, `"schemaVersion":1`, `"schemaVersion":1,"extra":true`, 1),
-			"contract-invalid"},
-		"zero schema version": {strings.Replace(validContract, `"schemaVersion":1`, `"schemaVersion":0`, 1),
-			"contract-invalid"},
+			codeBackendContractInvalid},
+		"unknown field": {strings.Replace(validContract, `"schemaVersion":"appliance-backend-payload/v1"`, `"schemaVersion":"appliance-backend-payload/v1","extra":true`, 1),
+			codeBackendContractInvalid},
+		"wrong schema version": {strings.Replace(validContract, `"schemaVersion":"appliance-backend-payload/v1"`, `"schemaVersion":"appliance-backend-payload/v2"`, 1),
+			codeBackendContractInvalid},
 		"malformed command name": {strings.Replace(validContract, `"name":"status"`, `"name":"Status!"`, 1),
-			"contract-invalid"},
+			codeBackendContractInvalid},
 		"unsupported major": {strings.Replace(validContract, "appliance-backend/v1", "appliance-backend/v2", 1),
 			"contract-major-unsupported"},
 	} {
@@ -167,16 +179,16 @@ func TestHandshakeRefusesContractViolations(t *testing.T) {
 func TestHandshakeFailureExitIsUnavailable(t *testing.T) {
 	fakeBackend(t, "echo not-today >&2\nexit 9")
 	_, err := Handshake(context.Background())
-	ce := requireCLIError(t, err, exitcode.Unavailable, CodeBackendUnavailable)
-	if !strings.Contains(ce.Message, "not-today") {
-		t.Fatalf("handshake failure dropped the backend's stderr: %v", ce)
+	ce := requireCLIError(t, err, exitcode.ContractMismatch, codeBackendContractInvalid)
+	if strings.Contains(ce.Message, "not-today") {
+		t.Fatalf("handshake classification parsed mutable stderr prose: %v", ce)
 	}
 }
 
 // mutatingContract advertises the mutating slice this CLI ships, so gate
 // tests can exercise both sides of Supports.
 const mutatingContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract",` +
-	`"backendVersion":"0.1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":1,` +
+	`"backendVersion":"0.1.0","productRelease":"v0.9.8.9-rc.1","schemaVersion":"appliance-backend-payload/v1",` +
 	`"commands":[{"name":"gateway register-local","readOnly":false,"capabilities":[]},` +
 	`{"name":"logs","readOnly":false,"capabilities":["redaction"]}]}`
 
@@ -212,7 +224,7 @@ func TestMutatingRunsTheHandshakeFirstAndRefusesUnadvertised(t *testing.T) {
 	dir := fakeBackend(t, contractThenEcho(mutatingContract))
 	_, err := InvokeMutating(context.Background(), &Request{
 		Subcommand: "backup create", Args: []string{"/root/a.tar", "--key-file", "/root/k"}})
-	requireCLIError(t, err, exitcode.ContractMismatch, "command-unavailable")
+	requireCLIError(t, err, exitcode.ContractMismatch, codeBackendContractInvalid)
 	// The handshake ran; the refused subcommand itself never spawned.
 	argv, _ := os.ReadFile(filepath.Join(dir, "argv"))
 	if !strings.Contains(string(argv), "contract-version") {
@@ -224,7 +236,7 @@ func TestMutatingRunsTheHandshakeFirstAndRefusesUnadvertised(t *testing.T) {
 }
 
 func TestMutatingSecretTravelsOnStdinOnly(t *testing.T) {
-	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	dir := fakeBackend(t, contractThenEcho(validContract))
 	secret := "correcthorsebatterystaple"
 	res, err := InvokeMutating(context.Background(), &Request{
 		Subcommand: "gateway register-local",
@@ -252,7 +264,7 @@ func TestMutatingSecretTravelsOnStdinOnly(t *testing.T) {
 }
 
 func TestMutatingRefusesSecretForNonSecretSubcommand(t *testing.T) {
-	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	dir := fakeBackend(t, contractThenEcho(validContract))
 	_, err := InvokeMutating(context.Background(), &Request{
 		Subcommand: "logs", Args: []string{"gateway", "--redact"},
 		Secret: strings.NewReader("sneaky"),
@@ -264,7 +276,7 @@ func TestMutatingRefusesSecretForNonSecretSubcommand(t *testing.T) {
 }
 
 func TestReadOnlyEntryRefusesMutatingSubcommands(t *testing.T) {
-	dir := fakeBackend(t, contractThenEcho(mutatingContract))
+	dir := fakeBackend(t, contractThenEcho(validContract))
 	_, err := Invoke(context.Background(), "logs", false)
 	requireCLIError(t, err, exitcode.ContractMismatch, "argv-not-allowlisted")
 	if argv, _ := os.ReadFile(filepath.Join(dir, "argv")); strings.Contains(string(argv), "logs") {

@@ -17,7 +17,6 @@ package appliance
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -76,14 +75,15 @@ func dispatchMutating(out io.Writer, restOptions *api.RESTOptions, command strin
 	defer cancel()
 
 	res, err := backend.InvokeMutating(ctx, req)
+	var validated *backend.ValidatedPayload
 	if err == nil {
 		// mutating: a death mid-flight leaves host state unknown, which the
 		// taxonomy reports as PARTIAL rather than as a retryable failure.
-		err = backendOutcome(req.Subcommand, res, true)
+		validated, err = resolveBackendOutcome(req.Subcommand, res, true, req.JSON)
 	}
 	if err != nil {
 		if req.JSON {
-			writeEnvelope(out, command, res, err)
+			writeEnvelope(out, command, res, validated, err)
 		}
 		return err
 	}
@@ -91,17 +91,7 @@ func dispatchMutating(out io.Writer, restOptions *api.RESTOptions, command strin
 		_, werr := out.Write(res.Stdout)
 		return werr
 	}
-	if !json.Valid(res.Stdout) {
-		err = &exitcode.CLIError{
-			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("the backend's %s output is not a JSON document", req.Subcommand),
-			Origin:        "backend",
-			ComponentCode: "contract-invalid",
-		}
-		writeEnvelope(out, command, res, err)
-		return err
-	}
-	writeEnvelope(out, command, res, nil)
+	writeEnvelope(out, command, res, validated, nil)
 	return nil
 }
 

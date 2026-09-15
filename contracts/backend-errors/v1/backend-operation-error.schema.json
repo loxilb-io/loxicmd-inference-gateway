@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/backend-operation-error.schema.json",
+  "title": "BackendOperationError CP-CLI candidate",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "exit", "code", "origin", "componentCode", "retryable"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"enum": ["status", "network validate", "public-address configure", "gateway register-local", "diagnostics create", "logs", "backup key-create", "backup create", "backup verify"]},
+    "result": {"enum": ["ERROR", "PARTIAL"]},
+    "exit": {"enum": [2, 3, 4, 5, 6, 7, 8]},
+    "code": {"enum": ["INVALID_ARGUMENT", "AUTH", "PRECONDITION", "UNAVAILABLE", "CONTRACT_MISMATCH", "FAILED", "PARTIAL"]},
+    "origin": {"const": "backend"},
+    "componentCode": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+    "retryable": {"type": "boolean"},
+    "message": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000-\\u001F\\u007F]+$"},
+    "correlationId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "operationId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "recoveryGuidance": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[^\\u0000-\\u001F\\u007F]+$"}
+  },
+  "oneOf": [
+    {"properties": {"result": {"const": "ERROR"}, "exit": {"const": 2}, "code": {"const": "INVALID_ARGUMENT"}, "retryable": {"const": false}}},
+    {"properties": {"result": {"const": "ERROR"}, "exit": {"const": 3}, "code": {"const": "AUTH"}, "retryable": {"const": false}}},
+    {"properties": {"result": {"const": "ERROR"}, "exit": {"const": 4}, "code": {"const": "PRECONDITION"}, "retryable": {"const": false}}},
+    {"properties": {"result": {"const": "ERROR"}, "exit": {"const": 5}, "code": {"const": "UNAVAILABLE"}, "retryable": {"const": true}}},
+    {"properties": {"result": {"const": "ERROR"}, "exit": {"const": 6}, "code": {"const": "CONTRACT_MISMATCH"}, "retryable": {"const": false}}},
+    {"properties": {"result": {"const": "ERROR"}, "exit": {"const": 7}, "code": {"const": "FAILED"}, "retryable": {"const": false}}},
+    {"required": ["operationId", "recoveryGuidance"], "properties": {"result": {"const": "PARTIAL"}, "exit": {"const": 8}, "code": {"const": "PARTIAL"}, "retryable": {"const": false}}}
+  ]
+}

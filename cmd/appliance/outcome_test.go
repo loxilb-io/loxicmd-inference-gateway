@@ -26,18 +26,7 @@ import (
 
 // outcomeBackend answers the handshake, advertises the mutating command used
 // below, and hangs on it so the invocation has to be stopped from outside.
-const outcomeBackend = `
-if [ "$1" = "contract-version" ]; then
-cat <<JSON
-{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract",
- "backendVersion":"fake-1.0","productRelease":"qa","schemaVersion":1,
- "commands":[{"name":"status","readOnly":true,"capabilities":[]},
-             {"name":"backup create","readOnly":false,"capabilities":[]}]}
-JSON
-exit 0
-fi
-exec sleep 60
-`
+var outcomeBackend = withValidHandshake("exec sleep 60\n")
 
 func envelopeOf(t *testing.T, stdout string) map[string]any {
 	t.Helper()
@@ -120,11 +109,10 @@ func TestKilledReadOnlyIsNotPartial(t *testing.T) {
 // into PARTIAL would make the code meaningless -- exit 8 has to keep meaning
 // "nobody knows", or automation cannot use it to stop.
 func TestDecidedFailureStaysFailed(t *testing.T) {
-	binary, _ := buildCLIWithBackend(t, `
-if [ "$1" = "contract-version" ]; then echo '{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"BackendContract","backendVersion":"f","productRelease":"q","schemaVersion":1,"commands":[{"name":"status","readOnly":true,"capabilities":[]}]}'; exit 0; fi
+	binary, _ := buildCLIWithBackend(t, withValidHandshake(`
 echo "the backend decided to refuse" >&2
 exit 42
-`)
+`))
 	status, stdout, _ := runAppliance(t, binary, "appliance", "status", "-o", "json")
 	if status != 7 {
 		t.Fatalf("status=%d, want 7 (FAILED) for a decided refusal", status)

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "cli-wp00-selector/v1",
+  "selectorId": "CLI-WP00-CP-CLI-CANDIDATE",
+  "accounting": {
+    "requiredSetEquality": ["declared", "discovered", "selected", "started", "terminal", "executed"],
+    "requiredTerminalStates": ["PASS", "FAIL"],
+    "allowedSkipped": 0,
+    "allowedXfail": 0,
+    "allowedXpass": 0,
+    "allowedCanceled": 0,
+    "allowedOmitted": 0
+  },
+  "suites": [
+    {
+      "name": "metadata",
+      "caseIds": [
+        "metadata.exact-matrix.accept",
+        "metadata.duplicate-command.reject",
+        "metadata.missing-command.reject",
+        "metadata.extra-command.reject",
+        "metadata.renamed-command.reject",
+        "metadata.readonly-mismatch.reject",
+        "metadata.missing-capability.reject",
+        "metadata.unknown-capability.reject"
+      ]
+    },
+    {
+      "name": "payload",
+      "axes": {
+        "commands": ["status", "network-validate", "public-address-configure", "gateway-register-local", "diagnostics-create", "logs", "backup-key-create", "backup-create", "backup-verify"],
+        "cases": ["positive", "wrong-command", "missing-required", "unknown-key", "wrong-type-or-enum", "null-value", "second-json-document", "nested-command-result", "secret-bearing-key"]
+      },
+      "idTemplate": "payload.{command}.{case}"
+    },
+    {
+      "name": "backend-contract-error",
+      "caseIds": [
+        "error.release-marker-missing.positive",
+        "error.release-marker-invalid.positive",
+        "error.contract-invalid.positive",
+        "error.dependency-unavailable.positive",
+        "error.release-marker-missing.wrong-tuple",
+        "error.release-marker-invalid.extra",
+        "error.contract-invalid.control-character",
+        "error.contract-invalid.credential-pattern",
+        "error.dependency-unavailable.secret",
+        "error.dependency-unavailable.second-json-document"
+      ]
+    },
+    {
+      "name": "backend-operation-error",
+      "caseIds": [
+        "operation-error.status.positive",
+        "operation-error.network-validate.positive",
+        "operation-error.public-address-configure.positive",
+        "operation-error.gateway-register-local.positive",
+        "operation-error.diagnostics-create.positive",
+        "operation-error.logs.positive",
+        "operation-error.backup-key-create.positive",
+        "operation-error.backup-create.positive",
+        "operation-error.backup-verify.positive",
+        "operation-error.status.wrong-command",
+        "operation-error.network-validate.wrong-code",
+        "operation-error.gateway-register-local.wrong-retry",
+        "operation-error.diagnostics-create.missing-component",
+        "operation-error.logs.unknown-key",
+        "operation-error.backup-verify.control-character",
+        "operation-error.status.secret",
+        "operation-error.public-address-configure.missing-guidance",
+        "operation-error.backup-create.second-json-document"
+      ]
+    },
+    {
+      "name": "operation-receipt",
+      "caseIds": [
+        "receipt.applied.positive",
+        "receipt.unchanged.positive",
+        "receipt.partial.positive",
+        "receipt.applied.zero-delta",
+        "receipt.unchanged.nonzero-delta",
+        "receipt.partial.missing-guidance",
+        "receipt.partial.bad-time",
+        "receipt.applied.secret",
+        "receipt.applied.second-json-document"
+      ]
+    },
+    {
+      "name": "digest",
+      "caseIds": ["digest.schema-meta-validation", "digest.per-file", "digest.canonical-order", "digest.aggregate"]
+    },
+    {
+      "name": "selector-mutants",
+      "caseIds": ["selector.zero.reject", "selector.missing.reject", "selector.extra.reject", "selector.renamed.reject"]
+    }
+  ],
+  "expectedExpandedCaseCount": 134,
+  "requiredSelectorMutants": ["zero", "missing", "extra", "renamed"]
+}

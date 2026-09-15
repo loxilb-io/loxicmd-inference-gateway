@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "cli-wp00-selector-mutant/v1",
+  "mutant": "renamed",
+  "operation": "rename",
+  "from": "payload.status.positive",
+  "to": "payload.status-renamed.positive"
+}

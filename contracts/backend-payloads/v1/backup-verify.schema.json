@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/backup-verify.schema.json",
+  "title": "backup verify payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "archivePath", "authenticated", "checksumValid", "keyMatch", "manifestSchema", "releaseCompatibility", "componentChecksums", "observedAt"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "backup verify"},
+    "result": {"const": "VERIFIED"},
+    "archivePath": {"type": "string", "pattern": "^/[^\\u0000]+$"},
+    "authenticated": {"const": true},
+    "checksumValid": {"const": true},
+    "keyMatch": {"const": true},
+    "manifestSchema": {"type": "string", "minLength": 1},
+    "releaseCompatibility": {"const": "COMPATIBLE"},
+    "componentChecksums": {"type": "object", "minProperties": 1, "propertyNames": {"pattern": "^[a-z][a-z0-9-]*$"}, "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    "observedAt": {"type": "string", "format": "date-time", "pattern": "Z$"}
+  }
+}

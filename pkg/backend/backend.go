@@ -41,6 +41,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 )
@@ -76,6 +77,14 @@ const backendWaitDelay = 2 * time.Second
 const (
 	contractAPIPrefix = "loxilb.io/appliance-backend/v"
 	contractMajor     = 1
+	payloadSchema     = "appliance-backend-payload/v1"
+)
+
+const (
+	codeBackendReleaseMarkerMissing = "BACKEND_RELEASE_MARKER_MISSING"
+	codeBackendReleaseMarkerInvalid = "BACKEND_RELEASE_MARKER_INVALID"
+	codeBackendContractInvalid      = "BACKEND_CONTRACT_INVALID"
+	codeBackendHandshakeUnavailable = "BACKEND_HANDSHAKE_UNAVAILABLE"
 )
 
 // argvRule is one subcommand's spawn surface: how many positional arguments
@@ -110,6 +119,24 @@ var allowedArgv = map[string]argvRule{
 	"backup create":            {positionals: 1, flags: []string{"--key-file="}, mutating: true},
 	"backup verify":            {positionals: 1, flags: []string{"--key-file="}, mutating: true},
 }
+
+// contractCommands is the CLI-WP00-approved CONSERVATIVE_V1 matrix. The
+// handshake must advertise these ten entries byte-for-byte in this canonical
+// order; a backend command list is contract data, not a discovery hint.
+var contractCommands = []ContractCommand{
+	{Name: "status", ReadOnly: true, Capabilities: []string{"json-output"}},
+	{Name: "network validate", ReadOnly: true, Capabilities: []string{"json-output"}},
+	{Name: "public-address configure", Capabilities: []string{"json-output", "no-restart", "operation-receipt"}},
+	{Name: "gateway register-local", Capabilities: []string{"json-output", "secret-stdin", "operation-receipt"}},
+	{Name: "credentials bootstrap", Capabilities: []string{"console-only"}},
+	{Name: "diagnostics create", Capabilities: []string{"json-output", "redaction", "explicit-output", "operation-receipt"}},
+	{Name: "logs", Capabilities: []string{"json-output", "redaction", "bounded-window"}},
+	{Name: "backup key-create", Capabilities: []string{"json-output", "key-file", "operation-receipt"}},
+	{Name: "backup create", Capabilities: []string{"json-output", "key-file", "operation-receipt"}},
+	{Name: "backup verify", Capabilities: []string{"json-output", "key-file"}},
+}
+
+var capabilityShape = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 // validate checks one extra-argv slice against the rule. Positional tokens
 // must come first; flags must match the rule exactly, with '='-suffixed
@@ -153,7 +180,7 @@ type Contract struct {
 	Kind           string            `json:"kind"`
 	BackendVersion string            `json:"backendVersion"`
 	ProductRelease string            `json:"productRelease"`
-	SchemaVersion  int               `json:"schemaVersion"`
+	SchemaVersion  string            `json:"schemaVersion"`
 	Commands       []ContractCommand `json:"commands"`
 }
 
@@ -167,13 +194,63 @@ type ContractCommand struct {
 // Supports reports whether the backend advertises the subcommand. A
 // subcommand absent from the contract is unavailable regardless of what
 // this CLI build knows about.
-func (c *Contract) Supports(name string) bool {
+func (c *Contract) Lookup(name string) (ContractCommand, bool) {
 	for _, cmd := range c.Commands {
 		if cmd.Name == name {
-			return true
+			return cmd, true
 		}
 	}
-	return false
+	return ContractCommand{}, false
+}
+
+// Supports remains the compatibility predicate for callers that need only
+// availability. Enforcement paths use Lookup so readOnly and capabilities
+// cannot be silently discarded.
+func (c *Contract) Supports(name string) bool {
+	_, ok := c.Lookup(name)
+	return ok
+}
+
+// BackendContractError is the exact typed nonzero result of
+// `contract-version --json`. Retryable remains available to the composition
+// layer even though the current public CLIError predates that field.
+type BackendContractError struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Exit          int    `json:"exit"`
+	Code          string `json:"code"`
+	ComponentCode string `json:"componentCode"`
+	Retryable     bool   `json:"retryable"`
+	Message       string `json:"message,omitempty"`
+}
+
+func (e *BackendContractError) Error() string {
+	if e.Message != "" {
+		return e.Message
+	}
+	return fmt.Sprintf("backend handshake failed: %s", e.ComponentCode)
+}
+
+// Unwrap preserves compatibility with exitcode.Classify while keeping the
+// richer typed error available through errors.As.
+func (e *BackendContractError) Unwrap() error {
+	return &exitcode.CLIError{
+		Code:          exitcode.Code(e.Exit),
+		Message:       e.Error(),
+		Origin:        "backend",
+		ComponentCode: e.ComponentCode,
+	}
+}
+
+// DegradedResult contains only typed observations. In JSON mode Invoke clears
+// the unvalidated backend streams before returning this value.
+type DegradedResult struct {
+	Degraded           bool   `json:"degraded"`
+	Reason             string `json:"reason"`
+	HandshakeStatus    int    `json:"handshakeStatus"`
+	OperationAttempted bool   `json:"operationAttempted"`
+	BackendExitStatus  int    `json:"backendExitStatus"`
+	RetryGuidance      string `json:"retryGuidance"`
+	CorrelationID      string `json:"correlationId"`
 }
 
 // Result is one backend invocation, preserved without loss.
@@ -191,6 +268,9 @@ type Result struct {
 	// was ours. Callers need this to tell "the operator's --timeout bounded
 	// a slow operation" from "the backend died on its own".
 	TimedOut bool
+	// Degraded is set only when a read-only best-effort operation followed a
+	// failed handshake. It never contains backend stdout or secret material.
+	Degraded *DegradedResult
 }
 
 // OperationID is the identifier a caller can recover with. The backend's own
@@ -336,9 +416,52 @@ type Request struct {
 }
 
 // Invoke runs one allowlisted read-only backend subcommand with no extra
-// arguments. Kept as the simple entry point for the read-only set.
+// arguments. It handshakes first. A typed/contract handshake failure may be
+// followed by one best-effort read, but JSON bytes from that read are discarded
+// and the typed handshake verdict remains the returned error.
 func Invoke(ctx context.Context, subcommand string, jsonOut bool) (*Result, error) {
-	return invoke(ctx, &Request{Subcommand: subcommand, JSON: jsonOut}, false)
+	req := &Request{Subcommand: subcommand, JSON: jsonOut}
+	if err := validateRequest(req, false); err != nil {
+		return nil, err
+	}
+	contract, handshakeErr := Handshake(ctx)
+	if handshakeErr == nil {
+		if err := requireAdvertisedCommand(contract, subcommand, true); err != nil {
+			return nil, err
+		}
+		return invoke(ctx, req, false)
+	}
+	if !allowsReadOnlyBestEffort(handshakeErr) {
+		return nil, handshakeErr
+	}
+
+	res, operationErr := invoke(ctx, req, false)
+	if res == nil {
+		res = &Result{}
+	}
+	classified := exitcode.Classify(handshakeErr)
+	retryGuidance := "Correct the installed backend contract before retrying."
+	var typed *BackendContractError
+	if errors.As(handshakeErr, &typed) && typed.Retryable {
+		retryGuidance = "Retry with bounded backoff after the backend dependency recovers."
+	}
+	res.Degraded = &DegradedResult{
+		Degraded:           true,
+		Reason:             classified.ComponentCode,
+		HandshakeStatus:    int(classified.Code),
+		OperationAttempted: true,
+		BackendExitStatus:  res.ExitCode,
+		RetryGuidance:      retryGuidance,
+		CorrelationID:      res.CorrelationID,
+	}
+	if operationErr != nil {
+		res.Degraded.BackendExitStatus = -1
+	}
+	if jsonOut {
+		res.Stdout = nil
+		res.Stderr = nil
+	}
+	return res, handshakeErr
 }
 
 // InvokeMutating runs one allowlisted mutating subcommand. Per the
@@ -346,46 +469,22 @@ func Invoke(ctx context.Context, subcommand string, jsonOut bool) (*Result, erro
 // refuses — changing no host state — when the installed backend does not
 // advertise the subcommand.
 func InvokeMutating(ctx context.Context, req *Request) (*Result, error) {
+	if err := validateRequest(req, true); err != nil {
+		return nil, err
+	}
 	contract, err := Handshake(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if !contract.Supports(req.Subcommand) {
-		return nil, &exitcode.CLIError{
-			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("the installed backend does not provide %q (backend %s, release %s)", req.Subcommand, contract.BackendVersion, contract.ProductRelease),
-			Origin:        "backend",
-			ComponentCode: "command-unavailable",
-		}
+	if err := requireAdvertisedCommand(contract, req.Subcommand, false); err != nil {
+		return nil, err
 	}
 	return invoke(ctx, req, true)
 }
 
 func invoke(ctx context.Context, req *Request, mutating bool) (*Result, error) {
-	rule, ok := allowedArgv[req.Subcommand]
-	if !ok || rule.mutating != mutating {
-		return nil, &exitcode.CLIError{
-			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("subcommand %q is not in this CLI's backend allowlist", req.Subcommand),
-			Origin:        "cli",
-			ComponentCode: "argv-not-allowlisted",
-		}
-	}
-	if err := rule.validate(req.Args); err != nil {
-		return nil, &exitcode.CLIError{
-			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("argv for %q rejected: %v", req.Subcommand, err),
-			Origin:        "cli",
-			ComponentCode: "argv-not-allowlisted",
-		}
-	}
-	if req.Secret != nil && !rule.stdinSecret {
-		return nil, &exitcode.CLIError{
-			Code:          exitcode.ContractMismatch,
-			Message:       fmt.Sprintf("subcommand %q does not take a secret stream", req.Subcommand),
-			Origin:        "cli",
-			ComponentCode: "argv-not-allowlisted",
-		}
+	if err := validateRequest(req, mutating); err != nil {
+		return nil, err
 	}
 	id := newCorrelationID()
 	argv := append(strings.Fields(req.Subcommand), req.Args...)
@@ -401,33 +500,62 @@ func invoke(ctx context.Context, req *Request, mutating bool) (*Result, error) {
 	return res, nil
 }
 
+func validateRequest(req *Request, mutating bool) error {
+	rule, ok := allowedArgv[req.Subcommand]
+	if !ok || rule.mutating != mutating {
+		return &exitcode.CLIError{
+			Code:          exitcode.ContractMismatch,
+			Message:       fmt.Sprintf("subcommand %q is not in this CLI's backend allowlist", req.Subcommand),
+			Origin:        "cli",
+			ComponentCode: "argv-not-allowlisted",
+		}
+	}
+	if err := rule.validate(req.Args); err != nil {
+		return &exitcode.CLIError{
+			Code:          exitcode.ContractMismatch,
+			Message:       fmt.Sprintf("argv for %q rejected: %v", req.Subcommand, err),
+			Origin:        "cli",
+			ComponentCode: "argv-not-allowlisted",
+		}
+	}
+	if req.Secret != nil && !rule.stdinSecret {
+		return &exitcode.CLIError{
+			Code:          exitcode.ContractMismatch,
+			Message:       fmt.Sprintf("subcommand %q does not take a secret stream", req.Subcommand),
+			Origin:        "cli",
+			ComponentCode: "argv-not-allowlisted",
+		}
+	}
+	return nil
+}
+
 // Handshake runs `contract-version --json` and validates the response
 // against the frozen schema rules. It is required before any mutating
-// subcommand; read-only subcommands may proceed without it for best-effort
-// diagnosis.
+// subcommand. Read-only subcommands also handshake and may perform a single
+// typed degraded best-effort read when the executable itself is available.
 func Handshake(ctx context.Context) (*Contract, error) {
 	res, err := run(ctx, []string{"contract-version", "--json"})
 	if err != nil {
 		return nil, err
 	}
 	if res.ExitCode != 0 {
-		return nil, &exitcode.CLIError{
-			Code:          exitcode.Unavailable,
-			Message:       fmt.Sprintf("the backend's contract-version handshake failed (exit %d): %s", res.ExitCode, strings.TrimSpace(string(res.Stderr))),
-			Origin:        "backend",
-			ComponentCode: CodeBackendUnavailable,
+		typed, typedErr := decodeBackendContractError(res.Stdout)
+		if typedErr != nil {
+			return nil, contractViolation(fmt.Sprintf("the backend's typed contract error is invalid: %v", typedErr))
 		}
+		if typed.Exit != res.ExitCode {
+			return nil, contractViolation(fmt.Sprintf("typed contract error exit %d does not match process exit %d", typed.Exit, res.ExitCode))
+		}
+		return nil, typed
 	}
-	var contract Contract
-	dec := json.NewDecoder(bytes.NewReader(res.Stdout))
-	dec.DisallowUnknownFields()
-	if derr := dec.Decode(&contract); derr != nil {
+	contract, derr := decodeContract(res.Stdout)
+	if derr != nil {
 		return nil, contractViolation(fmt.Sprintf("the backend's contract document does not parse: %v", derr))
 	}
 	if verr := contract.validate(); verr != nil {
 		return nil, verr
 	}
-	return &contract, nil
+	return contract, nil
 }
 
 // validate enforces the schema rules the CLI depends on. A violation is a
@@ -440,8 +568,8 @@ func (c *Contract) validate() error {
 		return contractViolation(fmt.Sprintf("contract apiVersion %q is malformed", c.APIVersion))
 	case c.BackendVersion == "" || c.ProductRelease == "":
 		return contractViolation("contract omits backendVersion or productRelease")
-	case c.SchemaVersion < 1:
-		return contractViolation(fmt.Sprintf("contract schemaVersion %d is invalid", c.SchemaVersion))
+	case c.SchemaVersion != payloadSchema:
+		return contractViolation(fmt.Sprintf("contract schemaVersion %q is invalid", c.SchemaVersion))
 	}
 	if c.APIVersion != fmt.Sprintf("%s%d", contractAPIPrefix, contractMajor) {
 		return &exitcode.CLIError{
@@ -451,12 +579,206 @@ func (c *Contract) validate() error {
 			ComponentCode: "contract-major-unsupported",
 		}
 	}
-	for _, cmd := range c.Commands {
+	if len(c.Commands) != len(contractCommands) {
+		return contractViolation(fmt.Sprintf("contract advertises %d commands, want %d", len(c.Commands), len(contractCommands)))
+	}
+	seenCommands := make(map[string]struct{}, len(c.Commands))
+	for index, cmd := range c.Commands {
 		if !commandNameShape.MatchString(cmd.Name) {
 			return contractViolation(fmt.Sprintf("contract advertises malformed command name %q", cmd.Name))
 		}
+		if _, exists := seenCommands[cmd.Name]; exists {
+			return contractViolation(fmt.Sprintf("contract advertises duplicate command %q", cmd.Name))
+		}
+		seenCommands[cmd.Name] = struct{}{}
+		seenCapabilities := make(map[string]struct{}, len(cmd.Capabilities))
+		for _, capability := range cmd.Capabilities {
+			if !capabilityShape.MatchString(capability) {
+				return contractViolation(fmt.Sprintf("command %q advertises malformed capability %q", cmd.Name, capability))
+			}
+			if _, exists := seenCapabilities[capability]; exists {
+				return contractViolation(fmt.Sprintf("command %q advertises duplicate capability %q", cmd.Name, capability))
+			}
+			seenCapabilities[capability] = struct{}{}
+		}
+		want := contractCommands[index]
+		if cmd.Name != want.Name || cmd.ReadOnly != want.ReadOnly || !equalStrings(cmd.Capabilities, want.Capabilities) {
+			return contractViolation(fmt.Sprintf("command metadata at index %d differs from the approved matrix", index))
+		}
 	}
 	return nil
+}
+
+func requireAdvertisedCommand(contract *Contract, name string, readOnly bool) error {
+	advertised, ok := contract.Lookup(name)
+	if !ok {
+		return contractViolation(fmt.Sprintf("the installed backend does not advertise %q", name))
+	}
+	var expected *ContractCommand
+	for index := range contractCommands {
+		if contractCommands[index].Name == name {
+			expected = &contractCommands[index]
+			break
+		}
+	}
+	if expected == nil || expected.ReadOnly != readOnly || advertised.ReadOnly != expected.ReadOnly || !equalStrings(advertised.Capabilities, expected.Capabilities) {
+		return contractViolation(fmt.Sprintf("the installed backend metadata for %q differs from the approved matrix", name))
+	}
+	return nil
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func allowsReadOnlyBestEffort(err error) bool {
+	var classified *exitcode.CLIError
+	if !errors.As(err, &classified) {
+		return true
+	}
+	return classified.ComponentCode != CodeBackendUnavailable && classified.ComponentCode != CodeBackendForbidden
+}
+
+func decodeExactOne[T any](raw []byte) (*T, error) {
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var value *T
+	if err := dec.Decode(&value); err != nil {
+		return nil, err
+	}
+	if value == nil {
+		return nil, errors.New("document is null")
+	}
+	var trailing any
+	if err := dec.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return nil, errors.New("document contains a second JSON value")
+		}
+		return nil, fmt.Errorf("document has trailing content: %w", err)
+	}
+	return value, nil
+}
+
+type backendContractErrorWire struct {
+	SchemaVersion *string `json:"schemaVersion"`
+	Exit          *int    `json:"exit"`
+	Code          *string `json:"code"`
+	ComponentCode *string `json:"componentCode"`
+	Retryable     *bool   `json:"retryable"`
+	Message       *string `json:"message,omitempty"`
+}
+
+type contractWire struct {
+	APIVersion     *string                `json:"apiVersion"`
+	Kind           *string                `json:"kind"`
+	BackendVersion *string                `json:"backendVersion"`
+	ProductRelease *string                `json:"productRelease"`
+	SchemaVersion  *string                `json:"schemaVersion"`
+	Commands       *[]contractCommandWire `json:"commands"`
+}
+
+type contractCommandWire struct {
+	Name         *string   `json:"name"`
+	ReadOnly     *bool     `json:"readOnly"`
+	Capabilities *[]string `json:"capabilities"`
+}
+
+func decodeContract(raw []byte) (*Contract, error) {
+	wire, err := decodeExactOne[contractWire](raw)
+	if err != nil {
+		return nil, err
+	}
+	if wire.APIVersion == nil || wire.Kind == nil || wire.BackendVersion == nil || wire.ProductRelease == nil || wire.SchemaVersion == nil || wire.Commands == nil {
+		return nil, errors.New("contract omits or nulls a required field")
+	}
+	contract := &Contract{
+		APIVersion:     *wire.APIVersion,
+		Kind:           *wire.Kind,
+		BackendVersion: *wire.BackendVersion,
+		ProductRelease: *wire.ProductRelease,
+		SchemaVersion:  *wire.SchemaVersion,
+		Commands:       make([]ContractCommand, 0, len(*wire.Commands)),
+	}
+	for index, command := range *wire.Commands {
+		if command.Name == nil || command.ReadOnly == nil || command.Capabilities == nil {
+			return nil, fmt.Errorf("contract command at index %d omits or nulls a required field", index)
+		}
+		contract.Commands = append(contract.Commands, ContractCommand{
+			Name:         *command.Name,
+			ReadOnly:     *command.ReadOnly,
+			Capabilities: append([]string(nil), (*command.Capabilities)...),
+		})
+	}
+	return contract, nil
+}
+
+var credentialValueShape = regexp.MustCompile(`(?i)(password|token|api[_-]?key|private[_-]?key)\s*[:=]`)
+
+func decodeBackendContractError(raw []byte) (*BackendContractError, error) {
+	wire, err := decodeExactOne[backendContractErrorWire](raw)
+	if err != nil {
+		return nil, err
+	}
+	if wire.SchemaVersion == nil || wire.Exit == nil || wire.Code == nil || wire.ComponentCode == nil || wire.Retryable == nil {
+		return nil, errors.New("typed contract error omits a required field")
+	}
+	result := &BackendContractError{
+		SchemaVersion: *wire.SchemaVersion,
+		Exit:          *wire.Exit,
+		Code:          *wire.Code,
+		ComponentCode: *wire.ComponentCode,
+		Retryable:     *wire.Retryable,
+	}
+	if wire.Message != nil {
+		result.Message = *wire.Message
+	}
+	if result.SchemaVersion != "backend-contract-error/v1" {
+		return nil, fmt.Errorf("typed contract error schemaVersion %q is unsupported", result.SchemaVersion)
+	}
+	if result.Message != "" {
+		if len([]byte(result.Message)) > 512 {
+			return nil, errors.New("typed contract error message exceeds 512 UTF-8 bytes")
+		}
+		for _, r := range result.Message {
+			if unicode.IsControl(r) {
+				return nil, errors.New("typed contract error message contains a control character")
+			}
+		}
+		if credentialValueShape.MatchString(result.Message) || strings.Contains(result.Message, "CLI_WP00_SYNTHETIC_SECRET_DO_NOT_EMIT") {
+			return nil, errors.New("typed contract error message contains prohibited credential material")
+		}
+	} else if wire.Message != nil {
+		return nil, errors.New("typed contract error message is empty")
+	}
+	wantCode := ""
+	wantRetryable := false
+	switch result.ComponentCode {
+	case codeBackendReleaseMarkerMissing:
+		if result.Exit == int(exitcode.Precondition) {
+			wantCode = exitcode.Precondition.Label()
+		}
+	case codeBackendReleaseMarkerInvalid, codeBackendContractInvalid:
+		if result.Exit == int(exitcode.ContractMismatch) {
+			wantCode = exitcode.ContractMismatch.Label()
+		}
+	case codeBackendHandshakeUnavailable:
+		if result.Exit == int(exitcode.Unavailable) {
+			wantCode = exitcode.Unavailable.Label()
+			wantRetryable = true
+		}
+	}
+	if wantCode == "" || result.Code != wantCode || result.Retryable != wantRetryable {
+		return nil, errors.New("typed contract error tuple is not one of the approved failures")
+	}
+	return result, nil
 }
 
 func contractViolation(msg string) *exitcode.CLIError {
@@ -464,6 +786,6 @@ func contractViolation(msg string) *exitcode.CLIError {
 		Code:          exitcode.ContractMismatch,
 		Message:       msg,
 		Origin:        "backend",
-		ComponentCode: "contract-invalid",
+		ComponentCode: codeBackendContractInvalid,
 	}
 }

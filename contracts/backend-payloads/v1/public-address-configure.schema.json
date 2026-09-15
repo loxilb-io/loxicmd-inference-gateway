@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://loxilb.io/schemas/appliance-backend/v1/public-address-configure.schema.json",
+  "title": "public-address configure payload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "command", "result", "operationId", "publicAddress", "privateAddressPreserved", "certificate", "restart", "readiness"],
+  "properties": {
+    "schemaVersion": {"const": "appliance-backend-payload/v1"},
+    "command": {"const": "public-address configure"},
+    "result": {"enum": ["APPLIED", "UNCHANGED", "PENDING_RESTART"]},
+    "operationId": {"type": "string", "minLength": 1},
+    "publicAddress": {"type": "string", "format": "ipv4"},
+    "privateAddressPreserved": {"const": true},
+    "certificate": {"type": "object", "additionalProperties": false, "required": ["fingerprintSha256", "sans"], "properties": {"fingerprintSha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "sans": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}},
+    "restart": {"enum": ["RECONCILED", "PENDING"]},
+    "readiness": {"enum": ["READY", "NOT_READY", "PENDING_RESTART"]}
+  },
+  "allOf": [{"if": {"properties": {"result": {"const": "PENDING_RESTART"}}, "required": ["result"]}, "then": {"properties": {"restart": {"const": "PENDING"}, "readiness": {"const": "PENDING_RESTART"}}}}]
+}
