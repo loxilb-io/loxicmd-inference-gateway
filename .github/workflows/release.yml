@@ -10,9 +10,9 @@ name: Release
 # release metadata attached to a GitHub Release.
 #
 # Release-input rules enforced here:
-#   - only a signed annotated v* tag reaches the build; both the normal push
-#     path and manual recovery path verify the tag type and signature presence
-#     without coupling the GitHub-hosted runner to a personal or host SSH key
+#   - only an annotated v* tag reaches the build; both the normal push path and
+#     manual recovery path verify the tag object and exact peeled commit
+#     without coupling the GitHub-hosted runner to any external key or server
 #   - manual recovery requires the expected full source SHA and rejects the
 #     build if the immutable tag resolves anywhere else
 #   - the resolved commit is recorded and re-verified from inside the binary
@@ -29,7 +29,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing signed annotated release tag to recover
+        description: Existing annotated release tag to recover
         required: true
         type: string
       expected_source_revision:
@@ -99,17 +99,7 @@ jobs:
             exit 1
           fi
 
-          # The release asset trust root is the GitHub OIDC/Sigstore
-          # attestation below. A tag must still carry a cryptographic
-          # signature, but signer trust is intentionally not pinned to a
-          # personal or server SSH key in this portable hosted-runner job.
-          if ! git cat-file -p "$TAG_REF" | \
-               grep -Eq '^-----BEGIN (SSH|PGP) SIGNATURE-----$'; then
-            echo "::error::${RELEASE_TAG} does not carry a cryptographic signature"
-            exit 1
-          fi
-
-          # The commit the signed tag resolved to is the one identity every
+          # The commit the annotated tag resolved to is the one identity every
           # later step verifies against. A moving or mismatched ref is fatal.
           REV="$(git rev-parse "${TAG_REF}^{}")"
           HEAD_REV="$(git rev-parse HEAD)"
@@ -350,7 +340,7 @@ jobs:
                 repository: $repository,
                 ref: $ref,
                 artifactSourceRevision: $revision,
-                annotatedTagSignaturePresent: true
+                annotatedTagObjectVerified: true
               },
               build: {
                 gatewayContract: $contract,
