@@ -20,14 +20,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
-	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 
 	"github.com/spf13/cobra"
 )
@@ -70,6 +71,7 @@ type CreateLoadBalancerOptions struct {
 	SessionHeaderName string
 	TraceType         string
 	BackendProtocol   string
+	SockMapMode       string
 	// SSE.
 	SseMode              bool
 	APIKeyAuth           string
@@ -455,6 +457,7 @@ ex)
 	createLbCmd.Flags().StringVar(&o.SessionHeaderName, "session-header-name", "", "Header for session stickiness with --select=persist (ex) mcp-session-id, X-Conversation-Id, cookie:<name>")
 	createLbCmd.Flags().StringVar(&o.TraceType, "trace-type", "", "Deep-inspection trace catalog (ex) anthropic, mcp, v1")
 	createLbCmd.Flags().StringVar(&o.BackendProtocol, "backend-protocol", "", "Backend transport: http1|http2|both")
+	createLbCmd.Flags().StringVar(&o.SockMapMode, "sockmap-mode", "", "Directional sockmap acceleration: off|request|response|both")
 	// SSE.
 	createLbCmd.Flags().BoolVar(&o.SseMode, "sse-mode", false, "Enable SSE streaming mode (suppresses idle timeout during text/event-stream)")
 	createLbCmd.Flags().StringVar(&o.APIKeyAuth, "api-key-auth", "", "Data-plane X-Api-Key policy: disabled|required (default: disabled)")
@@ -671,7 +674,7 @@ func lbMtlsBackendRequested(o *CreateLoadBalancerOptions) bool {
 func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 	sel := SelectToNum(o.Select)
 	return o.ModelName != "" || o.PathPrefix != "" || o.PathMatchMode != "" ||
-		o.SessionHeaderName != "" || o.TraceType != "" ||
+		o.SessionHeaderName != "" || o.TraceType != "" || o.SockMapMode != "" ||
 		o.SseMode || o.APIKeyAuth != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 || o.CbEnable ||
 		o.ChwblPrefixHashLevel != 0 || o.ChwblPrefixHashFlags != 0 || o.ChwblMeanLoadFactor != 0 ||
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
@@ -692,6 +695,11 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 	case "", "disabled", "required":
 	default:
 		return fmt.Errorf("--api-key-auth must be one of disabled|required")
+	}
+	switch o.SockMapMode {
+	case "", "off", "request", "response", "both":
+	default:
+		return fmt.Errorf("--sockmap-mode must be one of off|request|response|both")
 	}
 	if !lbAIRequested(o) {
 		return nil
@@ -829,6 +837,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.SessionHdrName = o.SessionHeaderName
 	s.TraceType = o.TraceType
 	s.BackendProtocol = o.BackendProtocol
+	s.SockMapMode = o.SockMapMode
 	// SSE.
 	s.SseMode = o.SseMode
 	s.APIKeyAuth = o.APIKeyAuth
