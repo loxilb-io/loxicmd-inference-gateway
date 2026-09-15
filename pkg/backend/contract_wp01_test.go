@@ -130,7 +130,7 @@ func TestCLIWP01HandshakeApprovedFixtureIdentity(t *testing.T) {
 	if err := json.Unmarshal(rawManifest, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	if manifest.Bundle.AggregateSHA256 != "sha256:df777da68ef3174e96cd7509e06efeae3b750e25d5dc67a19d07390d0e14a3bd" {
+	if manifest.Bundle.AggregateSHA256 != "sha256:648eaabb50fdaa4531de2cbb1e7a0419ba838f5d4216bddba40d79b1903d19cd" {
 		t.Fatalf("CP-CLI aggregate = %q", manifest.Bundle.AggregateSHA256)
 	}
 	want := map[string]string{}

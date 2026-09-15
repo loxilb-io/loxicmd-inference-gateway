@@ -54,7 +54,7 @@
       {"path": "scripts/test-evidence-verifier.sh", "sha256": "sha256:653eac55a5b574a2032338f318df27a671958dae56983d36b7e1877a09662dbe"},
       {"path": "testdata/backend-contract/fixtures.json", "sha256": "sha256:94816b637095ff1a544881875cfc08ac41207af213ed6218b982a41197b9d4df"},
       {"path": "testdata/backend-contract/selectors/contract-meta-tests.v1.json", "sha256": "sha256:e61da3f93415fe79f66e939e78e352b5c2918e350bc5771275c4b268c7e90685"},
-      {"path": "testdata/backend-contract/selectors/dispatcher-tests.v1.json", "sha256": "sha256:79fda7e3c5bbaec8dad4ac090bafa21018fc0ae1309eab6294d1f8c1dac648d6"},
+      {"path": "testdata/backend-contract/selectors/dispatcher-tests.v1.json", "sha256": "sha256:97d5932821ebe1f74beead3f3e7ef8871aff863e00f42ddc7fca4b1452d1dca9"},
       {"path": "testdata/backend-contract/selectors/handshake-tests.v1.json", "sha256": "sha256:01cb023e2d7a718a24c97431ea75c8ee2b18b885bbcbd5b21527ee4d87f61130"},
       {"path": "testdata/backend-contract/selectors/mutants/extra.json", "sha256": "sha256:38b2570455c7f94bd3f4fc17b08e5c24176d97e4f73d289eebccf543b1cf4452"},
       {"path": "testdata/backend-contract/selectors/mutants/missing.json", "sha256": "sha256:a8010c22737f30fd4b2558dd270b6600344c778449f298f7f831e282871eab62"},
@@ -62,7 +62,7 @@
       {"path": "testdata/backend-contract/selectors/mutants/zero.json", "sha256": "sha256:cc63d7ce6572043f35768dbb637226b7f9daf6b47c3f18be2c888d496b6aeba8"},
       {"path": "testdata/backend-contract/selectors/payload-tests.v1.json", "sha256": "sha256:30e9e67672178df5fa23d230180f27415c673f32fdbbeab4d56b7c1f51f3c58d"}
     ],
-    "aggregateSha256": "sha256:df777da68ef3174e96cd7509e06efeae3b750e25d5dc67a19d07390d0e14a3bd"
+    "aggregateSha256": "sha256:648eaabb50fdaa4531de2cbb1e7a0419ba838f5d4216bddba40d79b1903d19cd"
   },
   "nonProof": [
     "CLI dispatcher behavior is proven only against fake backends; no Product-owned installed backend is implemented or proven.",

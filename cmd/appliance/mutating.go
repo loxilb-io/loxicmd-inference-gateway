@@ -52,6 +52,30 @@ const (
 	maxLogLines = 10000
 )
 
+// diagnosticsOutputValue keeps both public meanings of -o/--output usable on
+// the diagnostics leaf command. Cobra otherwise lets the local archive flag
+// shadow the root persistent output-format flag, including its -o shorthand.
+// Recognized CLI formats select rendering; every other value remains the
+// archive path and is subjected to the absolute-path check in RunE.
+type diagnosticsOutputValue struct {
+	format *string
+	path   *string
+}
+
+func (v *diagnosticsOutputValue) Set(value string) error {
+	switch value {
+	case "json", "wide", "table":
+		*v.format = value
+	default:
+		*v.path = value
+	}
+	return nil
+}
+
+func (v *diagnosticsOutputValue) String() string { return "" }
+
+func (v *diagnosticsOutputValue) Type() string { return "string" }
+
 // stdioIsTerminal reports whether both stdin and stdout are character
 // devices — the console-only guard for credentials bootstrap. A pipe, a
 // file redirect, or capture tooling fails the check.
@@ -69,7 +93,7 @@ func stdioIsTerminal() bool {
 // performs the contract-version handshake first and refuses — changing no
 // host state — when the installed backend does not advertise the
 // subcommand.
-func dispatchMutating(out io.Writer, restOptions *api.RESTOptions, command string, req *backend.Request) error {
+func dispatchMutating(out, errOut io.Writer, restOptions *api.RESTOptions, command string, req *backend.Request) error {
 	req.JSON = restOptions.PrintOption == "json"
 	ctx, cancel := requestContext(restOptions)
 	defer cancel()
@@ -85,6 +109,9 @@ func dispatchMutating(out io.Writer, restOptions *api.RESTOptions, command strin
 		if req.JSON {
 			writeEnvelope(out, command, res, validated, err)
 		}
+		return err
+	}
+	if _, err := errOut.Write(res.Stderr); err != nil {
 		return err
 	}
 	if !req.JSON {
@@ -132,7 +159,7 @@ Examples:
 			if noRestart {
 				req.Args = append(req.Args, "--no-restart")
 			}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions, "appliance.public-address.configure", req)
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.public-address.configure", req)
 		},
 	}
 	configure.Flags().BoolVar(&noRestart, "no-restart", false,
@@ -182,7 +209,7 @@ Examples:
 				Args:       []string{"--username", username, "--password-stdin"},
 				Secret:     bytes.NewReader(secret),
 			}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions, "appliance.gateway.register-local", req)
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.gateway.register-local", req)
 		},
 	}
 	register.Flags().StringVar(&username, "username", "", "OAM username to register with")
@@ -226,7 +253,7 @@ land in files, logs, or inventory collection.`,
 				}
 			}
 			req := &backend.Request{Subcommand: "credentials bootstrap"}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions, "appliance.credentials.bootstrap", req)
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.credentials.bootstrap", req)
 		},
 	})
 	return parent
@@ -271,11 +298,12 @@ Examples:
 				reqArgs = append(reqArgs, "--output", output)
 			}
 			req := &backend.Request{Subcommand: "diagnostics create", Args: reqArgs}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions, "appliance.diagnostics.create", req)
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.diagnostics.create", req)
 		},
 	}
 	create.Flags().BoolVar(&redact, "redact", false, "Required: produce the redacted archive (the only kind there is)")
-	create.Flags().StringVar(&output, "output", "", "Absolute path for the archive (default: the backend's support directory)")
+	create.Flags().VarP(&diagnosticsOutputValue{format: &restOptions.PrintOption, path: &output},
+		"output", "o", "CLI format (json, wide, or table), or an absolute archive path")
 	parent.AddCommand(create)
 	return parent
 }
@@ -321,7 +349,7 @@ Examples:
 				reqArgs = append(reqArgs, "--lines", strconv.Itoa(lines))
 			}
 			req := &backend.Request{Subcommand: "logs", Args: reqArgs}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions, "appliance.logs", req)
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.logs", req)
 		},
 	}
 	logs.Flags().BoolVar(&redact, "redact", false, "Required: redact tokens, credentials, and customer content (the only mode there is)")
@@ -367,7 +395,7 @@ never the key value.`,
 				}
 			}
 			req := &backend.Request{Subcommand: "backup key-create", Args: []string{"--key-file", newKeyFile}}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions, "appliance.backup.key-create", req)
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.backup.key-create", req)
 		},
 	}
 	keyCreate.Flags().StringVar(&newKeyFile, "key-file", "", "Absolute path for the new key; an existing file is never overwritten")
@@ -410,7 +438,7 @@ func backupArchiveCmd(restOptions *api.RESTOptions, use, subcommand, short, long
 				return err
 			}
 			req := &backend.Request{Subcommand: subcommand, Args: []string{path, "--key-file", keyFile}}
-			return dispatchMutating(cmd.OutOrStdout(), restOptions,
+			return dispatchMutating(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions,
 				"appliance."+strings.ReplaceAll(subcommand, " ", "."), req)
 		},
 	}

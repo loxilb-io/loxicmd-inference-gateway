@@ -1,6 +1,6 @@
 {
   "schemaVersion": "cli-go-test-selector/v1",
-  "selectorId": "CLI-WP03-DISPATCHER-INTEGRATION",
+  "selectorId": "CLI-WP04-DISPATCHER-INTEGRATION",
   "package": "./cmd/appliance",
   "suites": [
     {
@@ -16,6 +16,13 @@
         "TestCLIWP03DispatcherActivePathRejectsSchemaInvalidDocument",
         "TestCLIWP03DispatcherActivePathPreservesStructuredError",
         "TestCLIWP03MutatingDispatcherPreservesPartialOperationID"
+      ]
+    },
+    {
+      "name": "output-streams",
+      "tests": [
+        "TestCLIWP04DiagnosticsOutputComposition",
+        "TestCLIWP04SuccessfulBackendStderrSeparation"
       ]
     }
   ],
