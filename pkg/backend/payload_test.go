@@ -32,7 +32,7 @@ import (
 )
 
 const (
-	approvedCLIWP00Aggregate           = "sha256:df777da68ef3174e96cd7509e06efeae3b750e25d5dc67a19d07390d0e14a3bd"
+	approvedCLIWP00Aggregate           = "sha256:648eaabb50fdaa4531de2cbb1e7a0419ba838f5d4216bddba40d79b1903d19cd"
 	approvedFixtureDigest              = "sha256:94816b637095ff1a544881875cfc08ac41207af213ed6218b982a41197b9d4df"
 	approvedSchemaSetDigest            = "sha256:7b740bd6fd63c9b3d29a5f02b769f5bdc8cf0e12a7322d0d5cb4422189ec2780"
 	approvedOperationErrorSchemaDigest = "sha256:137b12626e5736a9b2da71730dc8221acde06731b927a16d720c7ec18d9615cc"

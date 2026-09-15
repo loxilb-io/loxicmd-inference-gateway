@@ -90,7 +90,7 @@ Examples:
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return dispatchReadOnly(cmd.OutOrStdout(), restOptions, "appliance.status", "status")
+			return dispatchReadOnly(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.status", "status")
 		},
 	}
 }
@@ -121,7 +121,7 @@ Examples:
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
-			return dispatchReadOnly(cmd.OutOrStdout(), restOptions, "appliance.network.validate", "network validate")
+			return dispatchReadOnly(cmd.OutOrStdout(), cmd.ErrOrStderr(), restOptions, "appliance.network.validate", "network validate")
 		},
 	})
 	return networkCmd
@@ -170,7 +170,7 @@ type applianceData struct {
 // dispatchReadOnly invokes a read-only backend subcommand and renders the
 // outcome. The backend package performs the contract-version handshake first;
 // only a typed degraded-handshake class may continue to one best-effort read.
-func dispatchReadOnly(out io.Writer, restOptions *api.RESTOptions, command, subcommand string) error {
+func dispatchReadOnly(out, errOut io.Writer, restOptions *api.RESTOptions, command, subcommand string) error {
 	jsonOut := restOptions.PrintOption == "json"
 	ctx, cancel := requestContext(restOptions)
 	defer cancel()
@@ -184,6 +184,9 @@ func dispatchReadOnly(out io.Writer, restOptions *api.RESTOptions, command, subc
 		if jsonOut {
 			writeEnvelope(out, command, res, validated, err)
 		}
+		return err
+	}
+	if _, err := errOut.Write(res.Stderr); err != nil {
 		return err
 	}
 	if !jsonOut {
