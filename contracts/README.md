@@ -63,6 +63,18 @@ exit `8` remains a separate composition step.
   still reveals the secret's existence and invites parsers to depend on the
   key.
 
+### Status contract compatibility
+
+CLI-WP05 extends the v1 `status` payload with optional consumer fields so an
+already-published v1 producer remains valid. The canonical fixture includes
+all of them: top-level `reasonCode`, `status` and `observedAt` for the `state`,
+`dataplane`, and `management` planes, and
+`publicAddressTls: {"configured": boolean}`. When present, verdicts use only
+`READY`, `DEGRADED`, `NOT_READY`, or `UNKNOWN`, observations are RFC 3339 UTC
+timestamps ending in `Z`, and the TLS object permits no certificate, key,
+token, password, customer rule, or other material. The pre-existing required
+fields, including plane `live`, `ready`, and `reasonCode`, remain unchanged.
+
 ## Consuming the contracts
 
 Automation must parse the JSON envelope and the exit code, never the human

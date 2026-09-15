@@ -112,6 +112,7 @@ type payloadSpec struct {
 	SchemaPath   string
 	SchemaID     string
 	RequiredKeys []string
+	OptionalKeys []string
 	Validate     func([]byte) error
 }
 
@@ -134,6 +135,7 @@ var payloadRegistry = map[PayloadTuple]payloadSpec{
 		SchemaPath:   "contracts/backend-payloads/v1/status.schema.json",
 		SchemaID:     "https://loxilb.io/schemas/appliance-backend/v1/status.schema.json",
 		RequiredKeys: []string{"schemaVersion", "command", "overallStatus", "productRelease", "initialized", "planes", "networkProfile", "activeOperations", "localGatewayRegistration", "observedAt"},
+		OptionalKeys: []string{"reasonCode", "publicAddressTls"},
 		Validate:     validateStatusPayload,
 	},
 	tuple("network validate"): {
@@ -256,7 +258,7 @@ func ValidatePayload(selected PayloadTuple, raw []byte) (*ValidatedPayload, erro
 			OperationError: operationError,
 		}, nil
 	}
-	if err := validateRequiredKeySet(*document, spec.RequiredKeys); err != nil {
+	if err := validateRequiredAndAllowedKeySet(*document, spec.RequiredKeys, stringSet(spec.OptionalKeys)); err != nil {
 		return nil, payloadError(selected, command, err.Error())
 	}
 	if err := spec.Validate(raw); err != nil {
@@ -374,6 +376,14 @@ func validateRequiredAndAllowedKeySet(document map[string]json.RawMessage, requi
 		}
 	}
 	return nil
+}
+
+func stringSet(values []string) map[string]struct{} {
+	result := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		result[value] = struct{}{}
+	}
+	return result
 }
 
 func observedCommand(document map[string]json.RawMessage, fallback string) string {
@@ -592,16 +602,19 @@ func uniqueNonEmpty(values []string, field string) error {
 }
 
 type statusPayload struct {
-	SchemaVersion  string `json:"schemaVersion"`
-	Command        string `json:"command"`
-	OverallStatus  string `json:"overallStatus"`
-	ProductRelease string `json:"productRelease"`
-	Initialized    bool   `json:"initialized"`
+	SchemaVersion  string  `json:"schemaVersion"`
+	Command        string  `json:"command"`
+	OverallStatus  string  `json:"overallStatus"`
+	ReasonCode     *string `json:"reasonCode"`
+	ProductRelease string  `json:"productRelease"`
+	Initialized    bool    `json:"initialized"`
 	Planes         []struct {
-		Name       string `json:"name"`
-		Live       bool   `json:"live"`
-		Ready      bool   `json:"ready"`
-		ReasonCode string `json:"reasonCode"`
+		Name       string  `json:"name"`
+		Live       bool    `json:"live"`
+		Ready      bool    `json:"ready"`
+		ReasonCode string  `json:"reasonCode"`
+		Status     *string `json:"status"`
+		ObservedAt *string `json:"observedAt"`
 	} `json:"planes"`
 	NetworkProfile struct {
 		Name       string `json:"name"`
@@ -613,6 +626,9 @@ type statusPayload struct {
 		InstallationID string `json:"installationId"`
 		InstanceID     string `json:"instanceId"`
 	} `json:"localGatewayRegistration"`
+	PublicAddressTLS *struct {
+		Configured *bool `json:"configured"`
+	} `json:"publicAddressTls"`
 	ObservedAt string `json:"observedAt"`
 }
 
@@ -623,6 +639,9 @@ func validateStatusPayload(raw []byte) error {
 	}
 	if !oneOf(doc.OverallStatus, "READY", "DEGRADED", "NOT_READY", "UNKNOWN") {
 		return errors.New("overallStatus is outside the approved enum")
+	}
+	if doc.ReasonCode != nil && !upperCodeShape.MatchString(*doc.ReasonCode) {
+		return errors.New("reasonCode is malformed")
 	}
 	if err := nonEmpty(doc.ProductRelease, "productRelease"); err != nil {
 		return err
@@ -636,6 +655,27 @@ func validateStatusPayload(raw []byte) error {
 		}
 		if !upperCodeShape.MatchString(plane.ReasonCode) {
 			return errors.New("planes.reasonCode is malformed")
+		}
+		if plane.Status != nil {
+			if !oneOf(plane.Name, "state", "dataplane", "management") {
+				return errors.New("planes.name is invalid for a status-bearing plane")
+			}
+			if !oneOf(*plane.Status, "READY", "DEGRADED", "NOT_READY", "UNKNOWN") {
+				return errors.New("planes.status is outside the approved enum")
+			}
+		}
+		if plane.ObservedAt != nil {
+			if !oneOf(plane.Name, "state", "dataplane", "management") {
+				return errors.New("planes.name is invalid for an observed plane")
+			}
+			if err := utcTimestamp(*plane.ObservedAt, "planes.observedAt"); err != nil {
+				return err
+			}
+		}
+	}
+	if doc.PublicAddressTLS != nil {
+		if doc.PublicAddressTLS.Configured == nil {
+			return errors.New("publicAddressTls.configured is missing")
 		}
 	}
 	if err := nonEmpty(doc.NetworkProfile.Name, "networkProfile.name"); err != nil {

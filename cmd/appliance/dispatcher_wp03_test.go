@@ -197,3 +197,79 @@ func TestCLIWP03MutatingDispatcherPreservesPartialOperationID(t *testing.T) {
 		t.Fatalf("partial operation evidence lost: %s", stdout)
 	}
 }
+
+func TestCLIWP05DispatcherPreservesStatusFacts(t *testing.T) {
+	res := &backend.Result{Stdout: []byte(validStatusPayload), ExitCode: 0, CorrelationID: "cli-wp05-01"}
+	validated, err := resolveBackendOutcome("status", res, false, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validated == nil || string(validated.Document) != validStatusPayload {
+		t.Fatalf("dispatcher did not preserve the validated status bytes: %#v", validated)
+	}
+	var document struct {
+		ReasonCode string `json:"reasonCode"`
+		Planes     []struct {
+			Name       string `json:"name"`
+			Status     string `json:"status"`
+			ObservedAt string `json:"observedAt"`
+		} `json:"planes"`
+		PublicAddressTLS struct {
+			Configured bool `json:"configured"`
+		} `json:"publicAddressTls"`
+	}
+	if err := json.Unmarshal(validated.Document, &document); err != nil {
+		t.Fatal(err)
+	}
+	if document.ReasonCode != "DATAPLANE_DEGRADED" || len(document.Planes) != 3 ||
+		document.Planes[0].Name != "state" || document.Planes[1].Status != "DEGRADED" ||
+		document.Planes[2].ObservedAt != "2026-09-15T00:00:02Z" || !document.PublicAddressTLS.Configured {
+		t.Fatalf("status facts changed across dispatcher: %+v", document)
+	}
+}
+
+func TestCLIWP05DispatcherRejectsInvalidStatusFacts(t *testing.T) {
+	var canonical map[string]any
+	if err := json.Unmarshal([]byte(validStatusPayload), &canonical); err != nil {
+		t.Fatal(err)
+	}
+	for name, mutate := range map[string]func(map[string]any){
+		"invalid plane enum": func(document map[string]any) {
+			document["planes"].([]any)[0].(map[string]any)["status"] = "HEALTHY"
+		},
+		"non UTC plane timestamp": func(document map[string]any) {
+			document["planes"].([]any)[0].(map[string]any)["observedAt"] = "2026-09-15T09:00:00+09:00"
+		},
+		"invalid TLS shape": func(document map[string]any) {
+			document["publicAddressTls"].(map[string]any)["configured"] = "yes"
+		},
+		"secret-shaped TLS field": func(document map[string]any) {
+			document["publicAddressTls"].(map[string]any)["privateKey"] = "CLI_WP00_SYNTHETIC_SECRET_DO_NOT_EMIT"
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(canonical)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document map[string]any
+			if err := json.Unmarshal(raw, &document); err != nil {
+				t.Fatal(err)
+			}
+			mutate(document)
+			raw, err = json.Marshal(document)
+			if err != nil {
+				t.Fatal(err)
+			}
+			res := &backend.Result{Stdout: raw, ExitCode: 0, CorrelationID: "cli-wp05-01"}
+			validated, err := resolveBackendOutcome("status", res, false, true)
+			if validated != nil {
+				t.Fatalf("invalid status facts escaped dispatcher: %s", validated.Document)
+			}
+			var payloadErr *backend.PayloadValidationError
+			if !errors.As(err, &payloadErr) {
+				t.Fatalf("error type = %T, want PayloadValidationError", err)
+			}
+		})
+	}
+}

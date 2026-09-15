@@ -6,7 +6,7 @@
       {
         "id": "payload.status.positive",
         "command": "status",
-        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "status", "overallStatus": "DEGRADED", "productRelease": "v0.9.8.9-rc.1", "initialized": true, "planes": [{"name": "gateway", "live": true, "ready": false, "reasonCode": "DEPENDENCY_PENDING"}], "networkProfile": {"name": "dual-nic", "configured": true}, "activeOperations": [], "localGatewayRegistration": {"registered": true, "installationId": "install-01", "instanceId": "gateway-01"}, "observedAt": "2026-09-15T00:00:00Z"}
+        "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "status", "overallStatus": "DEGRADED", "reasonCode": "DATAPLANE_DEGRADED", "productRelease": "v0.9.8.9-rc.1", "initialized": true, "planes": [{"name": "state", "live": true, "ready": true, "reasonCode": "STATE_READY", "status": "READY", "observedAt": "2026-09-15T00:00:00Z"}, {"name": "dataplane", "live": true, "ready": false, "reasonCode": "DEPENDENCY_PENDING", "status": "DEGRADED", "observedAt": "2026-09-15T00:00:01Z"}, {"name": "management", "live": true, "ready": true, "reasonCode": "MANAGEMENT_READY", "status": "READY", "observedAt": "2026-09-15T00:00:02Z"}], "networkProfile": {"name": "dual-nic", "configured": true}, "activeOperations": [], "localGatewayRegistration": {"registered": true, "installationId": "install-01", "instanceId": "gateway-01"}, "publicAddressTls": {"configured": true}, "observedAt": "2026-09-15T00:00:03Z"}
       },
       {
         "id": "payload.network-validate.positive",
@@ -66,6 +66,21 @@
       "cardinality": 72
     },
     "twoSidedRule": "Every expanded command and negativeMutationClass pair names payload.{schemaSlug}.positive as its valid twin."
+  },
+  "statusContract": {
+    "positive": [
+      {"id": "status.legacy-optional.accept", "command": "status", "document": {"schemaVersion": "appliance-backend-payload/v1", "command": "status", "overallStatus": "NOT_READY", "productRelease": "v0.9.8.9-rc.1", "initialized": true, "planes": [{"name": "gateway", "live": false, "ready": false, "reasonCode": "GATEWAY_DOWN"}], "networkProfile": {"name": "dual-nic", "configured": true}, "activeOperations": [], "localGatewayRegistration": {"registered": true, "installationId": "install-01", "instanceId": "gateway-01"}, "observedAt": "2026-09-15T00:00:00Z"}}
+    ],
+    "negative": [
+      {"id": "status.plane-status-invalid.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/planes/0/status", "value": "HEALTHY"},
+      {"id": "status.plane-observed-at-malformed.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/planes/0/observedAt", "value": "not-a-time"},
+      {"id": "status.plane-observed-at-non-utc.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/planes/0/observedAt", "value": "2026-09-15T09:00:00+09:00"},
+      {"id": "status.reason-code-malformed.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/reasonCode", "value": "bad"},
+      {"id": "status.public-address-tls-type.reject", "twin": "payload.status.positive", "operation": "replace", "path": "/publicAddressTls/configured", "value": "yes"},
+      {"id": "status.public-address-tls-missing-configured.reject", "twin": "payload.status.positive", "operation": "remove", "path": "/publicAddressTls/configured"},
+      {"id": "status.public-address-tls-unknown-field.reject", "twin": "payload.status.positive", "operation": "add", "path": "/publicAddressTls/certificate", "value": "forbidden"},
+      {"id": "status.public-address-tls-secret-field.reject", "twin": "payload.status.positive", "operation": "add", "path": "/publicAddressTls/privateKey", "valueFrom": "syntheticSecretSentinel"}
+    ]
   },
   "operationErrors": {
     "positive": [
