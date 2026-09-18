@@ -194,6 +194,50 @@ var payloadRegistry = map[PayloadTuple]payloadSpec{
 		RequiredKeys: []string{"schemaVersion", "command", "result", "archivePath", "authenticated", "checksumValid", "keyMatch", "manifestSchema", "releaseCompatibility", "componentChecksums", "observedAt"},
 		Validate:     validateBackupVerifyPayload,
 	},
+	tuple("restore plan"):          lifecyclePlanSpec("restore plan"),
+	tuple("restore execute"):       lifecycleExecuteSpec("restore execute"),
+	tuple("update plan"):           lifecyclePlanSpec("update plan"),
+	tuple("update execute"):        lifecycleExecuteSpec("update execute"),
+	tuple("update status"):         lifecycleStatusSpec("update status"),
+	tuple("rollback plan"):         lifecyclePlanSpec("rollback plan"),
+	tuple("rollback execute"):      lifecycleExecuteSpec("rollback execute"),
+	tuple("rollback status"):       lifecycleStatusSpec("rollback status"),
+	tuple("factory-reset plan"):    lifecyclePlanSpec("factory-reset plan"),
+	tuple("factory-reset execute"): lifecycleExecuteSpec("factory-reset execute"),
+}
+
+func lifecyclePlanSpec(command string) payloadSpec {
+	spec := payloadSpec{
+		Tuple:        tuple(command),
+		SchemaPath:   "contracts/backend-payloads/v1/lifecycle/" + strings.ReplaceAll(command, " ", "-") + ".schema.json",
+		SchemaID:     "https://loxilb.io/schemas/appliance-backend/v1/lifecycle/" + strings.ReplaceAll(command, " ", "-") + ".schema.json",
+		RequiredKeys: []string{"schemaVersion", "command", "result", "planHash", "expiresAt", "compatible", "affectedPlanes", "checks"},
+		Validate:     validateLifecyclePlanPayload,
+	}
+	if command == "factory-reset plan" {
+		spec.RequiredKeys = append(spec.RequiredKeys, "delete", "preserve")
+	}
+	return spec
+}
+
+func lifecycleExecuteSpec(command string) payloadSpec {
+	return payloadSpec{
+		Tuple:        tuple(command),
+		SchemaPath:   "contracts/backend-payloads/v1/lifecycle/" + strings.ReplaceAll(command, " ", "-") + ".schema.json",
+		SchemaID:     "https://loxilb.io/schemas/appliance-backend/v1/lifecycle/" + strings.ReplaceAll(command, " ", "-") + ".schema.json",
+		RequiredKeys: []string{"schemaVersion", "command", "result", "operationId", "planHash", "status", "acceptedAt"},
+		Validate:     validateLifecycleExecutePayload,
+	}
+}
+
+func lifecycleStatusSpec(command string) payloadSpec {
+	return payloadSpec{
+		Tuple:        tuple(command),
+		SchemaPath:   "contracts/backend-payloads/v1/lifecycle/" + strings.ReplaceAll(command, " ", "-") + ".schema.json",
+		SchemaID:     "https://loxilb.io/schemas/appliance-backend/v1/lifecycle/" + strings.ReplaceAll(command, " ", "-") + ".schema.json",
+		RequiredKeys: []string{"schemaVersion", "command", "operationId", "status", "phase", "observedAt"},
+		Validate:     validateLifecycleStatusPayload,
+	}
 }
 
 // RegisteredPayloadTuples returns a stable, canonical-order copy of the
@@ -985,4 +1029,133 @@ func validateChecksums(checksums map[string]string) error {
 		}
 	}
 	return nil
+}
+
+type lifecycleCheck struct {
+	Code   string `json:"code"`
+	Result string `json:"result"`
+}
+
+type lifecyclePlanPayload struct {
+	SchemaVersion  string           `json:"schemaVersion"`
+	Command        string           `json:"command"`
+	Result         string           `json:"result"`
+	PlanHash       string           `json:"planHash"`
+	ExpiresAt      string           `json:"expiresAt"`
+	Compatible     bool             `json:"compatible"`
+	AffectedPlanes []string         `json:"affectedPlanes"`
+	Checks         []lifecycleCheck `json:"checks"`
+	Delete         []string         `json:"delete"`
+	Preserve       []string         `json:"preserve"`
+}
+
+func validateLifecyclePlanPayload(raw []byte) error {
+	doc, err := decodePayload[lifecyclePlanPayload](raw)
+	if err != nil {
+		return err
+	}
+	if doc.Result != "PLANNED" || !digestShape.MatchString(doc.PlanHash) || !doc.Compatible {
+		return errors.New("lifecycle plan result, hash, or compatibility is invalid")
+	}
+	if err := utcTimestamp(doc.ExpiresAt, "expiresAt"); err != nil {
+		return err
+	}
+	if len(doc.AffectedPlanes) == 0 || len(doc.Checks) == 0 {
+		return errors.New("lifecycle plan must contain affectedPlanes and checks")
+	}
+	for _, plane := range doc.AffectedPlanes {
+		if !oneOf(plane, "state", "dataplane", "management", "host") {
+			return errors.New("lifecycle plan contains an invalid affected plane")
+		}
+	}
+	if err := uniqueNonEmpty(doc.AffectedPlanes, "affectedPlanes"); err != nil {
+		return err
+	}
+	for _, check := range doc.Checks {
+		if !upperCodeShape.MatchString(check.Code) || !oneOf(check.Result, "PASS", "WARN") {
+			return errors.New("lifecycle plan contains an invalid check")
+		}
+	}
+	requiredChecks := map[string][]string{
+		"restore plan":       {"ARCHIVE_AUTHENTICATION", "ARCHIVE_CHECKSUM", "SCHEMA_COMPATIBILITY", "DISK_CAPACITY", "INSTALLATION_COMPATIBILITY", "PRE_RESTORE_BACKUP", "ROLLBACK_FEASIBILITY"},
+		"update plan":        {"BUNDLE_SIGNATURE", "PRODUCT_LOCK", "SBOM", "MIGRATION", "BACKUP_GATE"},
+		"rollback plan":      {"APPROVED_RELEASE", "BACKUP_GATE", "DOWNGRADE_COMPATIBILITY", "POSTFLIGHT"},
+		"factory-reset plan": {"BACKUP_GATE", "SSH_PRESERVATION", "NETWORK_PRESERVATION", "NCP_AGENT_PRESERVATION"},
+	}
+	observed := make(map[string]bool, len(doc.Checks))
+	for _, check := range doc.Checks {
+		observed[check.Code] = true
+	}
+	for _, required := range requiredChecks[doc.Command] {
+		if !observed[required] {
+			return fmt.Errorf("lifecycle plan is missing required check %q", required)
+		}
+	}
+	if doc.Command == "factory-reset plan" {
+		if err := uniqueNonEmpty(doc.Delete, "delete"); err != nil {
+			return err
+		}
+		if err := uniqueNonEmpty(doc.Preserve, "preserve"); err != nil {
+			return err
+		}
+		for _, item := range append(append([]string(nil), doc.Delete...), doc.Preserve...) {
+			if !mapKeyShape.MatchString(item) {
+				return errors.New("factory-reset delete/preserve item is malformed")
+			}
+		}
+		preserved := make(map[string]bool, len(doc.Preserve))
+		for _, item := range doc.Preserve {
+			preserved[item] = true
+		}
+		for _, required := range []string{"ssh-access", "network-config", "ncp-agent"} {
+			if !preserved[required] {
+				return fmt.Errorf("factory-reset plan does not preserve %q", required)
+			}
+		}
+	}
+	return nil
+}
+
+type lifecycleExecutePayload struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Command       string `json:"command"`
+	Result        string `json:"result"`
+	OperationID   string `json:"operationId"`
+	PlanHash      string `json:"planHash"`
+	Status        string `json:"status"`
+	AcceptedAt    string `json:"acceptedAt"`
+}
+
+func validateLifecycleExecutePayload(raw []byte) error {
+	doc, err := decodePayload[lifecycleExecutePayload](raw)
+	if err != nil {
+		return err
+	}
+	if doc.Result != "ACCEPTED" || !identifierShape.MatchString(doc.OperationID) ||
+		!digestShape.MatchString(doc.PlanHash) || !oneOf(doc.Status, "PENDING", "RUNNING") {
+		return errors.New("lifecycle execute receipt is invalid")
+	}
+	return utcTimestamp(doc.AcceptedAt, "acceptedAt")
+}
+
+type lifecycleStatusPayload struct {
+	SchemaVersion string `json:"schemaVersion"`
+	Command       string `json:"command"`
+	OperationID   string `json:"operationId"`
+	Status        string `json:"status"`
+	Phase         string `json:"phase"`
+	ObservedAt    string `json:"observedAt"`
+}
+
+func validateLifecycleStatusPayload(raw []byte) error {
+	doc, err := decodePayload[lifecycleStatusPayload](raw)
+	if err != nil {
+		return err
+	}
+	if !identifierShape.MatchString(doc.OperationID) ||
+		!oneOf(doc.Status, "PENDING", "RUNNING", "SUCCEEDED", "FAILED", "ROLLED_BACK", "PARTIAL") ||
+		!upperCodeShape.MatchString(doc.Phase) {
+		return errors.New("lifecycle operation status is invalid")
+	}
+	return utcTimestamp(doc.ObservedAt, "observedAt")
 }

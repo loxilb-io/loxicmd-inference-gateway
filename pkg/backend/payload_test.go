@@ -789,14 +789,14 @@ func validateSchemaAgainstSpec(raw []byte, spec payloadSpec) error {
 func TestCLIWP02ParityMatchesSchemasFixturesAndRegistry(t *testing.T) {
 	fixtures, _ := loadWP02Fixtures(t)
 	registered := RegisteredPayloadTuples()
-	if len(registered) != 9 || len(payloadRegistry) != 9 {
-		t.Fatalf("registry count = %d/%d", len(registered), len(payloadRegistry))
-	}
 	fixtureCommands := map[string]struct{}{}
 	for _, fixture := range fixtures.Payloads.Positive {
 		fixtureCommands[fixture.Command] = struct{}{}
 	}
 	for _, tuple := range registered {
+		if _, legacy := fixtureCommands[tuple.Command]; !legacy {
+			continue
+		}
 		spec := payloadRegistry[tuple]
 		raw, err := os.ReadFile(filepath.Join(wp02RepoRoot(t), filepath.FromSlash(spec.SchemaPath)))
 		if err != nil {
@@ -805,8 +805,28 @@ func TestCLIWP02ParityMatchesSchemasFixturesAndRegistry(t *testing.T) {
 		if err := validateSchemaAgainstSpec(raw, spec); err != nil {
 			t.Fatalf("%s: %v", tuple.Command, err)
 		}
-		if _, ok := fixtureCommands[tuple.Command]; !ok {
-			t.Fatalf("registry command %q has no fixture", tuple.Command)
+	}
+	if len(fixtureCommands) != 9 {
+		t.Fatalf("legacy WP-02 fixture count = %d, want 9", len(fixtureCommands))
+	}
+}
+
+func TestNCPPhase2LifecycleSchemasMatchRegistry(t *testing.T) {
+	commands := []string{
+		"restore plan", "restore execute", "update plan", "update execute", "update status",
+		"rollback plan", "rollback execute", "rollback status", "factory-reset plan", "factory-reset execute",
+	}
+	for _, command := range commands {
+		spec, ok := payloadRegistry[tupleForCommand(command)]
+		if !ok {
+			t.Fatalf("lifecycle command %q is absent from registry", command)
+		}
+		raw, err := os.ReadFile(filepath.Join(wp02RepoRoot(t), filepath.FromSlash(spec.SchemaPath)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := validateSchemaAgainstSpec(raw, spec); err != nil {
+			t.Fatalf("%s: %v", command, err)
 		}
 	}
 }

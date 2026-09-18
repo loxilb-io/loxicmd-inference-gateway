@@ -1,11 +1,15 @@
 package api
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -17,6 +21,8 @@ import (
 
 type gatewayContractManifest struct {
 	Source struct {
+		Repository          string `json:"repository"`
+		Revision            string `json:"revision"`
 		SwaggerSHA256       string `json:"swagger_sha256"`
 		SwaggerExtrasSHA256 string `json:"swagger_extras_sha256"`
 	} `json:"source"`
@@ -47,14 +53,29 @@ func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
 		t.Fatalf("read contract manifest: %v", err)
 	}
 	var manifest gatewayContractManifest
-	if err := json.Unmarshal(b, &manifest); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(b))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&manifest); err != nil {
 		t.Fatalf("decode contract manifest: %v", err)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		t.Fatalf("contract manifest has trailing content: %v", err)
 	}
 	return manifest
 }
 
 func TestGatewayContractManifest(t *testing.T) {
 	manifest := loadGatewayContractManifest(t)
+	if manifest.Source.Repository != "https://github.com/loxilb-io/loxilb-inference-gateway" {
+		t.Fatalf("gateway contract repository is not the approved producer: %q", manifest.Source.Repository)
+	}
+	if len(manifest.Source.Revision) != 40 {
+		t.Fatalf("gateway contract revision must be an exact 40-character commit, got %q", manifest.Source.Revision)
+	}
+	if _, err := hex.DecodeString(manifest.Source.Revision); err != nil {
+		t.Fatalf("gateway contract revision must be hexadecimal: %v", err)
+	}
 	for name, value := range map[string]string{
 		"swagger_sha256":        manifest.Source.SwaggerSHA256,
 		"swagger_extras_sha256": manifest.Source.SwaggerExtrasSHA256,
@@ -84,12 +105,28 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 	}
 
 	manifest := loadGatewayContractManifest(t)
+	resolved, err := exec.Command("git", "-C", repo, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatalf("resolve Gateway checkout revision: %v", err)
+	}
+	if got := strings.TrimSpace(string(resolved)); got != manifest.Source.Revision {
+		t.Fatalf("Gateway checkout revision %s does not match the explicitly selected contract revision %s", got, manifest.Source.Revision)
+	}
 	specs := make(map[string]map[interface{}]interface{})
 	for _, name := range []string{"swagger.yml", "swagger-extras.yml"} {
 		path := filepath.Join(repo, "api", name)
 		b, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read %s: %v", path, err)
+		}
+		digest := sha256.Sum256(b)
+		gotDigest := hex.EncodeToString(digest[:])
+		wantDigest := manifest.Source.SwaggerSHA256
+		if name == "swagger-extras.yml" {
+			wantDigest = manifest.Source.SwaggerExtrasSHA256
+		}
+		if gotDigest != wantDigest {
+			t.Fatalf("%s digest %s does not match manifest %s", name, gotDigest, wantDigest)
 		}
 		var spec map[interface{}]interface{}
 		if err := yaml.Unmarshal(b, &spec); err != nil {

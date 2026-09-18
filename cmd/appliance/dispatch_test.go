@@ -165,8 +165,8 @@ esac`))
 		}
 	})
 
-	t.Run("unavailable command exits 6 and never stubs success", func(t *testing.T) {
-		status, stdout, stderr := runAppliance(t, binary, "appliance", "factory-reset", "-o", "json")
+	t.Run("unadvertised lifecycle command exits 6 with a contract error", func(t *testing.T) {
+		status, stdout, stderr := runAppliance(t, binary, "appliance", "factory-reset", "plan", "-o", "json")
 		if status != 6 {
 			t.Fatalf("status=%d, want the taxonomy's 6\nstdout=%q stderr=%q", status, stdout, stderr)
 		}
@@ -179,7 +179,7 @@ esac`))
 		if err := json.Unmarshal([]byte(stdout), &doc); err != nil {
 			t.Fatalf("failure envelope missing (%v): %s", err, stdout)
 		}
-		if doc.Success || doc.Data.ComponentCode != "command-unavailable" {
+		if doc.Success || doc.Data.ComponentCode != "BACKEND_CONTRACT_INVALID" {
 			t.Fatalf("unexpected failure envelope: %s", stdout)
 		}
 	})

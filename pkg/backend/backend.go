@@ -93,8 +93,9 @@ const (
 // token; any argv token outside the rule is rejected CLI-side before a
 // process starts.
 type argvRule struct {
-	positionals int
-	flags       []string
+	positionals    int
+	minPositionals int
+	flags          []string
 	// mutating subcommands run only after the contract-version handshake
 	// proves the installed backend advertises them.
 	mutating bool
@@ -118,11 +119,24 @@ var allowedArgv = map[string]argvRule{
 	"backup key-create":        {flags: []string{"--key-file="}, mutating: true},
 	"backup create":            {positionals: 1, flags: []string{"--key-file="}, mutating: true},
 	"backup verify":            {positionals: 1, flags: []string{"--key-file="}, mutating: true},
+	"restore plan":             {positionals: 1, minPositionals: 1, flags: []string{"--key-file="}},
+	"restore execute":          {flags: []string{"--plan-hash=", "--confirm="}, mutating: true},
+	"update plan":              {positionals: 1, minPositionals: 1},
+	"update execute":           {flags: []string{"--plan-hash=", "--confirm="}, mutating: true},
+	"update status":            {positionals: 1, minPositionals: 1},
+	"rollback plan":            {positionals: 1, minPositionals: 1, flags: []string{"--archive=", "--key-file="}},
+	"rollback execute":         {flags: []string{"--plan-hash=", "--confirm="}, mutating: true},
+	"rollback status":          {positionals: 1, minPositionals: 1},
+	"factory-reset plan":       {},
+	"factory-reset execute":    {flags: []string{"--plan-hash=", "--confirm="}, mutating: true},
 }
 
-// contractCommands is the CLI-WP00-approved CONSERVATIVE_V1 matrix. The
-// handshake must advertise these ten entries byte-for-byte in this canonical
-// order; a backend command list is contract data, not a discovery hint.
+// contractCommands is the approved command matrix. A backend may advertise
+// the ten-command rc.2 prefix for backwards-compatible diagnostics, or this
+// complete matrix. Lifecycle commands still fail closed unless their exact
+// metadata is present; a command list is contract data, not a discovery hint.
+const legacyContractCommandCount = 10
+
 var contractCommands = []ContractCommand{
 	{Name: "status", ReadOnly: true, Capabilities: []string{"json-output"}},
 	{Name: "network validate", ReadOnly: true, Capabilities: []string{"json-output"}},
@@ -134,6 +148,16 @@ var contractCommands = []ContractCommand{
 	{Name: "backup key-create", Capabilities: []string{"json-output", "key-file", "operation-receipt"}},
 	{Name: "backup create", Capabilities: []string{"json-output", "key-file", "operation-receipt"}},
 	{Name: "backup verify", Capabilities: []string{"json-output", "key-file"}},
+	{Name: "restore plan", ReadOnly: true, Capabilities: []string{"json-output", "archive", "key-file", "plan-hash"}},
+	{Name: "restore execute", Capabilities: []string{"json-output", "plan-hash", "one-time-challenge", "operation-receipt"}},
+	{Name: "update plan", ReadOnly: true, Capabilities: []string{"json-output", "signed-bundle", "plan-hash"}},
+	{Name: "update execute", Capabilities: []string{"json-output", "plan-hash", "one-time-challenge", "operation-receipt"}},
+	{Name: "update status", ReadOnly: true, Capabilities: []string{"json-output", "operation-status"}},
+	{Name: "rollback plan", ReadOnly: true, Capabilities: []string{"json-output", "approved-release", "archive", "key-file", "plan-hash"}},
+	{Name: "rollback execute", Capabilities: []string{"json-output", "plan-hash", "one-time-challenge", "operation-receipt"}},
+	{Name: "rollback status", ReadOnly: true, Capabilities: []string{"json-output", "operation-status"}},
+	{Name: "factory-reset plan", ReadOnly: true, Capabilities: []string{"json-output", "preservation-plan", "plan-hash"}},
+	{Name: "factory-reset execute", Capabilities: []string{"json-output", "plan-hash", "one-time-challenge", "operation-receipt"}},
 }
 
 var capabilityShape = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
@@ -148,6 +172,9 @@ func (r argvRule) validate(args []string) error {
 	}
 	if i > r.positionals {
 		return fmt.Errorf("%d positional argument(s), at most %d allowed", i, r.positionals)
+	}
+	if i < r.minPositionals {
+		return fmt.Errorf("%d positional argument(s), at least %d required", i, r.minPositionals)
 	}
 	for i < len(args) {
 		token := args[i]
@@ -420,13 +447,20 @@ type Request struct {
 // followed by one best-effort read, but JSON bytes from that read are discarded
 // and the typed handshake verdict remains the returned error.
 func Invoke(ctx context.Context, subcommand string, jsonOut bool) (*Result, error) {
-	req := &Request{Subcommand: subcommand, JSON: jsonOut}
+	return InvokeReadOnly(ctx, &Request{Subcommand: subcommand, JSON: jsonOut})
+}
+
+// InvokeReadOnly runs an allowlisted read-only request that may carry validated
+// positional and flag arguments. Lifecycle plan/status commands need this
+// request form while preserving the same handshake and degraded-read rules as
+// the historical argument-free reads.
+func InvokeReadOnly(ctx context.Context, req *Request) (*Result, error) {
 	if err := validateRequest(req, false); err != nil {
 		return nil, err
 	}
 	contract, handshakeErr := Handshake(ctx)
 	if handshakeErr == nil {
-		if err := requireAdvertisedCommand(contract, subcommand, true); err != nil {
+		if err := requireAdvertisedCommand(contract, req.Subcommand, true); err != nil {
 			return nil, err
 		}
 		return invoke(ctx, req, false)
@@ -457,7 +491,7 @@ func Invoke(ctx context.Context, subcommand string, jsonOut bool) (*Result, erro
 	if operationErr != nil {
 		res.Degraded.BackendExitStatus = -1
 	}
-	if jsonOut {
+	if req.JSON {
 		res.Stdout = nil
 		res.Stderr = nil
 	}
@@ -579,8 +613,8 @@ func (c *Contract) validate() error {
 			ComponentCode: "contract-major-unsupported",
 		}
 	}
-	if len(c.Commands) != len(contractCommands) {
-		return contractViolation(fmt.Sprintf("contract advertises %d commands, want %d", len(c.Commands), len(contractCommands)))
+	if len(c.Commands) != legacyContractCommandCount && len(c.Commands) != len(contractCommands) {
+		return contractViolation(fmt.Sprintf("contract advertises %d commands, want the legacy %d-command prefix or the complete %d-command matrix", len(c.Commands), legacyContractCommandCount, len(contractCommands)))
 	}
 	seenCommands := make(map[string]struct{}, len(c.Commands))
 	for index, cmd := range c.Commands {

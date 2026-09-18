@@ -63,14 +63,10 @@ and keep working while the gateway container is stopped or unhealthy.`,
 	applianceCmd.AddCommand(diagnosticsCmd(restOptions))
 	applianceCmd.AddCommand(logsCmd(restOptions))
 	applianceCmd.AddCommand(backupCmd(restOptions))
-	for _, unavailable := range []struct{ use, what string }{
-		{"restore", "restoring the appliance from a backup"},
-		{"update", "updating the appliance software"},
-		{"rollback", "rolling back an appliance update"},
-		{"factory-reset", "resetting the appliance to factory state"},
-	} {
-		applianceCmd.AddCommand(unavailableCmd(restOptions, unavailable.use, unavailable.what))
-	}
+	applianceCmd.AddCommand(restoreCmd(restOptions))
+	applianceCmd.AddCommand(updateCmd(restOptions))
+	applianceCmd.AddCommand(rollbackCmd(restOptions))
+	applianceCmd.AddCommand(factoryResetCmd(restOptions))
 	return applianceCmd
 }
 
@@ -127,32 +123,6 @@ Examples:
 	return networkCmd
 }
 
-// unavailableCmd is a function the current release does not provide. Per
-// the invocation contract it is visible in help as unavailable and fails
-// with a contract mismatch when invoked — never a successful stub.
-func unavailableCmd(restOptions *api.RESTOptions, use, what string) *cobra.Command {
-	return &cobra.Command{
-		Use:           use,
-		Short:         "Not available in this release",
-		Long:          fmt.Sprintf("Not available in this release: %s ships with a later appliance backend.", what),
-		SilenceUsage:  true,
-		SilenceErrors: true,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = args
-			err := &exitcode.CLIError{
-				Code:          exitcode.ContractMismatch,
-				Message:       fmt.Sprintf("appliance %s is not available in this release", use),
-				Origin:        "backend",
-				ComponentCode: "command-unavailable",
-			}
-			if restOptions.PrintOption == "json" {
-				writeEnvelope(cmd.OutOrStdout(), "appliance."+use, nil, nil, err)
-			}
-			return err
-		},
-	}
-}
-
 // applianceData is the data payload of the CommandResult envelope for a
 // dispatched command: the backend's own JSON document, preserved without
 // loss, plus the schema's failure triple when the invocation failed.
@@ -171,14 +141,19 @@ type applianceData struct {
 // outcome. The backend package performs the contract-version handshake first;
 // only a typed degraded-handshake class may continue to one best-effort read.
 func dispatchReadOnly(out, errOut io.Writer, restOptions *api.RESTOptions, command, subcommand string) error {
+	return dispatchReadOnlyRequest(out, errOut, restOptions, command, &backend.Request{Subcommand: subcommand})
+}
+
+func dispatchReadOnlyRequest(out, errOut io.Writer, restOptions *api.RESTOptions, command string, req *backend.Request) error {
 	jsonOut := restOptions.PrintOption == "json"
+	req.JSON = jsonOut
 	ctx, cancel := requestContext(restOptions)
 	defer cancel()
 
-	res, err := backend.Invoke(ctx, subcommand, jsonOut)
+	res, err := backend.InvokeReadOnly(ctx, req)
 	var validated *backend.ValidatedPayload
 	if err == nil {
-		validated, err = resolveBackendOutcome(subcommand, res, false, jsonOut)
+		validated, err = resolveBackendOutcome(req.Subcommand, res, false, jsonOut)
 	}
 	if err != nil {
 		if jsonOut {
