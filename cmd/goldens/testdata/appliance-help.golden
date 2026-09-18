@@ -12,15 +12,15 @@ Available Commands:
   backup         Encrypted appliance backups
   credentials    Initial appliance credentials
   diagnostics    Appliance support diagnostics
-  factory-reset  Not available in this release
+  factory-reset  Plan and execute a safety-preserving factory reset
   gateway        Local gateway registration in OAM
   logs           Retrieve bounded, redacted logs for an approved component
   network        Appliance network checks (read-only)
   public-address Appliance public address (CSP 1:1 NAT) management
-  restore        Not available in this release
-  rollback       Not available in this release
+  restore        Plan and execute an authenticated appliance restore
+  rollback       Plan, execute, and inspect a governed appliance rollback
   status         Read the complete appliance lifecycle state (read-only)
-  update         Not available in this release
+  update         Plan, execute, and inspect a signed appliance update
 
 Flags:
   -h, --help   help for appliance

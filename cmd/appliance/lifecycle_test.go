@@ -16,6 +16,7 @@
 package appliance
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -96,7 +97,14 @@ esac
 	} {
 		t.Run(name, func(t *testing.T) {
 			status, stdout, stderr := runAppliance(t, binary, tc.args...)
-			if status != 0 || stderr != "" || !strings.Contains(stdout, `"command":"`+tc.command+`"`) || !strings.Contains(stdout, `"success":true`) {
+			var result struct {
+				Command string `json:"command"`
+				Success bool   `json:"success"`
+			}
+			if err := json.Unmarshal([]byte(stdout), &result); err != nil {
+				t.Fatalf("stdout is not the result envelope (%v): %s", err, stdout)
+			}
+			if status != 0 || stderr != "" || result.Command != tc.command || !result.Success {
 				t.Fatalf("status=%d stdout=%q stderr=%q", status, stdout, stderr)
 			}
 			raw, err := os.ReadFile(record)
