@@ -74,10 +74,22 @@ jobs:
         with:
           path: cli
 
+      - name: Resolve the explicitly selected Gateway contract revision
+        id: gateway-contract
+        working-directory: cli
+        shell: bash
+        run: |
+          revision="$(jq -er '.source.revision' testdata/contracts/gateway-api.json)"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::gateway contract revision must be an exact 40-character commit"
+            exit 1
+          }
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: loxilb-io/loxilb-inference-gateway
-          ref: main
+          ref: ${{ steps.gateway-contract.outputs.revision }}
           path: gateway
           persist-credentials: false
 

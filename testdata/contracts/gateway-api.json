@@ -1,7 +1,9 @@
 {
   "source": {
-    "swagger_sha256": "8a22e2d566e5d37b7771b850a80d54c211c4aef4ab5543106ea1f06eeb146763",
-    "swagger_extras_sha256": "4e602fc9652f481e48ede784e51d462300940b1995cb2cd19473fe840e6e0efb"
+    "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
+    "revision": "c58e1ee481bfc12ded112de07219bde497b79d36",
+    "swagger_sha256": "908db1c4a8401495a47714cb1c33c452419e94d72d324b330b737b5e214a784d",
+    "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
   },
   "operations": [
     {"spec": "swagger.yml", "path": "/config/loadbalancer", "methods": ["post"]},

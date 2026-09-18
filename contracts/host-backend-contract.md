@@ -81,3 +81,29 @@ and validates the response against `backend-contract.schema.json`. The rules:
 - Functions the installed backend does not advertise are reported as
   unavailable in help/capabilities and fail with `6` if invoked; they are
   never implemented as successful stubs.
+
+## Destructive lifecycle command matrix
+
+The rc.2 ten-command matrix remains an accepted prefix so read-only diagnosis
+continues to work during an orchestrated backend upgrade. The following
+commands require the complete matrix and exact ordered capabilities; absence,
+reordering, or capability drift fails with `6` before an operation is called.
+
+| Command | Backend argv beyond command | Effect |
+|---|---|---|
+| `restore plan` | `ARCHIVE --key-file PATH` | read-only |
+| `restore execute` | `--plan-hash SHA256 --confirm CHALLENGE` | mutating |
+| `update plan` | `BUNDLE` | read-only |
+| `update execute` | `--plan-hash SHA256 --confirm CHALLENGE` | mutating |
+| `update status` | `OPERATION_ID` | read-only |
+| `rollback plan` | `RELEASE --archive PATH --key-file PATH` | read-only |
+| `rollback execute` | `--plan-hash SHA256 --confirm CHALLENGE` | mutating |
+| `rollback status` | `OPERATION_ID` | read-only |
+| `factory-reset plan` | none | read-only |
+| `factory-reset execute` | `--plan-hash SHA256 --confirm CHALLENGE` | mutating |
+
+Archive and bundle inputs are absolute existing regular files and may not be
+symlinks. Key files additionally satisfy the root-only secret-file policy.
+Release and operation IDs are non-flag identifiers. The challenge is a
+short-lived confirmation value, not a password, token, key, or other bearer
+credential; secret values are never accepted through these command lines.

@@ -165,8 +165,8 @@ esac`))
 		}
 	})
 
-	t.Run("unavailable command exits 6 and never stubs success", func(t *testing.T) {
-		status, stdout, stderr := runAppliance(t, binary, "appliance", "factory-reset", "-o", "json")
+	t.Run("unadvertised lifecycle command exits 6 and never stubs success", func(t *testing.T) {
+		status, stdout, stderr := runAppliance(t, binary, "appliance", "factory-reset", "plan", "-o", "json")
 		if status != 6 {
 			t.Fatalf("status=%d, want the taxonomy's 6\nstdout=%q stderr=%q", status, stdout, stderr)
 		}

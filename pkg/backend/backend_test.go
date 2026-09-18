@@ -42,6 +42,22 @@ const validContract = `{"apiVersion":"loxilb.io/appliance-backend/v1","kind":"Ba
 	`{"name":"backup create","readOnly":false,"capabilities":["json-output","key-file","operation-receipt"]},` +
 	`{"name":"backup verify","readOnly":false,"capabilities":["json-output","key-file"]}]}`
 
+const lifecycleContractSuffix = `,` +
+	`{"name":"restore plan","readOnly":true,"capabilities":["json-output","archive","key-file","plan-hash"]},` +
+	`{"name":"restore execute","readOnly":false,"capabilities":["json-output","plan-hash","one-time-challenge","operation-receipt"]},` +
+	`{"name":"update plan","readOnly":true,"capabilities":["json-output","signed-bundle","plan-hash"]},` +
+	`{"name":"update execute","readOnly":false,"capabilities":["json-output","plan-hash","one-time-challenge","operation-receipt"]},` +
+	`{"name":"update status","readOnly":true,"capabilities":["json-output","operation-status"]},` +
+	`{"name":"rollback plan","readOnly":true,"capabilities":["json-output","approved-release","archive","key-file","plan-hash"]},` +
+	`{"name":"rollback execute","readOnly":false,"capabilities":["json-output","plan-hash","one-time-challenge","operation-receipt"]},` +
+	`{"name":"rollback status","readOnly":true,"capabilities":["json-output","operation-status"]},` +
+	`{"name":"factory-reset plan","readOnly":true,"capabilities":["json-output","preservation-plan","plan-hash"]},` +
+	`{"name":"factory-reset execute","readOnly":false,"capabilities":["json-output","plan-hash","one-time-challenge","operation-receipt"]}`
+
+func validLifecycleContract() string {
+	return strings.TrimSuffix(validContract, "]}") + lifecycleContractSuffix + "]}"
+}
+
 // fakeBackend writes an executable script standing in for the host backend
 // and points the adapter at it. The script records its argv and environment
 // so the tests can prove what the adapter actually spawned.
@@ -148,6 +164,76 @@ func TestHandshakeAcceptsAValidContract(t *testing.T) {
 	}
 	if !contract.Supports("backup create") || contract.Supports("restore") {
 		t.Fatal("exact command availability was not preserved")
+	}
+}
+
+func TestHandshakeAcceptsCompleteLifecycleContract(t *testing.T) {
+	fakeBackend(t, fmt.Sprintf("echo '%s'", validLifecycleContract()))
+	contract, err := Handshake(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !contract.Supports("restore plan") || !contract.Supports("factory-reset execute") {
+		t.Fatalf("lifecycle capabilities lost: %+v", contract.Commands)
+	}
+}
+
+func TestLifecycleReadOnlyAndMutatingArgvAreGated(t *testing.T) {
+	dir := fakeBackend(t, contractThenEcho(validLifecycleContract()))
+	plan, err := InvokeReadOnly(context.Background(), &Request{
+		Subcommand: "restore plan", Args: []string{"/root/backup.tar", "--key-file", "/root/backup.key"}, JSON: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	argv, _ := os.ReadFile(filepath.Join(dir, "argv"))
+	if got := strings.Split(strings.TrimSpace(string(argv)), "\n"); strings.Join(got[:5], " ") != "restore plan /root/backup.tar --key-file /root/backup.key" || got[len(got)-1] != "--json" {
+		t.Fatalf("restore plan argv = %#v", got)
+	}
+
+	execute, err := InvokeMutating(context.Background(), &Request{
+		Subcommand: "update execute", Args: []string{"--plan-hash", strings.Repeat("a", 64), "--confirm", "challenge-1234"}, JSON: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.CorrelationID == "" || execute.CorrelationID == "" {
+		t.Fatal("lifecycle invocation lost a correlation ID")
+	}
+}
+
+func TestLifecycleCapabilityDriftFailsBeforeOperation(t *testing.T) {
+	drifted := strings.Replace(validLifecycleContract(), `"one-time-challenge","operation-receipt"`, `"operation-receipt","one-time-challenge"`, 1)
+	dir := fakeBackend(t, contractThenEcho(drifted))
+	_, err := InvokeMutating(context.Background(), &Request{
+		Subcommand: "restore execute", Args: []string{"--plan-hash", strings.Repeat("a", 64), "--confirm", "challenge-1234"},
+	})
+	requireCLIError(t, err, exitcode.ContractMismatch, codeBackendContractInvalid)
+	argv, _ := os.ReadFile(filepath.Join(dir, "argv"))
+	if strings.Contains(string(argv), "restore\nexecute") {
+		t.Fatalf("capability drift still reached operation: %q", argv)
+	}
+}
+
+func TestLifecycleInvalidArgvFailsBeforeHandshake(t *testing.T) {
+	for name, req := range map[string]*Request{
+		"missing restore archive": {Subcommand: "restore plan", Args: []string{"--key-file", "/root/key"}},
+		"unknown execute flag":    {Subcommand: "update execute", Args: []string{"--plan-hash", strings.Repeat("a", 64), "--force"}},
+		"too many status ids":     {Subcommand: "rollback status", Args: []string{"op-1", "op-2"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := fakeBackend(t, contractThenEcho(validLifecycleContract()))
+			var err error
+			if strings.Contains(req.Subcommand, "execute") {
+				_, err = InvokeMutating(context.Background(), req)
+			} else {
+				_, err = InvokeReadOnly(context.Background(), req)
+			}
+			requireCLIError(t, err, exitcode.ContractMismatch, "argv-not-allowlisted")
+			if _, statErr := os.Stat(filepath.Join(dir, "argv")); !os.IsNotExist(statErr) {
+				t.Fatalf("invalid argv still spawned backend: %v", statErr)
+			}
+		})
 	}
 }
 

@@ -9,6 +9,21 @@ inference gateway's `api/swagger.yml` / `api/swagger-extras.yml`. Example
 addresses use the documentation ranges `192.0.2.0/24` (VIPs) and
 `203.0.113.0/24` (backends); replace them with your own.
 
+The consumed Gateway contract records the producer repository, an exact
+40-character revision, and both spec digests in
+`testdata/contracts/gateway-api.json`. Update it only with an explicitly
+selected immutable revision:
+
+```bash
+ruby scripts/update-gateway-contract.rb /path/to/loxilb-inference-gateway EXACT_40_HEX_REVISION
+GATEWAY_REPO=/path/to/checkout-at-that-revision \
+  go test ./pkg/api -run 'TestGatewayContract|TestLifecycleModels|TestLifecycleEnums'
+```
+
+The updater reads `git show REVISION:api/...`; it never resolves or consumes a
+moving branch head. CI checks out the recorded revision and fails on revision,
+digest, operation, field, or enum drift.
+
 - [Global flags](#global-flags)
 - [Load balancer & inference routing](#load-balancer--inference-routing)
 - [AI-native resources](#ai-native-resources-api-keys-rate-limits-kv-inventory)
@@ -380,6 +395,35 @@ it would otherwise skip, but `--api --ip` is valid - interface configuration is
 host-level state the snapshot document excludes. `save --config-path` names the
 client-local directory for those text dumps; where the gateway writes
 `snapshot.json` is decided by the gateway's own `--config-path`.
+
+### Appliance host lifecycle
+
+Gateway configuration restore above is distinct from whole-appliance restore.
+The host lifecycle commands dispatch directly to the fixed Product backend and
+work without a running Gateway API. Plans are read-only; execution requires the
+exact unexpired plan hash and its one-time confirmation challenge.
+
+```bash
+loxicmd appliance restore plan /root/backup.tar.age --key-file /root/backup.key
+loxicmd appliance restore execute --plan-hash SHA256 --confirm CHALLENGE
+
+loxicmd appliance update plan /root/signed-update.bundle
+loxicmd appliance update execute --plan-hash SHA256 --confirm CHALLENGE
+loxicmd appliance update status OPERATION_ID
+
+loxicmd appliance rollback plan v0.9.8.9-rc.1 \
+  --archive /root/pre-update.tar.age --key-file /root/backup.key
+loxicmd appliance rollback execute --plan-hash SHA256 --confirm CHALLENGE
+loxicmd appliance rollback status OPERATION_ID
+
+loxicmd appliance factory-reset plan
+loxicmd appliance factory-reset execute --plan-hash SHA256 --confirm CHALLENGE
+```
+
+An installed backend that does not advertise an exact lifecycle command and
+capability tuple is rejected before mutation. Archive/bundle/key values are
+validated file references; their contents are never printed or inherited
+through the backend environment.
 
 ---
 

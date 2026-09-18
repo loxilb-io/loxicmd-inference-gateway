@@ -9,7 +9,8 @@ depend on across releases:
 | `exit-codes.md` | The process exit-code taxonomy and the error-origin preservation rules |
 | `host-backend-contract.md` | How the `appliance` command family invokes the host lifecycle backend |
 | `backend-contract.schema.json` | The response document of the backend's `contract-version --json` handshake |
-| `backend-payloads/v1/*.schema.json` | The nine command-selected bare backend payloads consumed by the Appliance CLI |
+| `backend-payloads/v1/*.schema.json` | The original nine command-selected bare backend payloads consumed by the Appliance CLI |
+| `backend-payloads/v1/lifecycle/*.schema.json` | Plan, execute-receipt, and durable-status payloads for restore/update/rollback/factory-reset |
 | `backend-errors/v1/backend-operation-error.schema.json` | The command-selected structured error payload for backend exits 2–8 |
 
 ## Appliance backend payload validation
@@ -80,6 +81,12 @@ fields, including plane `live`, `ready`, and `reasonCode`, remain unchanged.
 Automation must parse the JSON envelope and the exit code, never the human
 text. Human-readable output (the default, without `-o json`) is not a
 contract and may change between releases.
+
+The destructive lifecycle families are two-step operations. `plan` is
+read-only and returns a stable SHA-256 plan hash with an expiry. `execute`
+accepts only that hash plus a one-time challenge bound to it. The CLI never
+performs lifecycle work itself: the fixed-path Product backend owns backup
+gates, quiesce, mutation, read-back, rollback, and durable operation state.
 
 ## Migration: the interim lifecycle report
 
