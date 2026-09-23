@@ -437,6 +437,26 @@ loxicmd set log-level <level>       # operational params — /config/params
 loxicmd get log-level
 ```
 
+### Gateway logs — swagger `/logs`, `/log-archives`
+
+```bash
+# Newest lines of the gateway's own log, printed oldest to newest. --level
+# and --keyword are case-sensitive substring filters (AND). When older lines
+# remain, the last line of output names the --file and --cursor for the next
+# page; keep the filters unchanged from page to page.
+loxicmd get logs
+loxicmd get logs --lines 500 --level ERROR
+loxicmd get logs --keyword timeout --file gateway.log.1.gz
+loxicmd get logs -o json                         # the gateway's body, verbatim
+
+# Active log files and rotated archives, with size and last-modified time;
+# download one as stored (a .gz stays compressed) through a temporary file
+# renamed into place at mode 0600, or stream it to stdout with -f -.
+loxicmd get log-archives
+loxicmd get log-archives gateway.log.1.gz -f gateway.log.1.gz
+loxicmd get log-archives gateway.log.1.gz -f - | gunzip | less
+```
+
 The inherited classic loxilb surface — `port`, `conntrack`, `session`,
 `sessionulcl`, `policy`, `route`, `ipaddress`, `neighbor`, `fdb`, `vlan`,
 `vxlan`, `firewall`, `mirror`, `bgp`, `bfd`, `endpoint`, `status` — is available

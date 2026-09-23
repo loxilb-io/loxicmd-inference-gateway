@@ -47,6 +47,13 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   secret-file rules as every other secret-bearing path (absolute path, no
   symlinks, owner-only permissions) and the value never appears in argv or
   the process environment.
+- `get logs` and `get log-archives`: the gateway's own log tail
+  (`GET /logs`, paged backwards with `--level`/`--keyword` filters and a
+  printed `--cursor` for the next page) and its log files and rotated
+  archives (`GET /log-archives`, listed with size and modification time, or
+  downloaded as stored into `-f FILE` through a temporary file renamed into
+  place at mode 0600, or streamed with `-f -`). Both endpoints were reachable
+  only with `curl` before.
 
 ### Deprecated
 - `--token`: the literal token is visible in shell history and process

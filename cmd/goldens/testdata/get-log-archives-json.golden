@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+{"archives":["gateway.log","gateway.log.1.gz"],"archive_info":[{"name":"gateway.log","size_bytes":4096,"modified":"2025-01-01T00:00:02Z"},{"name":"gateway.log.1.gz","size_bytes":1024,"modified":"2024-12-31T00:00:00Z"}]}
+--- stderr ---

@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+{"logs":["2025-01-01T00:00:02Z INFO listener ready on 0.0.0.0:11111","2025-01-01T00:00:01Z INFO loading rules"],"log_file":"gateway.log","log_count":2,"total_size":4096,"has_more":true,"next_cursor":"b2Zmc2V0OjEwMjQ","scanned_bytes":128}
+--- stderr ---

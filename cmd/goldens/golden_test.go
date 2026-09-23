@@ -136,6 +136,17 @@ const diagnosticsBody = `{"version":"v1.2.3","build_info":"rev abc","product":"l
 // repository's history-wide secret scan never mistakes it for a credential.
 const apiKeyCreatedBody = `{"key_id":"key-abc","raw_key":"raw-key-material-placeholder"}`
 
+// logsBody mirrors GET /logs: one page, newest first, with an older page
+// still to fetch. logArchivesBody mirrors GET /log-archives with the
+// per-archive metadata populated.
+const logsBody = `{"logs":["2025-01-01T00:00:02Z INFO listener ready on 0.0.0.0:11111",` +
+	`"2025-01-01T00:00:01Z INFO loading rules"],"log_file":"gateway.log","log_count":2,` +
+	`"total_size":4096,"has_more":true,"next_cursor":"b2Zmc2V0OjEwMjQ","scanned_bytes":128}`
+
+const logArchivesBody = `{"archives":["gateway.log","gateway.log.1.gz"],` +
+	`"archive_info":[{"name":"gateway.log","size_bytes":4096,"modified":"2025-01-01T00:00:02Z"},` +
+	`{"name":"gateway.log.1.gz","size_bytes":1024,"modified":"2024-12-31T00:00:00Z"}]}`
+
 // goldenCase is one pinned invocation. Every case runs against a fake
 // gateway that answers with the given canned response.
 type goldenCase struct {
@@ -161,6 +172,12 @@ var goldenCases = []goldenCase{
 	{"get-ready-human", []string{"get", "ready"}, http.StatusOK, readyBody},
 	{"get-ready-json", []string{"get", "ready", "-o", "json"}, http.StatusOK, readyBody},
 	{"get-diagnostics-human", []string{"get", "diagnostics"}, http.StatusOK, diagnosticsBody},
+	{"get-logs-human", []string{"get", "logs"}, http.StatusOK, logsBody},
+	{"get-logs-json", []string{"get", "logs", "-o", "json"}, http.StatusOK, logsBody},
+	{"get-logs-help", []string{"get", "logs", "--help"}, http.StatusOK, ""},
+	{"get-log-archives-human", []string{"get", "log-archives"}, http.StatusOK, logArchivesBody},
+	{"get-log-archives-json", []string{"get", "log-archives", "-o", "json"}, http.StatusOK, logArchivesBody},
+	{"get-log-archives-help", []string{"get", "log-archives", "--help"}, http.StatusOK, ""},
 
 	// The appliance namespace never contacts the gateway, so only its
 	// help surfaces are pinned here (the not-available markers are part
