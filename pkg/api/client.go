@@ -68,6 +68,8 @@ const (
 	loxiMaintenanceResource     = "maintenance"
 	loxiDiagnosticsResource     = "diagnostics"
 	loxiStatusReadyResource     = "status/ready"
+	loxiLogsResource            = "logs"
+	loxiLogArchivesResource     = "log-archives"
 )
 
 type LoxiClient struct {
@@ -596,6 +598,32 @@ func (l *LoxiClient) Diagnostics() *Diagnostics {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiDiagnosticsResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) Logs() *Logs {
+	return &Logs{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiLogsResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) LogArchives() *LogArchives {
+	return &LogArchives{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiLogArchivesResource,
 			},
 		},
 	}

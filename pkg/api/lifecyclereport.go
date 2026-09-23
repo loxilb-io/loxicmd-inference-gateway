@@ -198,6 +198,9 @@ type LifecycleReport struct {
 	// GET/PUT /maintenance. On a recovery-required failure it is absent:
 	// the CLI has no state it can honestly report.
 	Maintenance *MaintenanceState `json:"maintenance,omitempty"`
+	// Archive is the identity of a log archive the CLI downloaded and where
+	// it was stored.
+	Archive *LogArchiveFileResult `json:"archive,omitempty"`
 	// Origin, HTTPStatus and ComponentCode are the failure triple of the
 	// envelope's data contract: present on every failure (pointers so a
 	// success omits them entirely), absent on success. ComponentCode is

@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+NAME              SIZE  MODIFIED
+gateway.log       4096  2025-01-01T00:00:02Z
+gateway.log.1.gz  1024  2024-12-31T00:00:00Z
+--- stderr ---

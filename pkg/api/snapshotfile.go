@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -123,19 +124,27 @@ func VerifySnapshotChecksum(body []byte, headerChecksum string) ([]byte, *Snapsh
 	return verified, result, nil
 }
 
-// WriteSnapshotFile stores a verified snapshot document at path without ever
-// leaving a partial file where a whole one used to be: it writes a temporary
-// file in the destination directory, flushes it to stable storage, and renames
-// it into place. A failed download therefore cannot destroy the backup a
-// previous successful one left behind.
-//
-// The file is created 0600 — a snapshot document carries the full
-// configuration of the gateway, including encrypted secret material.
+// WriteSnapshotFile stores a verified snapshot document at path through
+// WriteFileAtomic, so a failed download cannot destroy the backup a previous
+// successful one left behind.
 func WriteSnapshotFile(path string, data []byte) error {
+	_, err := WriteFileAtomic(path, bytes.NewReader(data))
+	return err
+}
+
+// WriteFileAtomic stores everything r yields at path without ever leaving a
+// partial file where a whole one used to be: it writes a temporary file in
+// the destination directory, flushes it to stable storage, and renames it
+// into place. It returns the number of bytes stored.
+//
+// The file is created 0600 — what lands here is a snapshot document carrying
+// the full configuration of the gateway, including encrypted secret material,
+// or a log archive carrying whatever the gateway wrote to its log.
+func WriteFileAtomic(path string, r io.Reader) (int64, error) {
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".tmp-*")
 	if err != nil {
-		return &LifecycleError{
+		return 0, &LifecycleError{
 			Reason:  ReasonFileWrite,
 			Message: fmt.Sprintf("cannot create a temporary file in %s: %v", dir, err),
 		}
@@ -147,40 +156,41 @@ func WriteSnapshotFile(path string, data []byte) error {
 	}
 	if err := tmp.Chmod(0600); err != nil {
 		cleanup()
-		return &LifecycleError{
+		return 0, &LifecycleError{
 			Reason:  ReasonFileWrite,
 			Message: fmt.Sprintf("cannot set permissions on %s: %v", tmpName, err),
 		}
 	}
-	if _, err := tmp.Write(data); err != nil {
+	n, err := io.Copy(tmp, r)
+	if err != nil {
 		cleanup()
-		return &LifecycleError{
+		return 0, &LifecycleError{
 			Reason:  ReasonFileWrite,
 			Message: fmt.Sprintf("cannot write %s: %v", tmpName, err),
 		}
 	}
 	// Flush the contents before the rename publishes the name: a rename
 	// that reaches the disk ahead of the data would leave an empty file
-	// under a name that promises a whole snapshot.
+	// under a name that promises a whole document.
 	if err := tmp.Sync(); err != nil {
 		cleanup()
-		return &LifecycleError{
+		return 0, &LifecycleError{
 			Reason:  ReasonFileWrite,
 			Message: fmt.Sprintf("cannot flush %s: %v", tmpName, err),
 		}
 	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpName)
-		return &LifecycleError{
+		return 0, &LifecycleError{
 			Reason:  ReasonFileWrite,
 			Message: fmt.Sprintf("cannot close %s: %v", tmpName, err),
 		}
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		os.Remove(tmpName)
-		return &LifecycleError{
+		return 0, &LifecycleError{
 			Reason:  ReasonFileWrite,
-			Message: fmt.Sprintf("cannot move the snapshot into place at %s: %v", path, err),
+			Message: fmt.Sprintf("cannot move the file into place at %s: %v", path, err),
 		}
 	}
 	// Persist the directory entry itself, so the published name survives a
@@ -189,5 +199,5 @@ func WriteSnapshotFile(path string, data []byte) error {
 		_ = d.Sync()
 		d.Close()
 	}
-	return nil
+	return n, nil
 }

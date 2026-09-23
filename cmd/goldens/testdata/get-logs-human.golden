@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+2025-01-01T00:00:01Z INFO loading rules
+2025-01-01T00:00:02Z INFO listener ready on 0.0.0.0:11111
+-- older lines remain: loxicmd get logs --file gateway.log --cursor b2Zmc2V0OjEwMjQ
+--- stderr ---
