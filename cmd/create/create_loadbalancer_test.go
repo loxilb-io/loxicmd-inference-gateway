@@ -80,7 +80,31 @@ func TestClassicLB_NoAIKeys(t *testing.T) {
 		"model_name", "sse_mode", "api_key_auth", "kvExactMode", "kvBlockSize", "kvHashAlgo",
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
-		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType", "sockMapMode")
+		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType", "sockMapMode",
+		"connectionLimit")
+}
+
+// --connection-limit is an L4 attribute, sent only when set: a classic rule
+// keeps its unlimited default absent, a declared ceiling reaches the wire as
+// connectionLimit.
+func TestConnectionLimitServiceArgument(t *testing.T) {
+	t.Run("declared", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.30", Select: "rr", ConnectionLimit: 100})
+		assertKey(t, m, "connectionLimit", 100)
+	})
+	t.Run("unset omitted", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.31", Select: "rr"})
+		assertAbsent(t, m, "connectionLimit")
+	})
+	t.Run("flag is registered as uint32", func(t *testing.T) {
+		f := NewCreateLoadBalancerCmd(&api.RESTOptions{}).Flags().Lookup("connection-limit")
+		if f == nil {
+			t.Fatal("--connection-limit is not registered")
+		}
+		if f.Value.Type() != "uint32" {
+			t.Fatalf("--connection-limit type %s, want uint32", f.Value.Type())
+		}
+	})
 }
 
 func TestSockMapModeServiceArguments(t *testing.T) {
