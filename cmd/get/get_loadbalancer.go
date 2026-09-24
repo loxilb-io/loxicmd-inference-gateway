@@ -228,9 +228,9 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 		} else {
 			table.SetHeader(LOADBALANCER_TITLE)
 			if lbrule.Service.PortMax == 0 {
-				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor)})
+				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor), fmt.Sprintf("%d", lbrule.Service.ConnectionLimit)})
 			} else {
-				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor)})
+				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor), fmt.Sprintf("%d", lbrule.Service.ConnectionLimit)})
 			}
 		}
 	}

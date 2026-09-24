@@ -56,6 +56,9 @@ type CreateLoadBalancerOptions struct {
 	PPv2En         bool
 	Egress         bool
 
+	// Concurrent-connection ceiling for the rule (0 = unlimited).
+	ConnectionLimit uint32
+
 	// Active health monitor probe.
 	ProbeType    string
 	ProbePort    uint16
@@ -432,6 +435,7 @@ ex)
 	createLbCmd.Flags().StringVarP(&o.Select, "select", "", "rr", "Select the hash algorithm for the load balance.(ex) rr, hash, priority, persist, lc")
 	createLbCmd.Flags().Uint32VarP(&o.Timeout, "inatimeout", "", 0, "Specify the timeout (in seconds) after which a LB session will be reset for inactivity")
 	createLbCmd.Flags().Uint32VarP(&o.Mark, "mark", "", 0, "Specify the mark num to segregate a load-balancer VIP service")
+	createLbCmd.Flags().Uint32Var(&o.ConnectionLimit, "connection-limit", 0, "Concurrent-connection ceiling across the rule's endpoints, enforced at SYN time on L4 rules (0 = unlimited)")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
 	createLbCmd.Flags().StringVarP(&o.Name, "name", "", o.Name, "Name for load balancer rule")
 	createLbCmd.Flags().BoolVarP(&o.Attach, "attachEP", "", false, "Attach endpoints to the load balancer rule")
@@ -830,6 +834,8 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.ProbeReq = o.ProbeReq
 	s.ProbeTimeout = o.ProbeTimeout
 	s.ProbeRetries = o.ProbeRetries
+	// L4 concurrent-connection ceiling; zero stays off the wire.
+	s.ConnectionLimit = o.ConnectionLimit
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix

@@ -118,6 +118,10 @@ loxicmd create lb 192.0.2.17 --tcp=2020:80 --mode=fullproxy \
 loxicmd create lb 192.0.2.18 --tcp=2020:8000 --mode=fullproxy \
   --select=chwbl --kv-engine-type=llamacpp --endpoints=203.0.113.1:1
 
+# Concurrent-connection ceiling on an L4 rule, enforced at SYN time  (cicd: tcplbconnlimit)
+loxicmd create lb 192.0.2.30 --tcp=2020:8080 --connection-limit=100 \
+  --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name

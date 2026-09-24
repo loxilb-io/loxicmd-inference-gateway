@@ -60,6 +60,9 @@ type LoadBalancerService struct {
 	PpV2       bool     `json:"proxyprotocolv2"    yaml:"proxyprotocolv2"`
 	Egress     bool     `json:"egress"             yaml:"egress"`
 
+	// Concurrent-connection ceiling across the rule's endpoints; 0 = unlimited.
+	ConnectionLimit uint32 `json:"connectionLimit,omitempty" yaml:"connectionLimit,omitempty"`
+
 	// Active health monitor probe (seen in AI cicd bodies alongside monitor=true).
 	ProbeType    string `json:"probetype,omitempty"    yaml:"probetype,omitempty"`
 	ProbePort    uint16 `json:"probeport,omitempty"    yaml:"probeport,omitempty"`
