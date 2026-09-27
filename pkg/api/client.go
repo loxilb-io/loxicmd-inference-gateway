@@ -70,6 +70,8 @@ const (
 	loxiStatusReadyResource     = "status/ready"
 	loxiLogsResource            = "logs"
 	loxiLogArchivesResource     = "log-archives"
+	loxiAuditStatusResource     = "audit/status"
+	loxiAuditSinkResource       = "audit/sink"
 )
 
 type LoxiClient struct {
@@ -624,6 +626,32 @@ func (l *LoxiClient) LogArchives() *LogArchives {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiLogArchivesResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AuditStatus() *AuditStatus {
+	return &AuditStatus{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAuditStatusResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AuditSink() *AuditSink {
+	return &AuditSink{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAuditSinkResource,
 			},
 		},
 	}

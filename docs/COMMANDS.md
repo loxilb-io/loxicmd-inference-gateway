@@ -461,6 +461,56 @@ loxicmd get log-archives gateway.log.1.gz -f gateway.log.1.gz
 loxicmd get log-archives gateway.log.1.gz -f - | gunzip | less
 ```
 
+### Audit trail — swagger `/audit/status`, `/audit/sink`
+
+Status and configuration only. The audit trail itself is deliberately not
+served over the management API and no command reads a record: the trail exists
+to watch the same role that holds the management credential. Read it on the
+gateway's filesystem.
+
+```bash
+# Writer state, per-stream accepted and dropped counts, the active segment,
+# the retention policy with the retention it projects, and the previous boot's
+# management intents that never received a result. Not audited, so it is safe
+# to poll. A gateway whose audit directory was unusable at start answers with
+# availability false, which explains every management call it then refuses.
+loxicmd get audit-status
+loxicmd get audit-status -o json                 # the gateway's body, verbatim
+
+# The remote syslog sink and what is known about its session. Certificate
+# material is named by path and never served, and the paths are on the
+# GATEWAY's filesystem. "Submitted" counts writes to the socket, not
+# deliveries — syslog over TLS carries no acknowledgement.
+loxicmd get audit-sink
+
+# set audit-sink REPLACES the configuration; it does not patch it, because the
+# endpoint does not. A flag left out is sent as its default, not kept from what
+# the gateway had — so to change one field, pass the others again. Read the
+# current configuration first with 'get audit-sink'.
+loxicmd set audit-sink --address siem.example.com:6514 \
+    --ca-bundle /etc/loxilb/siem-ca.pem
+loxicmd set audit-sink --address siem.example.com:6514 \
+    --ca-bundle /etc/loxilb/siem-ca.pem \
+    --server-name siem.corp.example.com --facility 13 --max-frame-bytes 8192
+
+# Mutual TLS: both halves of the keypair, or neither.
+loxicmd set audit-sink --address siem.example.com:6514 \
+    --ca-bundle /etc/loxilb/siem-ca.pem \
+    --client-cert /etc/loxilb/gw.pem --client-key /etc/loxilb/gw-key.pem
+
+# Remove the sink; the local trail keeps running and records already written
+# stay on disk.
+loxicmd set audit-sink --disable
+```
+
+`--ca-bundle` is required to configure a sink: the receiver's certificate is
+always verified and there is no mode that disables verification, so there is no
+default the CLI could supply. `--facility` takes 1-23: the gateway reads a
+facility of 0 as "not set" and substitutes 13, so facility 0 (kernel) is not
+selectable through this API. If a change cannot be confirmed (timeout, broken
+connection) the command fails with reason `recovery-required` and never claims
+success — verify with `loxicmd get audit-sink`.
+
 The inherited classic loxilb surface — `port`, `conntrack`, `session`,
 `sessionulcl`, `policy`, `route`, `ipaddress`, `neighbor`, `fdb`, `vlan`,
 `vxlan`, `firewall`, `mirror`, `bgp`, `bfd`, `endpoint`, `status` — is available

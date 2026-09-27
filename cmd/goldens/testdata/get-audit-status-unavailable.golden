@@ -1,0 +1,5 @@
+exit=0
+--- stdout ---
+Audit: NOT AVAILABLE - no writer was configured at start.
+  The audit directory was unusable; every audited management call is refused.
+--- stderr ---

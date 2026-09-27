@@ -1,0 +1,15 @@
+exit=0
+--- stdout ---
+Audit sink: enabled, connected
+  Receiver: siem.example.com:6514
+  CA bundle: /etc/loxilb/siem-ca.pem
+  Expected server name: siem.corp.example.com
+  Client certificate: /etc/loxilb/gw.pem
+  Client key: /etc/loxilb/gw-key.pem
+  Facility: 13
+  Max frame: 8192 bytes
+  Submitted to the socket: 1024 (not a delivery count; the protocol has no acknowledgement)
+  Sent shortened to fit the receiver's cap: 2
+  Write errors: 1 (each one holds the cursor back)
+  Last error: write: broken pipe
+--- stderr ---

@@ -54,6 +54,19 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   downloaded as stored into `-f FILE` through a temporary file renamed into
   place at mode 0600, or streamed with `-f -`). Both endpoints were reachable
   only with `curl` before.
+- `get audit-status`, `get audit-sink` and `set audit-sink`: the state of the
+  management audit trail (`GET /audit/status` — writer state, per-stream
+  accepted and dropped counts, the active segment, the retention policy with
+  the retention it projects, and the previous boot's management intents that
+  never received a result) and the remote syslog sink it is forwarded to
+  (`GET`/`POST /audit/sink`). Status and configuration only: the trail itself
+  is deliberately not served over the management API, so no command reads a
+  record. `set audit-sink` REPLACES the configuration rather than patching it,
+  because the endpoint does — a flag left out is sent as its default, not kept
+  — and `--address`/`--ca-bundle` are required to configure a sink since the
+  receiver's certificate is always verified and no mode disables that.
+  `--disable` removes the sink and leaves the local trail running. An
+  unconfirmed change reports `recovery-required`, never success.
 
 ### Deprecated
 - `--token`: the literal token is visible in shell history and process

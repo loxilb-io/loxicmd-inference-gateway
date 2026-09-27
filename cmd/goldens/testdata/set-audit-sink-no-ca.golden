@@ -1,0 +1,4 @@
+exit=2
+--- stdout ---
+--- stderr ---
+Error: --ca-bundle is required: the receiver's certificate is always verified and there is no mode that disables it (invalid-arguments)
