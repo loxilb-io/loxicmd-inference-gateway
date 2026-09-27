@@ -40,6 +40,21 @@ type LoadBalancerModel struct {
 	Endpoints    []LoadBalancerEndpoint `json:"endpoints" yaml:"endpoints"`
 }
 
+// FcEffective is the flow-control state of a service's model pool as the
+// gateway reports it on GET: the resolved limits plus the live counters.
+type FcEffective struct {
+	Mode                string `json:"mode,omitempty"                   yaml:"mode,omitempty"`
+	MaxOutstanding      uint32 `json:"max_outstanding,omitempty"        yaml:"max_outstanding,omitempty"`
+	EpMaxInflight       uint32 `json:"ep_max_inflight,omitempty"        yaml:"ep_max_inflight,omitempty"`
+	PrefillMaxInflight  uint32 `json:"prefill_max_inflight,omitempty"   yaml:"prefill_max_inflight,omitempty"`
+	DecodeMaxInflight   uint32 `json:"decode_max_inflight,omitempty"    yaml:"decode_max_inflight,omitempty"`
+	QueueDepth          uint32 `json:"queue_depth,omitempty"            yaml:"queue_depth,omitempty"`
+	QueueWaitMs         uint32 `json:"queue_wait_ms,omitempty"          yaml:"queue_wait_ms,omitempty"`
+	Inflight            uint32 `json:"inflight,omitempty"               yaml:"inflight,omitempty"`
+	Queued              uint32 `json:"queued,omitempty"                 yaml:"queued,omitempty"`
+	QueueMemoryBoundMib uint64 `json:"queue_memory_bound_mib,omitempty" yaml:"queue_memory_bound_mib,omitempty"`
+}
+
 type LoadBalancerService struct {
 	ExternalIP string   `json:"externalIP"         yaml:"externalIP"`
 	Port       uint16   `json:"port"               yaml:"port"`
@@ -62,6 +77,13 @@ type LoadBalancerService struct {
 
 	// Concurrent-connection ceiling across the rule's endpoints; 0 = unlimited.
 	ConnectionLimit uint32 `json:"connectionLimit,omitempty" yaml:"connectionLimit,omitempty"`
+
+	// Capacity admission queue of the service's model pool; 0 keeps the
+	// process default. Depth requires a non-zero wait.
+	FcMaxQueueDepth  uint32 `json:"fc_max_queue_depth,omitempty"   yaml:"fc_max_queue_depth,omitempty"`
+	FcMaxQueueWaitMs uint32 `json:"fc_max_queue_wait_ms,omitempty" yaml:"fc_max_queue_wait_ms,omitempty"`
+	// Flow-control state the gateway reports on GET; never sent on create.
+	FcEffective *FcEffective `json:"fc_effective,omitempty" yaml:"fc_effective,omitempty"`
 
 	// Active health monitor probe (seen in AI cicd bodies alongside monitor=true).
 	ProbeType    string `json:"probetype,omitempty"    yaml:"probetype,omitempty"`
