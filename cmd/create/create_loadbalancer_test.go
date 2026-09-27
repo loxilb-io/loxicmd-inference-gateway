@@ -164,7 +164,7 @@ func TestFcEffectiveReadback(t *testing.T) {
 	payload := `{"externalIP":"192.0.2.34","port":2020,"protocol":"tcp","sel":0,"mode":4,"BGP":false,"Monitor":false,` +
 		`"inactiveTimeOut":240,"block":0,"proxyprotocolv2":false,"egress":false,` +
 		`"fc_max_queue_depth":64,"fc_max_queue_wait_ms":30000,` +
-		`"fc_effective":{"mode":"pool","max_outstanding":128,"ep_max_inflight":32,"prefill_max_inflight":8,` +
+		`"fc_effective":{"mode":"enforce","max_outstanding":128,"ep_max_inflight":32,"prefill_max_inflight":8,` +
 		`"decode_max_inflight":24,"queue_depth":64,"queue_wait_ms":30000,"inflight":5,"queued":2,"queue_memory_bound_mib":64}}`
 	var s api.LoadBalancerService
 	if err := json.Unmarshal([]byte(payload), &s); err != nil {
@@ -177,7 +177,7 @@ func TestFcEffectiveReadback(t *testing.T) {
 	if fe == nil {
 		t.Fatal("fc_effective did not decode")
 	}
-	want := api.FcEffective{Mode: "pool", MaxOutstanding: 128, EpMaxInflight: 32, PrefillMaxInflight: 8,
+	want := api.FcEffective{Mode: "enforce", MaxOutstanding: 128, EpMaxInflight: 32, PrefillMaxInflight: 8,
 		DecodeMaxInflight: 24, QueueDepth: 64, QueueWaitMs: 30000, Inflight: 5, Queued: 2, QueueMemoryBoundMib: 64}
 	if *fe != want {
 		t.Fatalf("fc_effective = %+v, want %+v", *fe, want)

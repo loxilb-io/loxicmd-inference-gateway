@@ -46,4 +46,8 @@ type MaintenanceState struct {
 	DrainTimeoutSeconds   uint32 `json:"drain_timeout_seconds,omitempty"`
 	DrainDeadlineExceeded bool   `json:"drain_deadline_exceeded"`
 	Cancellable           bool   `json:"cancellable"`
+	// InFlightRequests counts the inference requests holding a capacity
+	// unit in the data plane: what a drain is waiting on. The gateway omits
+	// it at zero.
+	InFlightRequests int64 `json:"in_flight_requests,omitempty"`
 }

@@ -19,7 +19,8 @@ exit=0
       "elapsed_seconds": 42,
       "drain_timeout_seconds": 300,
       "drain_deadline_exceeded": false,
-      "cancellable": true
+      "cancellable": true,
+      "in_flight_requests": 5
     }
   },
   "warnings": []
