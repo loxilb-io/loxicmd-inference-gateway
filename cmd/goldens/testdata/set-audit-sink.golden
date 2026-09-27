@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Audit sink replaced: siem.example.com:6514, verified against /etc/loxilb/siem-ca.pem.
+--- stderr ---

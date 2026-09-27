@@ -1,0 +1,23 @@
+exit=0
+--- stdout ---
+Audit: available, running
+  Boot id: boot-abc
+  Sequence high: 1024
+  Last write: 2025-01-01T00:00:02Z
+  Accepted: data 24, mgmt 1000
+  Dropped:
+    data/queue_full: 3
+  Result records LOST after the change was applied: 1
+  Queue depth: data 5, mgmt 0
+  Queue high-water: data 64, mgmt 2
+  Active segment: seg-1
+    Opened: 2025-01-01T00:00:00Z, 24 records, 8192 bytes
+  Sealed on disk: 1048576 bytes
+  Retention: age 2592000s, quota 10485760 bytes, reserve 1048576 bytes
+  Projected retention: 30.5 days
+  Orphaned intents from the previous boot: 1
+    Most recent event id: ev-9
+  Counters: mgmt timeouts 1, rotations 4, pruned segments 2, permissions repaired 1, originator headers dropped 2, delegation lookups 7, heartbeats 12
+  Producers:
+    loxinet (data): pseq high 24, accepted 24, dropped queue_full 3
+--- stderr ---

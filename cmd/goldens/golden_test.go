@@ -147,6 +147,43 @@ const logArchivesBody = `{"archives":["gateway.log","gateway.log.1.gz"],` +
 	`"archive_info":[{"name":"gateway.log","size_bytes":4096,"modified":"2025-01-01T00:00:02Z"},` +
 	`{"name":"gateway.log.1.gz","size_bytes":1024,"modified":"2024-12-31T00:00:00Z"}]}`
 
+// auditStatusBody mirrors GET /audit/status on a running writer, with one
+// drop reason, one producer, an active segment and a bounded retention
+// policy, so every conditional branch of the rendering is pinned once.
+// auditStatusUnavailableBody is the answer from a gateway whose audit
+// directory was unusable at start: the one case where every other field
+// describes nothing, and the rendering must say so rather than print zeros.
+const auditStatusBody = `{"available":true,"running":true,"boot_id":"boot-abc",` +
+	`"seq_high":1024,"last_write":"2025-01-01T00:00:02Z",` +
+	`"accepted":{"mgmt":1000,"data":24},` +
+	`"dropped":[{"stream":"data","reason":"queue_full","count":3}],` +
+	`"result_drops":1,"originator_dropped":2,"delegation_lookups":7,` +
+	`"queue_depth":{"mgmt":0,"data":5},"queue_hwm":{"mgmt":2,"data":64},` +
+	`"write_failures":0,"sync_failures":0,"mgmt_timeouts":1,"panics":0,` +
+	`"restarts":0,"heartbeats":12,"rotations":4,"path_sanitized":0,` +
+	`"unattributed":0,"perm_repaired":1,"rotation_failed":0,` +
+	`"compress_failed":0,"compress_skipped":0,"pruned":2,` +
+	`"reserve_breaches":0,"reserve_breached":false,"sealed_bytes":1048576,` +
+	`"orphaned_intents":1,"last_orphan_event_id":"ev-9",` +
+	`"segment":{"uuid":"seg-1","opened":"2025-01-01T00:00:00Z","records":24,"bytes":8192},` +
+	`"retention":{"max_age_seconds":2592000,"max_bytes":10485760,"reserve_bytes":1048576},` +
+	`"projected_retention_days":30.5,` +
+	`"producers":[{"id":"loxinet","stream":"data","pseq_high":24,"accepted":24,` +
+	`"dropped":{"queue_full":3},"drop_ring_overflows":0}]}`
+
+const auditStatusUnavailableBody = `{"available":false}`
+
+// auditSinkBody mirrors GET /audit/sink on a configured, connected sink with
+// mutual TLS; auditSinkOffBody is the unconfigured answer, in which every
+// field is absent.
+const auditSinkBody = `{"enabled":true,"address":"siem.example.com:6514",` +
+	`"ca_bundle_path":"/etc/loxilb/siem-ca.pem","server_name":"siem.corp.example.com",` +
+	`"client_cert_path":"/etc/loxilb/gw.pem","client_key_path":"/etc/loxilb/gw-key.pem",` +
+	`"max_frame_bytes":8192,"facility":13,"connected":true,"submitted":1024,` +
+	`"truncated":2,"write_errors":1,"last_error":"write: broken pipe"}`
+
+const auditSinkOffBody = `{}`
+
 // goldenCase is one pinned invocation. Every case runs against a fake
 // gateway that answers with the given canned response.
 type goldenCase struct {
@@ -178,6 +215,32 @@ var goldenCases = []goldenCase{
 	{"get-log-archives-human", []string{"get", "log-archives"}, http.StatusOK, logArchivesBody},
 	{"get-log-archives-json", []string{"get", "log-archives", "-o", "json"}, http.StatusOK, logArchivesBody},
 	{"get-log-archives-help", []string{"get", "log-archives", "--help"}, http.StatusOK, ""},
+
+	// The audit commands. Status and sink are status-and-configuration
+	// only: the trail itself is deliberately not served over the
+	// management API, so there is no command here that reads a record.
+	// The unavailable-writer and unconfigured-sink renderings are pinned
+	// as their own cases because they are the two answers an operator
+	// acts on and the only ones where the remaining fields mean nothing.
+	{"get-audit-status-human", []string{"get", "audit-status"}, http.StatusOK, auditStatusBody},
+	{"get-audit-status-json", []string{"get", "audit-status", "-o", "json"}, http.StatusOK, auditStatusBody},
+	{"get-audit-status-unavailable", []string{"get", "audit-status"}, http.StatusOK, auditStatusUnavailableBody},
+	{"get-audit-status-help", []string{"get", "audit-status", "--help"}, http.StatusOK, ""},
+	{"get-audit-sink-human", []string{"get", "audit-sink"}, http.StatusOK, auditSinkBody},
+	{"get-audit-sink-json", []string{"get", "audit-sink", "-o", "json"}, http.StatusOK, auditSinkBody},
+	{"get-audit-sink-off", []string{"get", "audit-sink"}, http.StatusOK, auditSinkOffBody},
+	{"get-audit-sink-help", []string{"get", "audit-sink", "--help"}, http.StatusOK, ""},
+	// The sink endpoint answers 204 with no body, so these pin what the
+	// CLI says on its own rather than a rendering of a response.
+	{"set-audit-sink", []string{"set", "audit-sink", "--address", "siem.example.com:6514",
+		"--ca-bundle", "/etc/loxilb/siem-ca.pem"}, http.StatusNoContent, ""},
+	{"set-audit-sink-disable", []string{"set", "audit-sink", "--disable"}, http.StatusNoContent, ""},
+	// A set that never reaches the gateway: --ca-bundle is refused
+	// locally, because the receiver's certificate is always verified and
+	// there is no default the CLI could supply.
+	{"set-audit-sink-no-ca", []string{"set", "audit-sink", "--address", "siem.example.com:6514"},
+		http.StatusNoContent, ""},
+	{"set-audit-sink-help", []string{"set", "audit-sink", "--help"}, http.StatusOK, ""},
 
 	// The appliance namespace never contacts the gateway, so only its
 	// help surfaces are pinned here (the not-available markers are part
