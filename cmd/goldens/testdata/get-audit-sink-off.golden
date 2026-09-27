@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Audit sink: not configured - the trail is local only.
+--- stderr ---

@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+{"enabled":true,"address":"siem.example.com:6514","ca_bundle_path":"/etc/loxilb/siem-ca.pem","server_name":"siem.corp.example.com","client_cert_path":"/etc/loxilb/gw.pem","client_key_path":"/etc/loxilb/gw-key.pem","max_frame_bytes":8192,"facility":13,"connected":true,"submitted":1024,"truncated":2,"write_errors":1,"last_error":"write: broken pipe"}
+--- stderr ---
