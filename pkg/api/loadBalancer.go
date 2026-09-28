@@ -78,10 +78,12 @@ type LoadBalancerService struct {
 	// Concurrent-connection ceiling across the rule's endpoints; 0 = unlimited.
 	ConnectionLimit uint32 `json:"connectionLimit,omitempty" yaml:"connectionLimit,omitempty"`
 
-	// Capacity admission queue of the service's model pool; 0 keeps the
-	// process default. Depth requires a non-zero wait.
-	FcMaxQueueDepth  uint32 `json:"fc_max_queue_depth,omitempty"   yaml:"fc_max_queue_depth,omitempty"`
-	FcMaxQueueWaitMs uint32 `json:"fc_max_queue_wait_ms,omitempty" yaml:"fc_max_queue_wait_ms,omitempty"`
+	// Capacity admission queue of the service's model pool; 0 restores the
+	// process default. Pointers because a replace keeps each field it
+	// omits: nil stays off the wire, a pointer to 0 is sent. Depth requires
+	// a non-zero wait on the resulting rule.
+	FcMaxQueueDepth  *uint32 `json:"fc_max_queue_depth,omitempty"   yaml:"fc_max_queue_depth,omitempty"`
+	FcMaxQueueWaitMs *uint32 `json:"fc_max_queue_wait_ms,omitempty" yaml:"fc_max_queue_wait_ms,omitempty"`
 	// Flow-control state the gateway reports on GET; never sent on create.
 	FcEffective *FcEffective `json:"fc_effective,omitempty" yaml:"fc_effective,omitempty"`
 

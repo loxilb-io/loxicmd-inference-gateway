@@ -122,8 +122,9 @@ loxicmd create lb 192.0.2.18 --tcp=2020:8000 --mode=fullproxy \
 loxicmd create lb 192.0.2.30 --tcp=2020:8080 --connection-limit=100 \
   --endpoints=203.0.113.1:1
 
-# Capacity admission queue: --fc-max-queue-depth (0..65536, 0 = process default) with the
-# required --fc-max-queue-wait-ms (0..3600000) before a 504 admission_queue_timeout
+# Capacity admission queue: --fc-max-queue-depth (0..65536, 0 = process default) with
+# --fc-max-queue-wait-ms (1..3600000) before a 504 admission_queue_timeout. On a replace
+# an omitted flag keeps the rule's current value and the current wait completes a new depth.
 loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-max-queue-depth=64 --fc-max-queue-wait-ms=30000 --endpoints=203.0.113.1:1
 

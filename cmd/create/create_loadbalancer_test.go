@@ -138,12 +138,31 @@ func TestFcQueueServiceArguments(t *testing.T) {
 			t.Fatalf("ceiling pair rejected: %v", err)
 		}
 	})
-	t.Run("depth without wait", func(t *testing.T) {
-		err := validateLBAIOptions(&CreateLoadBalancerOptions{FcMaxQueueDepth: 64})
-		if err == nil {
-			t.Fatal("expected error for --fc-max-queue-depth without --fc-max-queue-wait-ms")
+	// create lb is create-or-replace, and a replace keeps each field it
+	// omits: a flag given as 0 must reach the gateway (it restores the
+	// process default), an omitted one must not (it keeps the rule's value).
+	t.Run("explicit zero goes on the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.36", Select: "rr",
+			FcMaxQueueDepthSet: true, FcMaxQueueWaitMsSet: true})
+		assertKey(t, m, "fc_max_queue_depth", 0)
+		assertKey(t, m, "fc_max_queue_wait_ms", 0)
+	})
+	t.Run("depth alone is the gateway's to judge", func(t *testing.T) {
+		// On a replace the rule's current wait completes the pair.
+		o := &CreateLoadBalancerOptions{ExternalIP: "192.0.2.37", Select: "rr", FcMaxQueueDepth: 64, FcMaxQueueDepthSet: true}
+		if err := validateLBAIOptions(o); err != nil {
+			t.Fatalf("depth alone rejected client-side: %v", err)
 		}
-		if want := "--fc-max-queue-wait-ms is required when --fc-max-queue-depth is set"; err.Error() != want {
+		m := serviceMap(t, o)
+		assertKey(t, m, "fc_max_queue_depth", 64)
+		assertAbsent(t, m, "fc_max_queue_wait_ms")
+	})
+	t.Run("depth with an explicit zero wait", func(t *testing.T) {
+		err := validateLBAIOptions(&CreateLoadBalancerOptions{FcMaxQueueDepth: 64, FcMaxQueueDepthSet: true, FcMaxQueueWaitMsSet: true})
+		if err == nil {
+			t.Fatal("expected error for --fc-max-queue-depth with --fc-max-queue-wait-ms 0")
+		}
+		if want := "--fc-max-queue-wait-ms must be non-zero when --fc-max-queue-depth is set"; err.Error() != want {
 			t.Fatalf("error %q, want %q", err.Error(), want)
 		}
 	})
@@ -170,8 +189,8 @@ func TestFcEffectiveReadback(t *testing.T) {
 	if err := json.Unmarshal([]byte(payload), &s); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if s.FcMaxQueueDepth != 64 || s.FcMaxQueueWaitMs != 30000 {
-		t.Fatalf("queue fields = %d/%d, want 64/30000", s.FcMaxQueueDepth, s.FcMaxQueueWaitMs)
+	if s.FcMaxQueueDepth == nil || *s.FcMaxQueueDepth != 64 || s.FcMaxQueueWaitMs == nil || *s.FcMaxQueueWaitMs != 30000 {
+		t.Fatalf("queue fields = %v/%v, want 64/30000", s.FcMaxQueueDepth, s.FcMaxQueueWaitMs)
 	}
 	fe := s.FcEffective
 	if fe == nil {
