@@ -128,6 +128,15 @@ loxicmd create lb 192.0.2.30 --tcp=2020:8080 --connection-limit=100 \
 loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-max-queue-depth=64 --fc-max-queue-wait-ms=30000 --endpoints=203.0.113.1:1
 
+# The rest of the capacity admission gate, per rule: --fc-mode (off|observe|enforce,
+# inherit = the process default), --fc-max-outstanding, --fc-ep-max-inflight,
+# --fc-prefill-max-inflight, --fc-decode-max-inflight (0..100000) and
+# --fc-telemetry-stale-ms (0..3600000). 0 restores the process default; on a replace
+# an omitted flag keeps the rule's current value. get lb -o wide shows the mode and
+# pool ceiling in force with their source (rule, env or default).
+loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
+  --fc-mode=enforce --fc-max-outstanding=4 --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name

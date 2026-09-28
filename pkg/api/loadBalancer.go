@@ -53,6 +53,21 @@ type FcEffective struct {
 	Inflight            uint32 `json:"inflight,omitempty"               yaml:"inflight,omitempty"`
 	Queued              uint32 `json:"queued,omitempty"                 yaml:"queued,omitempty"`
 	QueueMemoryBoundMib uint64 `json:"queue_memory_bound_mib,omitempty" yaml:"queue_memory_bound_mib,omitempty"`
+	TelemetryStaleMs    uint32 `json:"telemetry_stale_ms,omitempty"     yaml:"telemetry_stale_ms,omitempty"`
+	// Source names where each value came from: rule, env or default.
+	Source *FcEffectiveSource `json:"source,omitempty" yaml:"source,omitempty"`
+}
+
+// FcEffectiveSource is where each value of FcEffective came from.
+type FcEffectiveSource struct {
+	Mode               string `json:"mode,omitempty"                 yaml:"mode,omitempty"`
+	MaxOutstanding     string `json:"max_outstanding,omitempty"      yaml:"max_outstanding,omitempty"`
+	EpMaxInflight      string `json:"ep_max_inflight,omitempty"      yaml:"ep_max_inflight,omitempty"`
+	PrefillMaxInflight string `json:"prefill_max_inflight,omitempty" yaml:"prefill_max_inflight,omitempty"`
+	DecodeMaxInflight  string `json:"decode_max_inflight,omitempty"  yaml:"decode_max_inflight,omitempty"`
+	QueueDepth         string `json:"queue_depth,omitempty"          yaml:"queue_depth,omitempty"`
+	QueueWaitMs        string `json:"queue_wait_ms,omitempty"        yaml:"queue_wait_ms,omitempty"`
+	TelemetryStaleMs   string `json:"telemetry_stale_ms,omitempty"   yaml:"telemetry_stale_ms,omitempty"`
 }
 
 type LoadBalancerService struct {
@@ -84,6 +99,16 @@ type LoadBalancerService struct {
 	// a non-zero wait on the resulting rule.
 	FcMaxQueueDepth  *uint32 `json:"fc_max_queue_depth,omitempty"   yaml:"fc_max_queue_depth,omitempty"`
 	FcMaxQueueWaitMs *uint32 `json:"fc_max_queue_wait_ms,omitempty" yaml:"fc_max_queue_wait_ms,omitempty"`
+	// The rest of the capacity admission gate, the same way: FcMode is
+	// off, observe, enforce or inherit (the process default), sent only when
+	// given; nil numeric fields stay off the wire, a pointer to 0 restores
+	// the process default on a replace.
+	FcMode               string  `json:"fc_mode,omitempty"                 yaml:"fc_mode,omitempty"`
+	FcMaxOutstanding     *uint32 `json:"fc_max_outstanding,omitempty"      yaml:"fc_max_outstanding,omitempty"`
+	FcEpMaxInflight      *uint32 `json:"fc_ep_max_inflight,omitempty"      yaml:"fc_ep_max_inflight,omitempty"`
+	FcPrefillMaxInflight *uint32 `json:"fc_prefill_max_inflight,omitempty" yaml:"fc_prefill_max_inflight,omitempty"`
+	FcDecodeMaxInflight  *uint32 `json:"fc_decode_max_inflight,omitempty"  yaml:"fc_decode_max_inflight,omitempty"`
+	FcTelemetryStaleMs   *uint32 `json:"fc_telemetry_stale_ms,omitempty"   yaml:"fc_telemetry_stale_ms,omitempty"`
 	// Flow-control state the gateway reports on GET; never sent on create.
 	FcEffective *FcEffective `json:"fc_effective,omitempty" yaml:"fc_effective,omitempty"`
 

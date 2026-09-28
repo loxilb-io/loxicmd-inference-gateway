@@ -67,6 +67,20 @@ type CreateLoadBalancerOptions struct {
 	FcMaxQueueDepthSet  bool
 	FcMaxQueueWaitMsSet bool
 
+	// The rest of the capacity admission gate. FcMode is sent when given;
+	// the numeric fields carry whether their flag was given, like the queue.
+	FcMode                  string
+	FcMaxOutstanding        uint32
+	FcEpMaxInflight         uint32
+	FcPrefillMaxInflight    uint32
+	FcDecodeMaxInflight     uint32
+	FcTelemetryStaleMs      uint32
+	FcMaxOutstandingSet     bool
+	FcEpMaxInflightSet      bool
+	FcPrefillMaxInflightSet bool
+	FcDecodeMaxInflightSet  bool
+	FcTelemetryStaleMsSet   bool
+
 	// Active health monitor probe.
 	ProbeType    string
 	ProbePort    uint16
@@ -285,6 +299,11 @@ ex)
 			}
 			o.FcMaxQueueDepthSet = cmd.Flags().Changed("fc-max-queue-depth")
 			o.FcMaxQueueWaitMsSet = cmd.Flags().Changed("fc-max-queue-wait-ms")
+			o.FcMaxOutstandingSet = cmd.Flags().Changed("fc-max-outstanding")
+			o.FcEpMaxInflightSet = cmd.Flags().Changed("fc-ep-max-inflight")
+			o.FcPrefillMaxInflightSet = cmd.Flags().Changed("fc-prefill-max-inflight")
+			o.FcDecodeMaxInflightSet = cmd.Flags().Changed("fc-decode-max-inflight")
+			o.FcTelemetryStaleMsSet = cmd.Flags().Changed("fc-telemetry-stale-ms")
 			if err := validateLBAIOptions(&o); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
@@ -447,6 +466,12 @@ ex)
 	createLbCmd.Flags().Uint32VarP(&o.Mark, "mark", "", 0, "Specify the mark num to segregate a load-balancer VIP service")
 	createLbCmd.Flags().Uint32Var(&o.ConnectionLimit, "connection-limit", 0, "Concurrent-connection ceiling across the rule's endpoints, enforced at SYN time on L4 rules (0 = unlimited)")
 	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueDepth, "fc-max-queue-depth", 0, "Capacity admission queue depth of the service's model pool: inference requests that may wait for a unit instead of a 429; 0 restores the process default, omitted keeps the rule's current value on a replace; needs a wait (--fc-max-queue-wait-ms, or the rule's current one on a replace); ceiling 65536; each waiter parks about 1 MiB of client receive buffer")
+	createLbCmd.Flags().StringVar(&o.FcMode, "fc-mode", "", "Capacity admission gate of the service's model pool: off, observe or enforce; inherit returns a replaced rule to the process default (LLB_FC_MODE); omitted keeps the rule's current mode on a replace")
+	createLbCmd.Flags().Uint32Var(&o.FcMaxOutstanding, "fc-max-outstanding", 0, "Pool-wide ceiling on executing inference requests; 0 restores the process default (LLB_FC_MAX_OUTSTANDING), omitted keeps the rule's current value on a replace; ceiling 100000")
+	createLbCmd.Flags().Uint32Var(&o.FcEpMaxInflight, "fc-ep-max-inflight", 0, "Per-endpoint ceiling on executing inference requests (normal role); 0 restores the process default (LLB_FC_EP_MAX_INFLIGHT); ceiling 100000")
+	createLbCmd.Flags().Uint32Var(&o.FcPrefillMaxInflight, "fc-prefill-max-inflight", 0, "Per-endpoint ceiling on prefill legs; 0 restores the process default (LLB_FC_PREFILL_MAX_INFLIGHT); ceiling 100000")
+	createLbCmd.Flags().Uint32Var(&o.FcDecodeMaxInflight, "fc-decode-max-inflight", 0, "Per-endpoint ceiling on decode legs; 0 restores the process default (LLB_FC_DECODE_MAX_INFLIGHT); ceiling 100000")
+	createLbCmd.Flags().Uint32Var(&o.FcTelemetryStaleMs, "fc-telemetry-stale-ms", 0, "How long the P/D scorers trust an endpoint's scraped queue depth without a refresh, in milliseconds; 0 restores the process default (LLB_FC_TELEMETRY_STALE_MS, else 30000); ceiling 3600000")
 	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueWaitMs, "fc-max-queue-wait-ms", 0, "Longest wait in the capacity admission queue in milliseconds before 504 admission_queue_timeout; non-zero whenever the rule has a queue depth; omitted keeps the rule's current value on a replace; ceiling 3600000")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
 	createLbCmd.Flags().StringVarP(&o.Name, "name", "", o.Name, "Name for load balancer rule")
@@ -708,6 +733,8 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 const (
 	fcMaxQueueDepthCeiling  = 65536
 	fcMaxQueueWaitMsCeiling = 3600000
+	fcCapCeiling            = 100000
+	fcTelemetryStaleCeiling = 3600000
 )
 
 // validateLBAIOptions enforces the documented cross-field constraints before
@@ -752,6 +779,27 @@ func validateFcQueueOptions(o *CreateLoadBalancerOptions) error {
 	}
 	if o.FcMaxQueueDepth > 0 && o.FcMaxQueueWaitMsSet && o.FcMaxQueueWaitMs == 0 {
 		return fmt.Errorf("--fc-max-queue-wait-ms must be non-zero when --fc-max-queue-depth is set")
+	}
+	switch o.FcMode {
+	case "", "off", "observe", "enforce", "inherit":
+	default:
+		return fmt.Errorf("--fc-mode must be one of off|observe|enforce|inherit")
+	}
+	for _, c := range []struct {
+		flag string
+		v    uint32
+	}{
+		{"--fc-max-outstanding", o.FcMaxOutstanding},
+		{"--fc-ep-max-inflight", o.FcEpMaxInflight},
+		{"--fc-prefill-max-inflight", o.FcPrefillMaxInflight},
+		{"--fc-decode-max-inflight", o.FcDecodeMaxInflight},
+	} {
+		if c.v > fcCapCeiling {
+			return fmt.Errorf("%s must be within 0..%d", c.flag, fcCapCeiling)
+		}
+	}
+	if o.FcTelemetryStaleMs > fcTelemetryStaleCeiling {
+		return fmt.Errorf("--fc-telemetry-stale-ms must be within 0..%d", fcTelemetryStaleCeiling)
 	}
 	return nil
 }
@@ -889,6 +937,12 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	// the rule's current value.
 	s.FcMaxQueueDepth = u32IfGiven(o.FcMaxQueueDepth, o.FcMaxQueueDepthSet)
 	s.FcMaxQueueWaitMs = u32IfGiven(o.FcMaxQueueWaitMs, o.FcMaxQueueWaitMsSet)
+	s.FcMode = o.FcMode
+	s.FcMaxOutstanding = u32IfGiven(o.FcMaxOutstanding, o.FcMaxOutstandingSet)
+	s.FcEpMaxInflight = u32IfGiven(o.FcEpMaxInflight, o.FcEpMaxInflightSet)
+	s.FcPrefillMaxInflight = u32IfGiven(o.FcPrefillMaxInflight, o.FcPrefillMaxInflightSet)
+	s.FcDecodeMaxInflight = u32IfGiven(o.FcDecodeMaxInflight, o.FcDecodeMaxInflightSet)
+	s.FcTelemetryStaleMs = u32IfGiven(o.FcTelemetryStaleMs, o.FcTelemetryStaleMsSet)
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix
