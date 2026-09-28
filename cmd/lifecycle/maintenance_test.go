@@ -27,7 +27,7 @@ import (
 )
 
 const maintenanceOnBody = `{"state":"maintenance","operation_id":"maint-1800000000-1",` +
-	`"refusing_new_config":true,"refusing_new_inference":false,"in_flight_streams":3,` +
+	`"refusing_new_config":true,"refusing_new_inference":false,"in_flight_streams":3,"in_flight_requests":5,` +
 	`"entered_at":"2027-01-15T10:00:00.000Z","elapsed_seconds":42,"drain_timeout_seconds":300,` +
 	`"drain_deadline_exceeded":false,"cancellable":true}`
 
@@ -47,6 +47,7 @@ func TestMaintenanceGetRendersGatewayTruth(t *testing.T) {
 		"Refusing new config: true",
 		"Refusing new inference: false",
 		"In-flight streams: 3",
+		"In-flight inference requests: 5",
 		"Elapsed: 42s of a 300s drain window",
 	} {
 		if !strings.Contains(text, want) {

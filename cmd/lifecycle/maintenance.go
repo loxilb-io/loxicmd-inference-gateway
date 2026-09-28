@@ -134,6 +134,7 @@ func humanMaintenance(out io.Writer, report *api.LifecycleReport) error {
 	fmt.Fprintf(out, "  Refusing new config: %v\n", st.RefusingNewConfig)
 	fmt.Fprintf(out, "  Refusing new inference: %v\n", st.RefusingNewInference)
 	fmt.Fprintf(out, "  In-flight streams: %d\n", st.InFlightStreams)
+	fmt.Fprintf(out, "  In-flight inference requests: %d\n", st.InFlightRequests)
 	if st.State == "maintenance" {
 		if st.DrainTimeoutSeconds > 0 {
 			fmt.Fprintf(out, "  Elapsed: %ds of a %ds drain window\n", st.ElapsedSeconds, st.DrainTimeoutSeconds)

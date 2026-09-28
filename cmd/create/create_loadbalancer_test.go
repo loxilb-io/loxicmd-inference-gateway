@@ -81,7 +81,7 @@ func TestClassicLB_NoAIKeys(t *testing.T) {
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
 		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType", "sockMapMode",
-		"connectionLimit")
+		"connectionLimit", "fc_max_queue_depth", "fc_max_queue_wait_ms", "fc_effective")
 }
 
 // --connection-limit is an L4 attribute, sent only when set: a classic rule
@@ -105,6 +105,110 @@ func TestConnectionLimitServiceArgument(t *testing.T) {
 			t.Fatalf("--connection-limit type %s, want uint32", f.Value.Type())
 		}
 	})
+}
+
+// --fc-max-queue-depth / --fc-max-queue-wait-ms are sent only when set: an
+// unset pair stays absent, a declared pair reaches the wire as
+// fc_max_queue_depth / fc_max_queue_wait_ms, and the gateway's bounds are
+// enforced before the request is built.
+func TestFcQueueServiceArguments(t *testing.T) {
+	t.Run("declared", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.32", Select: "rr", FcMaxQueueDepth: 64, FcMaxQueueWaitMs: 30000})
+		assertKey(t, m, "fc_max_queue_depth", 64)
+		assertKey(t, m, "fc_max_queue_wait_ms", 30000)
+	})
+	t.Run("unset omitted", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.33", Select: "rr"})
+		assertAbsent(t, m, "fc_max_queue_depth", "fc_max_queue_wait_ms", "fc_effective")
+	})
+	t.Run("flags are registered as uint32", func(t *testing.T) {
+		flags := NewCreateLoadBalancerCmd(&api.RESTOptions{}).Flags()
+		for _, name := range []string{"fc-max-queue-depth", "fc-max-queue-wait-ms"} {
+			f := flags.Lookup(name)
+			if f == nil {
+				t.Fatalf("--%s is not registered", name)
+			}
+			if f.Value.Type() != "uint32" {
+				t.Fatalf("--%s type %s, want uint32", name, f.Value.Type())
+			}
+		}
+	})
+	t.Run("pair accepted", func(t *testing.T) {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{FcMaxQueueDepth: 65536, FcMaxQueueWaitMs: 3600000}); err != nil {
+			t.Fatalf("ceiling pair rejected: %v", err)
+		}
+	})
+	// create lb is create-or-replace, and a replace keeps each field it
+	// omits: a flag given as 0 must reach the gateway (it restores the
+	// process default), an omitted one must not (it keeps the rule's value).
+	t.Run("explicit zero goes on the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.36", Select: "rr",
+			FcMaxQueueDepthSet: true, FcMaxQueueWaitMsSet: true})
+		assertKey(t, m, "fc_max_queue_depth", 0)
+		assertKey(t, m, "fc_max_queue_wait_ms", 0)
+	})
+	t.Run("depth alone is the gateway's to judge", func(t *testing.T) {
+		// On a replace the rule's current wait completes the pair.
+		o := &CreateLoadBalancerOptions{ExternalIP: "192.0.2.37", Select: "rr", FcMaxQueueDepth: 64, FcMaxQueueDepthSet: true}
+		if err := validateLBAIOptions(o); err != nil {
+			t.Fatalf("depth alone rejected client-side: %v", err)
+		}
+		m := serviceMap(t, o)
+		assertKey(t, m, "fc_max_queue_depth", 64)
+		assertAbsent(t, m, "fc_max_queue_wait_ms")
+	})
+	t.Run("depth with an explicit zero wait", func(t *testing.T) {
+		err := validateLBAIOptions(&CreateLoadBalancerOptions{FcMaxQueueDepth: 64, FcMaxQueueDepthSet: true, FcMaxQueueWaitMsSet: true})
+		if err == nil {
+			t.Fatal("expected error for --fc-max-queue-depth with --fc-max-queue-wait-ms 0")
+		}
+		if want := "--fc-max-queue-wait-ms must be non-zero when --fc-max-queue-depth is set"; err.Error() != want {
+			t.Fatalf("error %q, want %q", err.Error(), want)
+		}
+	})
+	t.Run("depth above ceiling", func(t *testing.T) {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{FcMaxQueueDepth: 65537, FcMaxQueueWaitMs: 1000}); err == nil {
+			t.Fatal("expected error for --fc-max-queue-depth above 65536")
+		}
+	})
+	t.Run("wait above ceiling", func(t *testing.T) {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{FcMaxQueueDepth: 64, FcMaxQueueWaitMs: 3600001}); err == nil {
+			t.Fatal("expected error for --fc-max-queue-wait-ms above 3600000")
+		}
+	})
+}
+
+// A GET payload carrying fc_effective decodes into the read-only struct.
+func TestFcEffectiveReadback(t *testing.T) {
+	payload := `{"externalIP":"192.0.2.34","port":2020,"protocol":"tcp","sel":0,"mode":4,"BGP":false,"Monitor":false,` +
+		`"inactiveTimeOut":240,"block":0,"proxyprotocolv2":false,"egress":false,` +
+		`"fc_max_queue_depth":64,"fc_max_queue_wait_ms":30000,` +
+		`"fc_effective":{"mode":"enforce","max_outstanding":128,"ep_max_inflight":32,"prefill_max_inflight":8,` +
+		`"decode_max_inflight":24,"queue_depth":64,"queue_wait_ms":30000,"inflight":5,"queued":2,"queue_memory_bound_mib":64}}`
+	var s api.LoadBalancerService
+	if err := json.Unmarshal([]byte(payload), &s); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if s.FcMaxQueueDepth == nil || *s.FcMaxQueueDepth != 64 || s.FcMaxQueueWaitMs == nil || *s.FcMaxQueueWaitMs != 30000 {
+		t.Fatalf("queue fields = %v/%v, want 64/30000", s.FcMaxQueueDepth, s.FcMaxQueueWaitMs)
+	}
+	fe := s.FcEffective
+	if fe == nil {
+		t.Fatal("fc_effective did not decode")
+	}
+	want := api.FcEffective{Mode: "enforce", MaxOutstanding: 128, EpMaxInflight: 32, PrefillMaxInflight: 8,
+		DecodeMaxInflight: 24, QueueDepth: 64, QueueWaitMs: 30000, Inflight: 5, Queued: 2, QueueMemoryBoundMib: 64}
+	if *fe != want {
+		t.Fatalf("fc_effective = %+v, want %+v", *fe, want)
+	}
+	// Absent on the wire stays nil, so a create body never echoes it back.
+	var bare api.LoadBalancerService
+	if err := json.Unmarshal([]byte(`{"externalIP":"192.0.2.35","port":2020,"protocol":"tcp","sel":0,"mode":0,"BGP":false,"Monitor":false,"inactiveTimeOut":0,"block":0,"proxyprotocolv2":false,"egress":false}`), &bare); err != nil {
+		t.Fatalf("unmarshal bare: %v", err)
+	}
+	if bare.FcEffective != nil {
+		t.Fatalf("fc_effective = %+v, want nil", *bare.FcEffective)
+	}
 }
 
 func TestSockMapModeServiceArguments(t *testing.T) {

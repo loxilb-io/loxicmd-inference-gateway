@@ -59,6 +59,14 @@ type CreateLoadBalancerOptions struct {
 	// Concurrent-connection ceiling for the rule (0 = unlimited).
 	ConnectionLimit uint32
 
+	// Capacity admission queue of the service's model pool (0 = process default).
+	FcMaxQueueDepth  uint32
+	FcMaxQueueWaitMs uint32
+	// Whether each queue flag was given on the command line: create lb is
+	// create-or-replace, and a replace keeps each field it omits.
+	FcMaxQueueDepthSet  bool
+	FcMaxQueueWaitMsSet bool
+
 	// Active health monitor probe.
 	ProbeType    string
 	ProbePort    uint16
@@ -275,6 +283,8 @@ ex)
 			if err := ReadCreateLoadBalancerOptions(&o, args); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
+			o.FcMaxQueueDepthSet = cmd.Flags().Changed("fc-max-queue-depth")
+			o.FcMaxQueueWaitMsSet = cmd.Flags().Changed("fc-max-queue-wait-ms")
 			if err := validateLBAIOptions(&o); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
@@ -436,6 +446,8 @@ ex)
 	createLbCmd.Flags().Uint32VarP(&o.Timeout, "inatimeout", "", 0, "Specify the timeout (in seconds) after which a LB session will be reset for inactivity")
 	createLbCmd.Flags().Uint32VarP(&o.Mark, "mark", "", 0, "Specify the mark num to segregate a load-balancer VIP service")
 	createLbCmd.Flags().Uint32Var(&o.ConnectionLimit, "connection-limit", 0, "Concurrent-connection ceiling across the rule's endpoints, enforced at SYN time on L4 rules (0 = unlimited)")
+	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueDepth, "fc-max-queue-depth", 0, "Capacity admission queue depth of the service's model pool: inference requests that may wait for a unit instead of a 429; 0 restores the process default, omitted keeps the rule's current value on a replace; needs a wait (--fc-max-queue-wait-ms, or the rule's current one on a replace); ceiling 65536; each waiter parks about 1 MiB of client receive buffer")
+	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueWaitMs, "fc-max-queue-wait-ms", 0, "Longest wait in the capacity admission queue in milliseconds before 504 admission_queue_timeout; non-zero whenever the rule has a queue depth; omitted keeps the rule's current value on a replace; ceiling 3600000")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
 	createLbCmd.Flags().StringVarP(&o.Name, "name", "", o.Name, "Name for load balancer rule")
 	createLbCmd.Flags().BoolVarP(&o.Attach, "attachEP", "", false, "Attach endpoints to the load balancer rule")
@@ -692,6 +704,12 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 		sel == 8 || sel == 9 || sel == 10
 }
 
+// Gateway-side bounds of the capacity admission queue.
+const (
+	fcMaxQueueDepthCeiling  = 65536
+	fcMaxQueueWaitMsCeiling = 3600000
+)
+
 // validateLBAIOptions enforces the documented cross-field constraints before
 // building the request.
 func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
@@ -705,6 +723,9 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 	default:
 		return fmt.Errorf("--sockmap-mode must be one of off|request|response|both")
 	}
+	if err := validateFcQueueOptions(o); err != nil {
+		return err
+	}
 	if !lbAIRequested(o) {
 		return nil
 	}
@@ -715,6 +736,33 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 		return fmt.Errorf("--pd-cache-aware requires --pd-disagg")
 	}
 	return validateKVEngineOptions(o)
+}
+
+// validateFcQueueOptions mirrors the gateway's admission-queue bounds so a
+// bad value is rejected before the request leaves the CLI. The pair rule (a
+// depth needs a wait) is the gateway's to judge on the rule a replace leaves
+// behind, where the stored wait counts; only a wait given as 0 beside a
+// depth is wrong whatever is stored.
+func validateFcQueueOptions(o *CreateLoadBalancerOptions) error {
+	if o.FcMaxQueueDepth > fcMaxQueueDepthCeiling {
+		return fmt.Errorf("--fc-max-queue-depth must be within 0..%d", fcMaxQueueDepthCeiling)
+	}
+	if o.FcMaxQueueWaitMs > fcMaxQueueWaitMsCeiling {
+		return fmt.Errorf("--fc-max-queue-wait-ms must be within 0..%d", fcMaxQueueWaitMsCeiling)
+	}
+	if o.FcMaxQueueDepth > 0 && o.FcMaxQueueWaitMsSet && o.FcMaxQueueWaitMs == 0 {
+		return fmt.Errorf("--fc-max-queue-wait-ms must be non-zero when --fc-max-queue-depth is set")
+	}
+	return nil
+}
+
+// u32IfGiven returns the value to send for an optional numeric flag: nil
+// when it was neither given nor set, so it stays off the wire.
+func u32IfGiven(v uint32, given bool) *uint32 {
+	if !given && v == 0 {
+		return nil
+	}
+	return &v
 }
 
 func validateKVEngineOptions(o *CreateLoadBalancerOptions) error {
@@ -836,6 +884,11 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.ProbeRetries = o.ProbeRetries
 	// L4 concurrent-connection ceiling; zero stays off the wire.
 	s.ConnectionLimit = o.ConnectionLimit
+	// Capacity admission queue: a flag given goes on the wire even at 0
+	// (the process default); an omitted one stays off, so a replace keeps
+	// the rule's current value.
+	s.FcMaxQueueDepth = u32IfGiven(o.FcMaxQueueDepth, o.FcMaxQueueDepthSet)
+	s.FcMaxQueueWaitMs = u32IfGiven(o.FcMaxQueueWaitMs, o.FcMaxQueueWaitMsSet)
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix

@@ -178,6 +178,10 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 		if lbrule.Service.Security != 0 {
 			protocolStr += fmt.Sprintf(":%s", NumToSecurty(int(lbrule.Service.Security)))
 		}
+		var effQueueDepth, effQueueWaitMs uint32
+		if eff := lbrule.Service.FcEffective; eff != nil {
+			effQueueDepth, effQueueWaitMs = eff.QueueDepth, eff.QueueWaitMs
+		}
 		if o.PrintOption == "wide" {
 			table.SetHeader(LOADBALANCER_WIDE_TITLE)
 			secIPs := ""
@@ -228,9 +232,9 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 		} else {
 			table.SetHeader(LOADBALANCER_TITLE)
 			if lbrule.Service.PortMax == 0 {
-				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor), fmt.Sprintf("%d", lbrule.Service.ConnectionLimit)})
+				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor), fmt.Sprintf("%d", lbrule.Service.ConnectionLimit), fcQueueCell(u32Val(lbrule.Service.FcMaxQueueDepth), effQueueDepth), fcQueueCell(u32Val(lbrule.Service.FcMaxQueueWaitMs), effQueueWaitMs)})
 			} else {
-				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor), fmt.Sprintf("%d", lbrule.Service.ConnectionLimit)})
+				data = append(data, []string{lbrule.Service.ExternalIP, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress), fmt.Sprintf("%d", len(lbrule.Endpoints)), fmt.Sprintf("%v", lbrule.Service.Timeout), BoolToMon(lbrule.Service.Monitor), fmt.Sprintf("%d", lbrule.Service.ConnectionLimit), fcQueueCell(u32Val(lbrule.Service.FcMaxQueueDepth), effQueueDepth), fcQueueCell(u32Val(lbrule.Service.FcMaxQueueWaitMs), effQueueWaitMs)})
 			}
 		}
 	}
@@ -336,4 +340,23 @@ func Lbdump(restOptions *api.RESTOptions, path string) (string, error) {
 		return file, err
 	}
 	return file, nil
+}
+
+// fcQueueCell renders a declared capacity-queue field. A service that
+// declares none (0) runs on the process default, which GET reports in
+// fc_effective: it is shown beside the 0, so the cell never reads as "no
+// queue" while one is in force.
+func fcQueueCell(declared, effective uint32) string {
+	if declared == 0 && effective != 0 {
+		return fmt.Sprintf("0 (default %d)", effective)
+	}
+	return fmt.Sprintf("%d", declared)
+}
+
+// u32Val reads an optional numeric field, 0 when the gateway left it out.
+func u32Val(p *uint32) uint32 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }

@@ -112,7 +112,7 @@ const successBody = `{"result":"Success"}`
 // drain window is open — the same shape the lifecycle tests pin. Every value
 // is server-provided, so the rendering is deterministic.
 const maintenanceBody = `{"state":"maintenance","operation_id":"maint-1800000000-1",` +
-	`"refusing_new_config":true,"refusing_new_inference":false,"in_flight_streams":3,` +
+	`"refusing_new_config":true,"refusing_new_inference":false,"in_flight_streams":3,"in_flight_requests":5,` +
 	`"entered_at":"2027-01-15T10:00:00.000Z","elapsed_seconds":42,"drain_timeout_seconds":300,` +
 	`"drain_deadline_exceeded":false,"cancellable":true}`
 
