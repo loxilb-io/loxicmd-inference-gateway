@@ -557,3 +557,62 @@ func TestValidateKVEngineOptions(t *testing.T) {
 		}
 	}
 }
+
+// The rest of the admission gate follows the queue's presence rules: a flag
+// given goes on the wire even at 0, an omitted one stays off; --fc-mode is
+// sent when given, "inherit" included.
+func TestFcGateServiceArguments(t *testing.T) {
+	t.Run("declared", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.40", Select: "rr",
+			FcMode: "enforce", FcMaxOutstanding: 8, FcMaxOutstandingSet: true, FcEpMaxInflight: 4, FcEpMaxInflightSet: true,
+			FcPrefillMaxInflight: 2, FcPrefillMaxInflightSet: true, FcDecodeMaxInflight: 6, FcDecodeMaxInflightSet: true,
+			FcTelemetryStaleMs: 60000, FcTelemetryStaleMsSet: true})
+		assertKey(t, m, "fc_mode", "enforce")
+		assertKey(t, m, "fc_max_outstanding", 8)
+		assertKey(t, m, "fc_ep_max_inflight", 4)
+		assertKey(t, m, "fc_prefill_max_inflight", 2)
+		assertKey(t, m, "fc_decode_max_inflight", 6)
+		assertKey(t, m, "fc_telemetry_stale_ms", 60000)
+	})
+	t.Run("omitted stays off the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.41", Select: "rr"})
+		assertAbsent(t, m, "fc_mode", "fc_max_outstanding", "fc_ep_max_inflight",
+			"fc_prefill_max_inflight", "fc_decode_max_inflight", "fc_telemetry_stale_ms")
+	})
+	t.Run("explicit zero and inherit go on the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.42", Select: "rr",
+			FcMode: "inherit", FcMaxOutstandingSet: true, FcTelemetryStaleMsSet: true})
+		assertKey(t, m, "fc_mode", "inherit")
+		assertKey(t, m, "fc_max_outstanding", 0)
+		assertKey(t, m, "fc_telemetry_stale_ms", 0)
+		assertAbsent(t, m, "fc_ep_max_inflight")
+	})
+	for _, c := range []struct {
+		name string
+		o    CreateLoadBalancerOptions
+		want string
+	}{
+		{"an unknown mode", CreateLoadBalancerOptions{FcMode: "yes"}, "--fc-mode must be one of off|observe|enforce|inherit"},
+		{"a ceiling above 100000", CreateLoadBalancerOptions{FcMaxOutstanding: 100001}, "--fc-max-outstanding must be within 0..100000"},
+		{"a decode ceiling above 100000", CreateLoadBalancerOptions{FcDecodeMaxInflight: 100001}, "--fc-decode-max-inflight must be within 0..100000"},
+		{"a window above an hour", CreateLoadBalancerOptions{FcTelemetryStaleMs: 3600001}, "--fc-telemetry-stale-ms must be within 0..3600000"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			err := validateLBAIOptions(&c.o)
+			if err == nil || err.Error() != c.want {
+				t.Fatalf("error %v, want %q", err, c.want)
+			}
+		})
+	}
+	t.Run("the flags are registered", func(t *testing.T) {
+		flags := NewCreateLoadBalancerCmd(&api.RESTOptions{}).Flags()
+		for name, typ := range map[string]string{"fc-mode": "string", "fc-max-outstanding": "uint32",
+			"fc-ep-max-inflight": "uint32", "fc-prefill-max-inflight": "uint32",
+			"fc-decode-max-inflight": "uint32", "fc-telemetry-stale-ms": "uint32"} {
+			f := flags.Lookup(name)
+			if f == nil || f.Value.Type() != typ {
+				t.Fatalf("--%s not registered as %s", name, typ)
+			}
+		}
+	})
+}

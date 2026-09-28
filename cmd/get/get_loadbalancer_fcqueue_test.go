@@ -15,7 +15,11 @@
  */
 package get
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
+)
 
 // A declared value is shown as is; an undeclared one (0) with a process
 // default in force shows the default beside it; with neither, 0.
@@ -33,5 +37,25 @@ func TestFcQueueCell(t *testing.T) {
 		if got := fcQueueCell(c.declared, c.effective); got != c.want {
 			t.Errorf("fcQueueCell(%d, %d) = %q, want %q", c.declared, c.effective, got, c.want)
 		}
+	}
+}
+
+func TestFcGateCells(t *testing.T) {
+	for _, c := range []struct {
+		name         string
+		eff          *api.FcEffective
+		gate, maxOut string
+	}{
+		{"no gate state", nil, "-", "-"},
+		{"with sources", &api.FcEffective{Mode: "enforce", MaxOutstanding: 4,
+			Source: &api.FcEffectiveSource{Mode: "env", MaxOutstanding: "rule"}}, "enforce (env)", "4 (rule)"},
+		{"a gateway without sources", &api.FcEffective{Mode: "observe", MaxOutstanding: 8}, "observe", "8"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			g, m := fcGateCells(c.eff)
+			if g != c.gate || m != c.maxOut {
+				t.Fatalf("cells %q / %q, want %q / %q", g, m, c.gate, c.maxOut)
+			}
+		})
 	}
 }
