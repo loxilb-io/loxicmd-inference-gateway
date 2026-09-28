@@ -616,3 +616,77 @@ func TestFcGateServiceArguments(t *testing.T) {
 		}
 	})
 }
+
+// The adaptive ceiling's three fields follow the same presence rules.
+func TestFcAdaptiveServiceArguments(t *testing.T) {
+	t.Run("declared", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.43", Select: "rr",
+			FcAdaptive: "on", FcWarmupMs: 20000, FcWarmupMsSet: true, FcTtftTargetMs: 300, FcTtftTargetMsSet: true})
+		assertKey(t, m, "fc_adaptive", "on")
+		assertKey(t, m, "fc_warmup_ms", 20000)
+		assertKey(t, m, "fc_ttft_target_ms", 300)
+	})
+	t.Run("omitted stays off the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.44", Select: "rr"})
+		assertAbsent(t, m, "fc_adaptive", "fc_warmup_ms", "fc_ttft_target_ms")
+	})
+	t.Run("explicit zero and inherit go on the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.45", Select: "rr",
+			FcAdaptive: "inherit", FcWarmupMsSet: true, FcTtftTargetMsSet: true})
+		assertKey(t, m, "fc_adaptive", "inherit")
+		assertKey(t, m, "fc_warmup_ms", 0)
+		assertKey(t, m, "fc_ttft_target_ms", 0)
+	})
+	for _, c := range []struct {
+		name string
+		o    CreateLoadBalancerOptions
+		want string
+	}{
+		{"an unknown switch", CreateLoadBalancerOptions{FcAdaptive: "yes"}, "--fc-adaptive must be one of on|off|inherit"},
+		{"a warm-up above an hour", CreateLoadBalancerOptions{FcWarmupMs: 3600001}, "--fc-warmup-ms must be within 0..3600000"},
+		{"a target above an hour", CreateLoadBalancerOptions{FcTtftTargetMs: 3600001}, "--fc-ttft-target-ms must be within 0..3600000"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			err := validateLBAIOptions(&c.o)
+			if err == nil || err.Error() != c.want {
+				t.Fatalf("error %v, want %q", err, c.want)
+			}
+		})
+	}
+	t.Run("the flags are registered", func(t *testing.T) {
+		flags := NewCreateLoadBalancerCmd(&api.RESTOptions{}).Flags()
+		for name, typ := range map[string]string{"fc-adaptive": "string", "fc-warmup-ms": "uint32", "fc-ttft-target-ms": "uint32"} {
+			f := flags.Lookup(name)
+			if f == nil || f.Value.Type() != typ {
+				t.Fatalf("--%s not registered as %s", name, typ)
+			}
+		}
+	})
+}
+
+func TestFcAdaptiveReadback(t *testing.T) {
+	payload := `{"externalIP":"192.0.2.46","port":2030,"protocol":"tcp","sel":0,"mode":4,"BGP":false,"Monitor":false,` +
+		`"inactiveTimeOut":240,"block":0,"proxyprotocolv2":false,"egress":false,` +
+		`"fc_adaptive":"on","fc_warmup_ms":20000,"fc_ttft_target_ms":300,` +
+		`"fc_effective":{"mode":"enforce","max_outstanding":10,"adaptive":"on","warmup_ms":20000,"ttft_target_ms":300,` +
+		`"effective_max_outstanding":2,"adapt_state":"tightened","adapt_reason":"queued","warming_endpoints":1,` +
+		`"source":{"adaptive":"rule","warmup_ms":"rule","ttft_target_ms":"env"}}}`
+	var s api.LoadBalancerService
+	if err := json.Unmarshal([]byte(payload), &s); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if s.FcAdaptive != "on" || s.FcWarmupMs == nil || *s.FcWarmupMs != 20000 || s.FcTtftTargetMs == nil || *s.FcTtftTargetMs != 300 {
+		t.Fatalf("rule fields = %q/%v/%v, want on/20000/300", s.FcAdaptive, s.FcWarmupMs, s.FcTtftTargetMs)
+	}
+	fe := s.FcEffective
+	if fe == nil || fe.Source == nil {
+		t.Fatal("fc_effective or its source did not decode")
+	}
+	if fe.Adaptive != "on" || fe.WarmupMs != 20000 || fe.TtftTargetMs != 300 || fe.EffectiveMaxOutstanding != 2 ||
+		fe.AdaptState != "tightened" || fe.AdaptReason != "queued" || fe.WarmingEndpoints != 1 {
+		t.Fatalf("fc_effective = %+v", *fe)
+	}
+	if fe.Source.Adaptive != "rule" || fe.Source.WarmupMs != "rule" || fe.Source.TtftTargetMs != "env" {
+		t.Fatalf("source = %+v", *fe.Source)
+	}
+}

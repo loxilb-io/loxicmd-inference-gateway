@@ -183,6 +183,7 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 			effQueueDepth, effQueueWaitMs = eff.QueueDepth, eff.QueueWaitMs
 		}
 		gateCell, maxOutCell := fcGateCells(lbrule.Service.FcEffective)
+		adaptCell := fcAdaptCell(lbrule.Service.FcEffective)
 		if o.PrintOption == "wide" {
 			table.SetHeader(LOADBALANCER_WIDE_TITLE)
 			secIPs := ""
@@ -206,13 +207,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", ""})
 					}
 				}
 			} else {
@@ -220,13 +221,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", ""})
 					}
 				}
 			}
@@ -381,4 +382,26 @@ func fcGateCells(eff *api.FcEffective) (string, string) {
 		modeSrc, maxSrc = eff.Source.Mode, eff.Source.MaxOutstanding
 	}
 	return eff.Mode + src(modeSrc), fmt.Sprintf("%d", eff.MaxOutstanding) + src(maxSrc)
+}
+
+// fcAdaptCell renders the adaptive ceiling for the wide view: its state, the
+// ceiling it holds against the configured one, why it moved, and how many
+// endpoints are still ramping up ("tightened 2/8 (ttft)", "open 8/8, 2
+// warming"). "off" when the rule does not adapt; "-" when the gateway reports
+// no adaptive state (no gate, or a gateway that predates it).
+func fcAdaptCell(eff *api.FcEffective) string {
+	if eff == nil || eff.AdaptState == "" {
+		return "-"
+	}
+	if eff.AdaptState == "off" {
+		return "off"
+	}
+	cell := fmt.Sprintf("%s %d/%d", eff.AdaptState, eff.EffectiveMaxOutstanding, eff.MaxOutstanding)
+	if eff.AdaptReason != "" && eff.AdaptReason != "none" {
+		cell += " (" + eff.AdaptReason + ")"
+	}
+	if eff.WarmingEndpoints > 0 {
+		cell += fmt.Sprintf(", %d warming", eff.WarmingEndpoints)
+	}
+	return cell
 }

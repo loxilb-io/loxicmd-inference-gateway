@@ -81,6 +81,14 @@ type CreateLoadBalancerOptions struct {
 	FcDecodeMaxInflightSet  bool
 	FcTelemetryStaleMsSet   bool
 
+	// The adaptive ceiling: FcAdaptive is sent when given, the two numeric
+	// fields carry whether their flag was given.
+	FcAdaptive        string
+	FcWarmupMs        uint32
+	FcTtftTargetMs    uint32
+	FcWarmupMsSet     bool
+	FcTtftTargetMsSet bool
+
 	// Active health monitor probe.
 	ProbeType    string
 	ProbePort    uint16
@@ -304,6 +312,8 @@ ex)
 			o.FcPrefillMaxInflightSet = cmd.Flags().Changed("fc-prefill-max-inflight")
 			o.FcDecodeMaxInflightSet = cmd.Flags().Changed("fc-decode-max-inflight")
 			o.FcTelemetryStaleMsSet = cmd.Flags().Changed("fc-telemetry-stale-ms")
+			o.FcWarmupMsSet = cmd.Flags().Changed("fc-warmup-ms")
+			o.FcTtftTargetMsSet = cmd.Flags().Changed("fc-ttft-target-ms")
 			if err := validateLBAIOptions(&o); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
@@ -472,6 +482,9 @@ ex)
 	createLbCmd.Flags().Uint32Var(&o.FcPrefillMaxInflight, "fc-prefill-max-inflight", 0, "Per-endpoint ceiling on prefill legs; 0 restores the process default (LLB_FC_PREFILL_MAX_INFLIGHT); ceiling 100000")
 	createLbCmd.Flags().Uint32Var(&o.FcDecodeMaxInflight, "fc-decode-max-inflight", 0, "Per-endpoint ceiling on decode legs; 0 restores the process default (LLB_FC_DECODE_MAX_INFLIGHT); ceiling 100000")
 	createLbCmd.Flags().Uint32Var(&o.FcTelemetryStaleMs, "fc-telemetry-stale-ms", 0, "How long the P/D scorers trust an endpoint's scraped queue depth without a refresh, in milliseconds; 0 restores the process default (LLB_FC_TELEMETRY_STALE_MS, else 30000); ceiling 3600000")
+	createLbCmd.Flags().StringVar(&o.FcAdaptive, "fc-adaptive", "", "Adaptive pool ceiling: on lets the ceiling in force tighten while endpoints report waiting requests or a slow time to first token and climb back one unit a second when they clear; off holds the configured ceiling; inherit returns a replaced rule to the process default (LLB_FC_ADAPTIVE); omitted keeps the rule's current value on a replace")
+	createLbCmd.Flags().Uint32Var(&o.FcWarmupMs, "fc-warmup-ms", 0, "Warm-up window in milliseconds: an endpoint back in service ramps from a quarter of its ceiling to all of it across the window; 0 restores the process default (LLB_FC_WARMUP_MS, else no ramp); ceiling 3600000")
+	createLbCmd.Flags().Uint32Var(&o.FcTtftTargetMs, "fc-ttft-target-ms", 0, "With --fc-adaptive on: tighten while an endpoint's streamed responses average more than this many milliseconds to their first token; 0 restores the process default (LLB_FC_TTFT_TARGET_MS, else not used); ceiling 3600000")
 	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueWaitMs, "fc-max-queue-wait-ms", 0, "Longest wait in the capacity admission queue in milliseconds before 504 admission_queue_timeout; non-zero whenever the rule has a queue depth; omitted keeps the rule's current value on a replace; ceiling 3600000")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
 	createLbCmd.Flags().StringVarP(&o.Name, "name", "", o.Name, "Name for load balancer rule")
@@ -735,6 +748,7 @@ const (
 	fcMaxQueueWaitMsCeiling = 3600000
 	fcCapCeiling            = 100000
 	fcTelemetryStaleCeiling = 3600000
+	fcAdaptiveMsCeiling     = 3600000
 )
 
 // validateLBAIOptions enforces the documented cross-field constraints before
@@ -800,6 +814,17 @@ func validateFcQueueOptions(o *CreateLoadBalancerOptions) error {
 	}
 	if o.FcTelemetryStaleMs > fcTelemetryStaleCeiling {
 		return fmt.Errorf("--fc-telemetry-stale-ms must be within 0..%d", fcTelemetryStaleCeiling)
+	}
+	switch o.FcAdaptive {
+	case "", "on", "off", "inherit":
+	default:
+		return fmt.Errorf("--fc-adaptive must be one of on|off|inherit")
+	}
+	if o.FcWarmupMs > fcAdaptiveMsCeiling {
+		return fmt.Errorf("--fc-warmup-ms must be within 0..%d", fcAdaptiveMsCeiling)
+	}
+	if o.FcTtftTargetMs > fcAdaptiveMsCeiling {
+		return fmt.Errorf("--fc-ttft-target-ms must be within 0..%d", fcAdaptiveMsCeiling)
 	}
 	return nil
 }
@@ -943,6 +968,9 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.FcPrefillMaxInflight = u32IfGiven(o.FcPrefillMaxInflight, o.FcPrefillMaxInflightSet)
 	s.FcDecodeMaxInflight = u32IfGiven(o.FcDecodeMaxInflight, o.FcDecodeMaxInflightSet)
 	s.FcTelemetryStaleMs = u32IfGiven(o.FcTelemetryStaleMs, o.FcTelemetryStaleMsSet)
+	s.FcAdaptive = o.FcAdaptive
+	s.FcWarmupMs = u32IfGiven(o.FcWarmupMs, o.FcWarmupMsSet)
+	s.FcTtftTargetMs = u32IfGiven(o.FcTtftTargetMs, o.FcTtftTargetMsSet)
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix
