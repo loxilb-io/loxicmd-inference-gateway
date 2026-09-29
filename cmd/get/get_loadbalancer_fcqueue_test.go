@@ -80,3 +80,24 @@ func TestFcAdaptCell(t *testing.T) {
 		})
 	}
 }
+
+func TestFcTenantCell(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		eff  *api.FcEffective
+		want string
+	}{
+		{"no gate state", nil, "-"},
+		{"a gateway without the tenant share", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8}, "-"},
+		{"a hundred is no share", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, TenantMaxSharePct: 100}, "-"},
+		{"in force, with its source", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, TenantMaxSharePct: 25, TenantsActive: 3,
+			Source: &api.FcEffectiveSource{TenantMaxSharePct: "rule"}}, "25% (rule), 3 active"},
+		{"idle, a gateway without sources", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, TenantMaxSharePct: 50}, "50%, 0 active"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := fcTenantCell(c.eff); got != c.want {
+				t.Fatalf("cell %q, want %q", got, c.want)
+			}
+		})
+	}
+}

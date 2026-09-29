@@ -64,6 +64,10 @@ type FcEffective struct {
 	AdaptState              string `json:"adapt_state,omitempty"               yaml:"adapt_state,omitempty"`
 	AdaptReason             string `json:"adapt_reason,omitempty"              yaml:"adapt_reason,omitempty"`
 	WarmingEndpoints        uint32 `json:"warming_endpoints,omitempty"         yaml:"warming_endpoints,omitempty"`
+	// The tenant share in force (0 or 100 is none) and the tenants holding a
+	// unit or waiting on the pool now.
+	TenantMaxSharePct uint32 `json:"tenant_max_share_pct,omitempty" yaml:"tenant_max_share_pct,omitempty"`
+	TenantsActive     uint32 `json:"tenants_active,omitempty"       yaml:"tenants_active,omitempty"`
 	// Source names where each value came from: rule, env or default.
 	Source *FcEffectiveSource `json:"source,omitempty" yaml:"source,omitempty"`
 }
@@ -81,6 +85,7 @@ type FcEffectiveSource struct {
 	Adaptive           string `json:"adaptive,omitempty"             yaml:"adaptive,omitempty"`
 	WarmupMs           string `json:"warmup_ms,omitempty"            yaml:"warmup_ms,omitempty"`
 	TtftTargetMs       string `json:"ttft_target_ms,omitempty"       yaml:"ttft_target_ms,omitempty"`
+	TenantMaxSharePct  string `json:"tenant_max_share_pct,omitempty" yaml:"tenant_max_share_pct,omitempty"`
 }
 
 type LoadBalancerService struct {
@@ -127,6 +132,8 @@ type LoadBalancerService struct {
 	FcAdaptive     string  `json:"fc_adaptive,omitempty"       yaml:"fc_adaptive,omitempty"`
 	FcWarmupMs     *uint32 `json:"fc_warmup_ms,omitempty"      yaml:"fc_warmup_ms,omitempty"`
 	FcTtftTargetMs *uint32 `json:"fc_ttft_target_ms,omitempty" yaml:"fc_ttft_target_ms,omitempty"`
+	// The tenant share in percent, under the same presence rules.
+	FcTenantMaxSharePct *uint32 `json:"fc_tenant_max_share_pct,omitempty" yaml:"fc_tenant_max_share_pct,omitempty"`
 	// Flow-control state the gateway reports on GET; never sent on create.
 	FcEffective *FcEffective `json:"fc_effective,omitempty" yaml:"fc_effective,omitempty"`
 

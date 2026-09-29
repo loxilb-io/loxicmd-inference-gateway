@@ -89,6 +89,10 @@ type CreateLoadBalancerOptions struct {
 	FcWarmupMsSet     bool
 	FcTtftTargetMsSet bool
 
+	// The tenant share, in percent; sent when its flag was given.
+	FcTenantMaxSharePct    uint32
+	FcTenantMaxSharePctSet bool
+
 	// Active health monitor probe.
 	ProbeType    string
 	ProbePort    uint16
@@ -314,6 +318,7 @@ ex)
 			o.FcTelemetryStaleMsSet = cmd.Flags().Changed("fc-telemetry-stale-ms")
 			o.FcWarmupMsSet = cmd.Flags().Changed("fc-warmup-ms")
 			o.FcTtftTargetMsSet = cmd.Flags().Changed("fc-ttft-target-ms")
+			o.FcTenantMaxSharePctSet = cmd.Flags().Changed("fc-tenant-max-share-pct")
 			if err := validateLBAIOptions(&o); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
@@ -485,6 +490,7 @@ ex)
 	createLbCmd.Flags().StringVar(&o.FcAdaptive, "fc-adaptive", "", "Adaptive pool ceiling: on lets the ceiling in force tighten while endpoints report waiting requests or a slow time to first token and climb back one unit a second when they clear; off holds the configured ceiling; inherit returns a replaced rule to the process default (LLB_FC_ADAPTIVE); omitted keeps the rule's current value on a replace")
 	createLbCmd.Flags().Uint32Var(&o.FcWarmupMs, "fc-warmup-ms", 0, "Warm-up window in milliseconds: an endpoint back in service ramps from a quarter of its ceiling to all of it across the window; 0 restores the process default (LLB_FC_WARMUP_MS, else no ramp); ceiling 3600000")
 	createLbCmd.Flags().Uint32Var(&o.FcTtftTargetMs, "fc-ttft-target-ms", 0, "With --fc-adaptive on: tighten while an endpoint's streamed responses average more than this many milliseconds to their first token; 0 restores the process default (LLB_FC_TTFT_TARGET_MS, else not used); ceiling 3600000")
+	createLbCmd.Flags().Uint32Var(&o.FcTenantMaxSharePct, "fc-tenant-max-share-pct", 0, "The most of the pool ceiling in force, and of the queue depth, one tenant may hold, in percent (rounded up, at least one); a tenant at its share waits for one of its own units or is refused with 429 admission_tenant_share while other tenants still admit; 100 is no share; 0 restores the process default (LLB_FC_TENANT_MAX_SHARE_PCT, else no share); omitted keeps the rule's current value on a replace")
 	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueWaitMs, "fc-max-queue-wait-ms", 0, "Longest wait in the capacity admission queue in milliseconds before 504 admission_queue_timeout; non-zero whenever the rule has a queue depth; omitted keeps the rule's current value on a replace; ceiling 3600000")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
 	createLbCmd.Flags().StringVarP(&o.Name, "name", "", o.Name, "Name for load balancer rule")
@@ -749,6 +755,7 @@ const (
 	fcCapCeiling            = 100000
 	fcTelemetryStaleCeiling = 3600000
 	fcAdaptiveMsCeiling     = 3600000
+	fcTenantSharePctCeiling = 100
 )
 
 // validateLBAIOptions enforces the documented cross-field constraints before
@@ -825,6 +832,9 @@ func validateFcQueueOptions(o *CreateLoadBalancerOptions) error {
 	}
 	if o.FcTtftTargetMs > fcAdaptiveMsCeiling {
 		return fmt.Errorf("--fc-ttft-target-ms must be within 0..%d", fcAdaptiveMsCeiling)
+	}
+	if o.FcTenantMaxSharePct > fcTenantSharePctCeiling {
+		return fmt.Errorf("--fc-tenant-max-share-pct must be within 0..%d", fcTenantSharePctCeiling)
 	}
 	return nil
 }
@@ -971,6 +981,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.FcAdaptive = o.FcAdaptive
 	s.FcWarmupMs = u32IfGiven(o.FcWarmupMs, o.FcWarmupMsSet)
 	s.FcTtftTargetMs = u32IfGiven(o.FcTtftTargetMs, o.FcTtftTargetMsSet)
+	s.FcTenantMaxSharePct = u32IfGiven(o.FcTenantMaxSharePct, o.FcTenantMaxSharePctSet)
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix

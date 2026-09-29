@@ -184,6 +184,7 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 		}
 		gateCell, maxOutCell := fcGateCells(lbrule.Service.FcEffective)
 		adaptCell := fcAdaptCell(lbrule.Service.FcEffective)
+		tenantCell := fcTenantCell(lbrule.Service.FcEffective)
 		if o.PrintOption == "wide" {
 			table.SetHeader(LOADBALANCER_WIDE_TITLE)
 			secIPs := ""
@@ -207,13 +208,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", "", ""})
 					}
 				}
 			} else {
@@ -221,13 +222,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", "", ""})
 					}
 				}
 			}
@@ -404,4 +405,19 @@ func fcAdaptCell(eff *api.FcEffective) string {
 		cell += fmt.Sprintf(", %d warming", eff.WarmingEndpoints)
 	}
 	return cell
+}
+
+// fcTenantCell renders the tenant share for the wide view: the share in force,
+// where it came from, and the tenants holding a unit or waiting now ("25%
+// (rule), 3 active"). "-" when no share holds (0 or 100) or the gateway
+// reports none.
+func fcTenantCell(eff *api.FcEffective) string {
+	if eff == nil || eff.TenantMaxSharePct == 0 || eff.TenantMaxSharePct >= 100 {
+		return "-"
+	}
+	cell := fmt.Sprintf("%d%%", eff.TenantMaxSharePct)
+	if eff.Source != nil && eff.Source.TenantMaxSharePct != "" {
+		cell += " (" + eff.Source.TenantMaxSharePct + ")"
+	}
+	return cell + fmt.Sprintf(", %d active", eff.TenantsActive)
 }
