@@ -59,3 +59,24 @@ func TestFcGateCells(t *testing.T) {
 		})
 	}
 }
+
+func TestFcAdaptCell(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		eff  *api.FcEffective
+		want string
+	}{
+		{"no gate state", nil, "-"},
+		{"a gateway without the adaptive ceiling", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8}, "-"},
+		{"off", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, AdaptState: "off", EffectiveMaxOutstanding: 8}, "off"},
+		{"open", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, AdaptState: "open", AdaptReason: "none", EffectiveMaxOutstanding: 8}, "open 8/8"},
+		{"tightened, with its reason", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, AdaptState: "tightened", AdaptReason: "ttft", EffectiveMaxOutstanding: 2}, "tightened 2/8 (ttft)"},
+		{"warming endpoints", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8, AdaptState: "open", EffectiveMaxOutstanding: 8, WarmingEndpoints: 2}, "open 8/8, 2 warming"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := fcAdaptCell(c.eff); got != c.want {
+				t.Fatalf("cell %q, want %q", got, c.want)
+			}
+		})
+	}
+}

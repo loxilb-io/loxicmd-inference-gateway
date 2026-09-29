@@ -54,6 +54,16 @@ type FcEffective struct {
 	Queued              uint32 `json:"queued,omitempty"                 yaml:"queued,omitempty"`
 	QueueMemoryBoundMib uint64 `json:"queue_memory_bound_mib,omitempty" yaml:"queue_memory_bound_mib,omitempty"`
 	TelemetryStaleMs    uint32 `json:"telemetry_stale_ms,omitempty"     yaml:"telemetry_stale_ms,omitempty"`
+	// The adaptive ceiling: the switch and its inputs in force, the ceiling
+	// it holds now, its state (off, open, tightened, frozen) and why, and the
+	// endpoints still ramping up after a return to service.
+	Adaptive                string `json:"adaptive,omitempty"                  yaml:"adaptive,omitempty"`
+	WarmupMs                uint32 `json:"warmup_ms,omitempty"                 yaml:"warmup_ms,omitempty"`
+	TtftTargetMs            uint32 `json:"ttft_target_ms,omitempty"            yaml:"ttft_target_ms,omitempty"`
+	EffectiveMaxOutstanding uint32 `json:"effective_max_outstanding,omitempty" yaml:"effective_max_outstanding,omitempty"`
+	AdaptState              string `json:"adapt_state,omitempty"               yaml:"adapt_state,omitempty"`
+	AdaptReason             string `json:"adapt_reason,omitempty"              yaml:"adapt_reason,omitempty"`
+	WarmingEndpoints        uint32 `json:"warming_endpoints,omitempty"         yaml:"warming_endpoints,omitempty"`
 	// Source names where each value came from: rule, env or default.
 	Source *FcEffectiveSource `json:"source,omitempty" yaml:"source,omitempty"`
 }
@@ -68,6 +78,9 @@ type FcEffectiveSource struct {
 	QueueDepth         string `json:"queue_depth,omitempty"          yaml:"queue_depth,omitempty"`
 	QueueWaitMs        string `json:"queue_wait_ms,omitempty"        yaml:"queue_wait_ms,omitempty"`
 	TelemetryStaleMs   string `json:"telemetry_stale_ms,omitempty"   yaml:"telemetry_stale_ms,omitempty"`
+	Adaptive           string `json:"adaptive,omitempty"             yaml:"adaptive,omitempty"`
+	WarmupMs           string `json:"warmup_ms,omitempty"            yaml:"warmup_ms,omitempty"`
+	TtftTargetMs       string `json:"ttft_target_ms,omitempty"       yaml:"ttft_target_ms,omitempty"`
 }
 
 type LoadBalancerService struct {
@@ -109,6 +122,11 @@ type LoadBalancerService struct {
 	FcPrefillMaxInflight *uint32 `json:"fc_prefill_max_inflight,omitempty" yaml:"fc_prefill_max_inflight,omitempty"`
 	FcDecodeMaxInflight  *uint32 `json:"fc_decode_max_inflight,omitempty"  yaml:"fc_decode_max_inflight,omitempty"`
 	FcTelemetryStaleMs   *uint32 `json:"fc_telemetry_stale_ms,omitempty"   yaml:"fc_telemetry_stale_ms,omitempty"`
+	// The adaptive ceiling, under the same presence rules: FcAdaptive is
+	// on, off or inherit, sent when given.
+	FcAdaptive     string  `json:"fc_adaptive,omitempty"       yaml:"fc_adaptive,omitempty"`
+	FcWarmupMs     *uint32 `json:"fc_warmup_ms,omitempty"      yaml:"fc_warmup_ms,omitempty"`
+	FcTtftTargetMs *uint32 `json:"fc_ttft_target_ms,omitempty" yaml:"fc_ttft_target_ms,omitempty"`
 	// Flow-control state the gateway reports on GET; never sent on create.
 	FcEffective *FcEffective `json:"fc_effective,omitempty" yaml:"fc_effective,omitempty"`
 

@@ -137,6 +137,16 @@ loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
 loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-mode=enforce --fc-max-outstanding=4 --endpoints=203.0.113.1:1
 
+# The adaptive pool ceiling, per rule: --fc-adaptive (on|off, inherit = the process
+# default) lets the ceiling in force tighten while endpoints report waiting requests
+# or a first token slower than --fc-ttft-target-ms, and climb back one unit a second;
+# --fc-warmup-ms ramps an endpoint back in service from a quarter of its ceiling
+# (0..3600000 each; 0 restores the process default). get lb -o wide shows the state
+# and the ceiling in force against the configured one ("tightened 2/8 (ttft)").
+loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
+  --fc-mode=enforce --fc-max-outstanding=8 --fc-adaptive=on --fc-ttft-target-ms=300 \
+  --fc-warmup-ms=20000 --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
