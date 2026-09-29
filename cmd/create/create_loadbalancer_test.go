@@ -742,3 +742,50 @@ func TestFcTenantShareReadback(t *testing.T) {
 		t.Fatalf("fc_effective = %+v", fe)
 	}
 }
+
+// The admission headers switch is a word, sent only when given.
+func TestFcExposeHeadersServiceArguments(t *testing.T) {
+	t.Run("declared", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.51", Select: "rr", FcExposeHeaders: "on"})
+		assertKey(t, m, "fc_expose_headers", "on")
+	})
+	t.Run("omitted stays off the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.52", Select: "rr"})
+		assertAbsent(t, m, "fc_expose_headers")
+	})
+	t.Run("not a switch word", func(t *testing.T) {
+		err := validateLBAIOptions(&CreateLoadBalancerOptions{FcExposeHeaders: "yes"})
+		if want := "--fc-expose-headers must be one of on|off|inherit"; err == nil || err.Error() != want {
+			t.Fatalf("error %v, want %q", err, want)
+		}
+	})
+	t.Run("inherit is accepted", func(t *testing.T) {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{FcExposeHeaders: "inherit"}); err != nil {
+			t.Fatalf("error %v", err)
+		}
+	})
+	t.Run("the flag is registered", func(t *testing.T) {
+		f := NewCreateLoadBalancerCmd(&api.RESTOptions{}).Flags().Lookup("fc-expose-headers")
+		if f == nil || f.Value.Type() != "string" {
+			t.Fatal("--fc-expose-headers not registered as string")
+		}
+	})
+}
+
+func TestFcExposeHeadersReadback(t *testing.T) {
+	payload := `{"externalIP":"192.0.2.53","port":2035,"protocol":"tcp","sel":0,"mode":4,"BGP":false,"Monitor":false,` +
+		`"inactiveTimeOut":240,"block":0,"proxyprotocolv2":false,"egress":false,"fc_expose_headers":"on",` +
+		`"fc_effective":{"mode":"enforce","max_outstanding":4,"expose_headers":"on",` +
+		`"source":{"expose_headers":"rule"}}}`
+	var s api.LoadBalancerService
+	if err := json.Unmarshal([]byte(payload), &s); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if s.FcExposeHeaders != "on" {
+		t.Fatalf("rule field = %q, want on", s.FcExposeHeaders)
+	}
+	fe := s.FcEffective
+	if fe == nil || fe.Source == nil || fe.ExposeHeaders != "on" || fe.Source.ExposeHeaders != "rule" {
+		t.Fatalf("fc_effective = %+v", fe)
+	}
+}

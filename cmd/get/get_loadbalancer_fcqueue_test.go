@@ -101,3 +101,23 @@ func TestFcTenantCell(t *testing.T) {
 		})
 	}
 }
+
+func TestFcHeadersCell(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		eff  *api.FcEffective
+		want string
+	}{
+		{"no gate state", nil, "-"},
+		{"a gateway without the switch", &api.FcEffective{Mode: "enforce", MaxOutstanding: 8}, "-"},
+		{"on, with its source", &api.FcEffective{Mode: "enforce", ExposeHeaders: "on",
+			Source: &api.FcEffectiveSource{ExposeHeaders: "rule"}}, "on (rule)"},
+		{"off, a gateway without sources", &api.FcEffective{Mode: "enforce", ExposeHeaders: "off"}, "off"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if got := fcHeadersCell(c.eff); got != c.want {
+				t.Fatalf("cell %q, want %q", got, c.want)
+			}
+		})
+	}
+}

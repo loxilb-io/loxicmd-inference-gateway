@@ -93,6 +93,9 @@ type CreateLoadBalancerOptions struct {
 	FcTenantMaxSharePct    uint32
 	FcTenantMaxSharePctSet bool
 
+	// The admission headers on admitted responses: sent when given.
+	FcExposeHeaders string
+
 	// Active health monitor probe.
 	ProbeType    string
 	ProbePort    uint16
@@ -490,6 +493,7 @@ ex)
 	createLbCmd.Flags().StringVar(&o.FcAdaptive, "fc-adaptive", "", "Adaptive pool ceiling: on lets the ceiling in force tighten while endpoints report waiting requests or a slow time to first token and climb back one unit a second when they clear; off holds the configured ceiling; inherit returns a replaced rule to the process default (LLB_FC_ADAPTIVE); omitted keeps the rule's current value on a replace")
 	createLbCmd.Flags().Uint32Var(&o.FcWarmupMs, "fc-warmup-ms", 0, "Warm-up window in milliseconds: an endpoint back in service ramps from a quarter of its ceiling to all of it across the window; 0 restores the process default (LLB_FC_WARMUP_MS, else no ramp); ceiling 3600000")
 	createLbCmd.Flags().Uint32Var(&o.FcTtftTargetMs, "fc-ttft-target-ms", 0, "With --fc-adaptive on: tighten while an endpoint's streamed responses average more than this many milliseconds to their first token; 0 restores the process default (LLB_FC_TTFT_TARGET_MS, else not used); ceiling 3600000")
+	createLbCmd.Flags().StringVar(&o.FcExposeHeaders, "fc-expose-headers", "", "Admission headers on admitted responses: on puts X-Loxilb-Admission-Inflight, -Queued and -Limit (the pool's counts as the response head goes out, and its ceiling in force) on every admitted inference response, streamed ones included; off leaves responses as the backend sent them; inherit returns a replaced rule to the process default (LLB_FC_EXPOSE_HEADERS); omitted keeps the rule's current value on a replace; on is refused with a sockmap mode that accelerates responses")
 	createLbCmd.Flags().Uint32Var(&o.FcTenantMaxSharePct, "fc-tenant-max-share-pct", 0, "The most of the pool ceiling in force, and of the queue depth, one tenant may hold, in percent (rounded up, at least one); a tenant at its share waits for one of its own units or is refused with 429 admission_tenant_share while other tenants still admit; 100 is no share; 0 restores the process default (LLB_FC_TENANT_MAX_SHARE_PCT, else no share); omitted keeps the rule's current value on a replace")
 	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueWaitMs, "fc-max-queue-wait-ms", 0, "Longest wait in the capacity admission queue in milliseconds before 504 admission_queue_timeout; non-zero whenever the rule has a queue depth; omitted keeps the rule's current value on a replace; ceiling 3600000")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
@@ -827,6 +831,11 @@ func validateFcQueueOptions(o *CreateLoadBalancerOptions) error {
 	default:
 		return fmt.Errorf("--fc-adaptive must be one of on|off|inherit")
 	}
+	switch o.FcExposeHeaders {
+	case "", "on", "off", "inherit":
+	default:
+		return fmt.Errorf("--fc-expose-headers must be one of on|off|inherit")
+	}
 	if o.FcWarmupMs > fcAdaptiveMsCeiling {
 		return fmt.Errorf("--fc-warmup-ms must be within 0..%d", fcAdaptiveMsCeiling)
 	}
@@ -982,6 +991,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.FcWarmupMs = u32IfGiven(o.FcWarmupMs, o.FcWarmupMsSet)
 	s.FcTtftTargetMs = u32IfGiven(o.FcTtftTargetMs, o.FcTtftTargetMsSet)
 	s.FcTenantMaxSharePct = u32IfGiven(o.FcTenantMaxSharePct, o.FcTenantMaxSharePctSet)
+	s.FcExposeHeaders = o.FcExposeHeaders
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix
