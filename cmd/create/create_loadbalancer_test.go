@@ -690,3 +690,55 @@ func TestFcAdaptiveReadback(t *testing.T) {
 		t.Fatalf("source = %+v", *fe.Source)
 	}
 }
+
+// The tenant share follows the same presence rules, bounded 0..100.
+func TestFcTenantShareServiceArguments(t *testing.T) {
+	t.Run("declared", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.47", Select: "rr",
+			FcTenantMaxSharePct: 25, FcTenantMaxSharePctSet: true})
+		assertKey(t, m, "fc_tenant_max_share_pct", 25)
+	})
+	t.Run("omitted stays off the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.48", Select: "rr"})
+		assertAbsent(t, m, "fc_tenant_max_share_pct")
+	})
+	t.Run("explicit zero goes on the wire", func(t *testing.T) {
+		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.49", Select: "rr", FcTenantMaxSharePctSet: true})
+		assertKey(t, m, "fc_tenant_max_share_pct", 0)
+	})
+	t.Run("above a hundred", func(t *testing.T) {
+		err := validateLBAIOptions(&CreateLoadBalancerOptions{FcTenantMaxSharePct: 101})
+		if want := "--fc-tenant-max-share-pct must be within 0..100"; err == nil || err.Error() != want {
+			t.Fatalf("error %v, want %q", err, want)
+		}
+	})
+	t.Run("a hundred is accepted", func(t *testing.T) {
+		if err := validateLBAIOptions(&CreateLoadBalancerOptions{FcTenantMaxSharePct: 100}); err != nil {
+			t.Fatalf("error %v", err)
+		}
+	})
+	t.Run("the flag is registered", func(t *testing.T) {
+		f := NewCreateLoadBalancerCmd(&api.RESTOptions{}).Flags().Lookup("fc-tenant-max-share-pct")
+		if f == nil || f.Value.Type() != "uint32" {
+			t.Fatal("--fc-tenant-max-share-pct not registered as uint32")
+		}
+	})
+}
+
+func TestFcTenantShareReadback(t *testing.T) {
+	payload := `{"externalIP":"192.0.2.50","port":2033,"protocol":"tcp","sel":0,"mode":4,"BGP":false,"Monitor":false,` +
+		`"inactiveTimeOut":240,"block":0,"proxyprotocolv2":false,"egress":false,"fc_tenant_max_share_pct":50,` +
+		`"fc_effective":{"mode":"enforce","max_outstanding":4,"tenant_max_share_pct":50,"tenants_active":2,` +
+		`"source":{"tenant_max_share_pct":"rule"}}}`
+	var s api.LoadBalancerService
+	if err := json.Unmarshal([]byte(payload), &s); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if s.FcTenantMaxSharePct == nil || *s.FcTenantMaxSharePct != 50 {
+		t.Fatalf("rule field = %v, want 50", s.FcTenantMaxSharePct)
+	}
+	fe := s.FcEffective
+	if fe == nil || fe.Source == nil || fe.TenantMaxSharePct != 50 || fe.TenantsActive != 2 || fe.Source.TenantMaxSharePct != "rule" {
+		t.Fatalf("fc_effective = %+v", fe)
+	}
+}

@@ -147,6 +147,16 @@ loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-mode=enforce --fc-max-outstanding=8 --fc-adaptive=on --fc-ttft-target-ms=300 \
   --fc-warmup-ms=20000 --endpoints=203.0.113.1:1
 
+# The tenant share, per rule: --fc-tenant-max-share-pct caps the part of the pool
+# ceiling in force, and of the queue depth, one tenant (the tenant id its credential
+# resolved to) may hold; a tenant at its share waits for one of its own units or is
+# refused with 429 admission_tenant_share while other tenants still admit (0..100;
+# 100 is no share, 0 restores the process default). get lb -o wide shows the share
+# in force and the tenants active ("25% (rule), 3 active").
+loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
+  --fc-mode=enforce --fc-max-outstanding=8 --fc-tenant-max-share-pct=25 \
+  --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
