@@ -157,6 +157,16 @@ loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-mode=enforce --fc-max-outstanding=8 --fc-tenant-max-share-pct=25 \
   --endpoints=203.0.113.1:1
 
+# The admission headers on admitted responses: --fc-expose-headers=on puts
+# X-Loxilb-Admission-Inflight, -Queued and -Limit (the pool's counts as the head goes
+# out, and its ceiling in force) on every admitted inference response, streamed ones
+# included; off leaves responses as sent; inherit returns to LLB_FC_EXPOSE_HEADERS.
+# Refused with a sockmap mode that accelerates responses. get lb -o wide shows it in
+# the Headers column ("on (rule)").
+loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
+  --fc-mode=enforce --fc-max-outstanding=8 --fc-expose-headers=on \
+  --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
