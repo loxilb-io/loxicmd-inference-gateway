@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Audit sink siem2 set: siem2.example.com:6514, verified against /etc/loxilb/siem2-ca.pem; it is sent streams data; data records of services chat; outcome failed; one data record in 10.
+--- stderr ---

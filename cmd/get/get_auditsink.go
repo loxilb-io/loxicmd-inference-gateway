@@ -24,12 +24,19 @@ import (
 
 func NewGetAuditSinkCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var getAuditSinkCmd = &cobra.Command{
-		Use:   "audit-sink",
-		Short: "Show the remote audit sink's configuration and session",
-		Long: `Show the remote audit sink's configuration and what is known about its
-current session (GET /audit/sink): the receiver, the bundle its certificate
-is verified against, the syslog facility and frame cap, and the submission
-counters.
+		Use:   "audit-sink [NAME]",
+		Short: "Show an audit sink's configuration and session",
+		Long: `Show an audit sink's configuration and what is known about its progress.
+
+With no name this is the compliance sink (GET /audit/sink), the one that is
+sent every record: the receiver, the bundle its certificate is verified
+against, the syslog facility and frame cap, and the submission counters.
+
+With a NAME it is that secondary sink (GET /audit/sinks/NAME): the same, and
+also the enterprise number its export sequence travels under, what it selects
+from the trail, the last record it is past, and the export sequence it has
+reached. The sinks that are configured are named by 'loxicmd get
+audit-status'.
 
 Certificate material is named by path and never served: the paths reported
 are on the gateway's own filesystem, not this host's. The submitted count is
@@ -40,14 +47,17 @@ With -o json the gateway's body is printed verbatim.
 
 ex)
 	loxicmd get audit-sink
-	loxicmd get audit-sink -o json`,
-		Args:          cobra.NoArgs,
+	loxicmd get audit-sink -o json
+	loxicmd get audit-sink siem2`,
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = args
-			return lifecycle.AuditSinkGet(restOptions, cmd.OutOrStdout(),
-				restOptions.PrintOption == "json")
+			jsonOut := restOptions.PrintOption == "json"
+			if len(args) == 1 {
+				return lifecycle.AuditNamedSinkGet(restOptions, cmd.OutOrStdout(), jsonOut, args[0])
+			}
+			return lifecycle.AuditSinkGet(restOptions, cmd.OutOrStdout(), jsonOut)
 		},
 	}
 	return getAuditSinkCmd

@@ -1,0 +1,4 @@
+exit=2
+--- stdout ---
+--- stderr ---
+Error: --enterprise-number is required for a secondary sink and must be between 1 and 4294967295, got 0 (invalid-arguments)

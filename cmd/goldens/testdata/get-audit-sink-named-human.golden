@@ -1,0 +1,15 @@
+exit=0
+--- stdout ---
+Audit sink siem2: secondary, connected
+  Receiver: siem2.example.com:6514
+  CA bundle: /etc/loxilb/siem2-ca.pem
+  Facility: 13
+  Max frame: unbounded
+  Enterprise number: 32473
+  Selects: streams data; data records of services chat; outcome failed; one data record in 10
+  Past record: seq 1024 in segment seg-1
+  Export sequence: high 88, epoch 1735689600
+  Submitted to the socket: 90 (not a delivery count; the protocol has no acknowledgement)
+  Sent again after a lost session: 2
+  Kept from this sink by its filter: 934
+--- stderr ---

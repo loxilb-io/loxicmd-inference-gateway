@@ -67,6 +67,17 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   receiver's certificate is always verified and no mode disables that.
   `--disable` removes the sink and leaves the local trail running. An
   unconfirmed change reports `recovery-required`, never success.
+- `get audit-sink NAME`, `set audit-sink NAME` and `delete audit-sink NAME`:
+  the secondary audit sinks that follow the trail beside the compliance sink
+  (`GET`/`PUT`/`DELETE /audit/sinks/{name}`). A secondary sink takes
+  `--enterprise-number`, required because its export sequence travels under a
+  private enterprise number and none is built in, and may select what it is
+  sent with `--stream`, `--service`, `--outcome` and `--data-sample`. Those
+  flags are refused without a name, and `--disable` with one, rather than
+  applied to the wrong sink. What the gateway would refuse with a bare 400 is
+  refused before the request with the flag named. `get audit-status` now
+  shows each configured sink's state, the last record it is past and how far
+  behind it is, and says when no compliance sink is configured.
 - `--originator`: send `X-Loxilb-Originator: cli:<os user>@<host>` on every
   request, so the gateway's audit trail records the OS account and host an
   invocation came from beside the account it authenticated as. Off by

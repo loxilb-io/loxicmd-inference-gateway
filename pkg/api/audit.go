@@ -29,6 +29,14 @@ type AuditSink struct {
 	CommonAPI
 }
 
+// AuditSinks is the client for GET, PUT and DELETE /audit/sinks/{name} — the
+// secondary sinks that follow the trail beside the compliance sink of
+// /audit/sink. The name is a sub-resource; there is no listing endpoint, the
+// configured sinks are named in /audit/status.
+type AuditSinks struct {
+	CommonAPI
+}
+
 // AuditSegmentStatus mirrors the segment the writer is appending to.
 type AuditSegmentStatus struct {
 	UUID    string `json:"uuid"`
@@ -117,6 +125,31 @@ type AuditStatusResult struct {
 	Retention              *AuditRetentionPolicy `json:"retention"`
 	ProjectedRetentionDays float64               `json:"projected_retention_days"`
 	Producers              []AuditProducerStatus `json:"producers"`
+
+	// ComplianceSink is a pointer because a gateway from before the sinks
+	// followed the trail does not send it, and "no compliance sink" is a
+	// statement that gateway never made.
+	ComplianceSink *bool             `json:"compliance_sink"`
+	Sinks          []AuditSinkStatus `json:"sinks"`
+}
+
+// AuditSinkCursor is a place in the trail: the last record a sink is past.
+type AuditSinkCursor struct {
+	SegmentUUID string `json:"segment_uuid"`
+	Seq         int64  `json:"seq"`
+}
+
+// AuditSinkStatus is one sink's progress through the trail, as
+// /audit/status reports it. LagRecords counts only the active segment, so
+// it says nothing while InActiveSegment is false.
+type AuditSinkStatus struct {
+	Name            string           `json:"name"`
+	Compliance      bool             `json:"compliance"`
+	State           string           `json:"state"`
+	Cursor          *AuditSinkCursor `json:"cursor"`
+	InActiveSegment bool             `json:"in_active_segment"`
+	LagRecords      int64            `json:"lag_records"`
+	LagDrops        int64            `json:"lag_drops"`
 }
 
 // AuditSinkConfig mirrors the /audit/sink contract, which is both the read
@@ -157,4 +190,57 @@ type AuditSinkRequest struct {
 	ClientKeyPath  string `json:"client_key_path"`
 	MaxFrameBytes  int64  `json:"max_frame_bytes"`
 	Facility       int64  `json:"facility"`
+}
+
+// AuditSinkFilter mirrors what a secondary sink selects from the trail. Each
+// field that is set narrows the selection; an empty filter keeps everything.
+type AuditSinkFilter struct {
+	Streams    []string `json:"streams,omitempty"`
+	Services   []string `json:"services,omitempty"`
+	Outcome    string   `json:"outcome,omitempty"`
+	DataSample int64    `json:"data_sample,omitempty"`
+}
+
+// AuditNamedSinkConfig mirrors what GET /audit/sinks/{name} answers: the
+// configuration and, read-only, how far the sink has got.
+type AuditNamedSinkConfig struct {
+	Name             string           `json:"name"`
+	Address          string           `json:"address"`
+	CABundlePath     string           `json:"ca_bundle_path"`
+	ServerName       string           `json:"server_name"`
+	ClientCertPath   string           `json:"client_cert_path"`
+	ClientKeyPath    string           `json:"client_key_path"`
+	MaxFrameBytes    int64            `json:"max_frame_bytes"`
+	Facility         int64            `json:"facility"`
+	EnterpriseNumber int64            `json:"enterprise_number"`
+	Filter           *AuditSinkFilter `json:"filter"`
+
+	// Read-only state.
+	State       string           `json:"state"`
+	Cursor      *AuditSinkCursor `json:"cursor"`
+	XseqHigh    int64            `json:"xseq_high"`
+	XseqEpoch   int64            `json:"xseq_epoch"`
+	Submitted   int64            `json:"submitted"`
+	Filtered    int64            `json:"filtered"`
+	Resent      int64            `json:"resent"`
+	Poison      int64            `json:"poison"`
+	Truncated   int64            `json:"truncated"`
+	WriteErrors int64            `json:"write_errors"`
+	LagDrops    int64            `json:"lag_drops"`
+	LastError   string           `json:"last_error"`
+}
+
+// AuditNamedSinkRequest is what PUT /audit/sinks/{name} carries. Like
+// AuditSinkRequest it holds the configurable fields only: the endpoint
+// replaces the sink's configuration, and the name travels in the path.
+type AuditNamedSinkRequest struct {
+	Address          string           `json:"address"`
+	CABundlePath     string           `json:"ca_bundle_path"`
+	ServerName       string           `json:"server_name"`
+	ClientCertPath   string           `json:"client_cert_path"`
+	ClientKeyPath    string           `json:"client_key_path"`
+	MaxFrameBytes    int64            `json:"max_frame_bytes"`
+	Facility         int64            `json:"facility"`
+	EnterpriseNumber int64            `json:"enterprise_number"`
+	Filter           *AuditSinkFilter `json:"filter,omitempty"`
 }

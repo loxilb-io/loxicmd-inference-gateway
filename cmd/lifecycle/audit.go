@@ -190,6 +190,37 @@ func humanAuditStatus(out io.Writer, st *api.AuditStatusResult) {
 		fmt.Fprintln(out, "  Counters: all zero")
 	}
 
+	// A gateway that does not say whether it has a compliance sink is one
+	// from before the sinks followed the trail; nothing is claimed for it.
+	if st.ComplianceSink != nil && !*st.ComplianceSink {
+		fmt.Fprintln(out, "  Compliance sink: NOT CONFIGURED - no record leaves the gateway in full")
+	}
+	if len(st.Sinks) > 0 {
+		fmt.Fprintln(out, "  Sinks:")
+		for _, k := range st.Sinks {
+			role := ""
+			if k.Compliance {
+				role = " (compliance)"
+			}
+			fmt.Fprintf(out, "    %s%s: %s", k.Name, role, k.State)
+			if k.Cursor != nil && k.Cursor.SegmentUUID != "" {
+				fmt.Fprintf(out, ", past seq %d in %s", k.Cursor.Seq, k.Cursor.SegmentUUID)
+			}
+			// The record lag is counted in the active segment only, so
+			// for a sink still in a sealed one a zero would read as
+			// "caught up" when it means "not measured".
+			if k.InActiveSegment {
+				fmt.Fprintf(out, ", %d records behind", k.LagRecords)
+			} else {
+				fmt.Fprint(out, ", still reading sealed segments")
+			}
+			if k.LagDrops != 0 {
+				fmt.Fprintf(out, ", %d segments LOST to retention before they were sent", k.LagDrops)
+			}
+			fmt.Fprintln(out)
+		}
+	}
+
 	if len(st.Producers) > 0 {
 		fmt.Fprintln(out, "  Producers:")
 		for _, p := range st.Producers {
@@ -334,6 +365,31 @@ type AuditSinkSetOptions struct {
 	ClientKeyPath  string
 	MaxFrameBytes  int64
 	Facility       int64
+
+	// What follows belongs to a named secondary sink. The compliance sink
+	// takes every record unnumbered, so it is refused there.
+	EnterpriseNumber int64
+	Streams          []string
+	Services         []string
+	Outcome          string
+	DataSample       int64
+}
+
+// secondaryOnly names the first flag set that only a named sink takes.
+func (so AuditSinkSetOptions) secondaryOnly() string {
+	switch {
+	case so.EnterpriseNumber != 0:
+		return "--enterprise-number"
+	case len(so.Streams) > 0:
+		return "--stream"
+	case len(so.Services) > 0:
+		return "--service"
+	case so.Outcome != "":
+		return "--outcome"
+	case so.DataSample != 0:
+		return "--data-sample"
+	}
+	return ""
 }
 
 // AuditSinkSet replaces the remote sink configuration (POST /audit/sink).
@@ -392,11 +448,27 @@ func AuditSinkSet(restOptions *api.RESTOptions, out io.Writer, jsonOut bool, so 
 // auditSinkRequest turns the flags into the complete body the endpoint
 // replaces the configuration with.
 func auditSinkRequest(so AuditSinkSetOptions) (api.AuditSinkRequest, error) {
+	invalid := func(format string, a ...any) (api.AuditSinkRequest, error) {
+		return api.AuditSinkRequest{}, &api.LifecycleError{
+			Reason:  api.ReasonInvalidArguments,
+			Message: fmt.Sprintf(format, a...),
+		}
+	}
+	if flag := so.secondaryOnly(); flag != "" {
+		return invalid("%s applies to a named secondary sink ('loxicmd set audit-sink <NAME> ...'); "+
+			"the compliance sink is sent every record, unnumbered", flag)
+	}
 	if so.Disable {
 		// Enabled false is the whole request: the gateway closes the
 		// session and drops the configuration, and reads nothing else.
 		return api.AuditSinkRequest{Enabled: false}, nil
 	}
+	return auditSinkTransport(so)
+}
+
+// auditSinkTransport checks the part of a sink every sink has: where it
+// sends and how the receiver is verified.
+func auditSinkTransport(so AuditSinkSetOptions) (api.AuditSinkRequest, error) {
 	invalid := func(format string, a ...any) (api.AuditSinkRequest, error) {
 		return api.AuditSinkRequest{}, &api.LifecycleError{
 			Reason:  api.ReasonInvalidArguments,

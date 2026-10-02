@@ -1,31 +1,24 @@
 exit=0
 --- stdout ---
-Show an audit sink's configuration and what is known about its progress.
+Remove a secondary audit sink (DELETE /audit/sinks/NAME).
 
-With no name this is the compliance sink (GET /audit/sink), the one that is
-sent every record: the receiver, the bundle its certificate is verified
-against, the syslog facility and frame cap, and the submission counters.
+The sink stops. The gateway keeps its place in the trail and its export
+sequence, so a sink set again under the same name continues both and no
+export sequence number is used twice. The local trail and the other sinks
+are not touched.
 
-With a NAME it is that secondary sink (GET /audit/sinks/NAME): the same, and
-also the enterprise number its export sequence travels under, what it selects
-from the trail, the last record it is past, and the export sequence it has
-reached. The sinks that are configured are named by 'loxicmd get
-audit-status'.
+The compliance sink has no name and is not removed here: use
+'loxicmd set audit-sink --disable'.
 
-Certificate material is named by path and never served: the paths reported
-are on the gateway's own filesystem, not this host's. The submitted count is
-writes to the socket, not deliveries - syslog over TLS carries no
-acknowledgement, so the gateway cannot know more than that.
-
-With -o json the gateway's body is printed verbatim.
+If the outcome cannot be confirmed (timeout, broken connection), the command
+fails with reason 'recovery-required' and never claims success - verify with
+'loxicmd get audit-sink NAME'.
 
 ex)
-	loxicmd get audit-sink
-	loxicmd get audit-sink -o json
-	loxicmd get audit-sink siem2
+	loxicmd delete audit-sink siem2
 
 Usage:
-  loxicmd get audit-sink [NAME] [flags]
+  loxicmd delete audit-sink <NAME> [flags]
 
 Flags:
   -h, --help   help for audit-sink

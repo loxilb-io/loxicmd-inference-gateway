@@ -547,6 +547,30 @@ loxicmd set audit-sink --address siem.example.com:6514 \
 # Remove the sink; the local trail keeps running and records already written
 # stay on disk.
 loxicmd set audit-sink --disable
+
+# Secondary sinks follow the trail beside the compliance sink above. The same
+# commands take a NAME (1 to 64 of a-z, 0-9, '-' and '_'; 'compliance' is
+# reserved). A secondary sink numbers what it sends, and that export sequence
+# travels under a private enterprise number, so --enterprise-number is
+# required: none is built in.
+loxicmd set audit-sink siem2 --address siem2.example.com:6514 \
+    --ca-bundle /etc/loxilb/siem2-ca.pem --enterprise-number 32473
+
+# It may select what it is sent. --stream (mgmt, data, audit_system) and
+# --service repeat; --service judges data records only; --outcome is ok or
+# failed; --data-sample N keeps one data record in N.
+loxicmd set audit-sink chat-fail --address siem2.example.com:6514 \
+    --ca-bundle /etc/loxilb/siem2-ca.pem --enterprise-number 32473 \
+    --stream data --service chat --outcome failed --data-sample 10
+
+# One sink: its configuration, the last record it is past and the export
+# sequence it has reached. 'get audit-status' names every configured sink
+# and how far behind each is.
+loxicmd get audit-sink siem2
+
+# Remove a secondary sink. The gateway keeps its place in the trail and its
+# export sequence; a sink set again under the same name continues both.
+loxicmd delete audit-sink siem2
 ```
 
 `--ca-bundle` is required to configure a sink: the receiver's certificate is
@@ -556,6 +580,12 @@ facility of 0 as "not set" and substitutes 13, so facility 0 (kernel) is not
 selectable through this API. If a change cannot be confirmed (timeout, broken
 connection) the command fails with reason `recovery-required` and never claims
 success — verify with `loxicmd get audit-sink`.
+
+The selection and numbering flags are refused without a NAME — the compliance
+sink is sent every record, unnumbered — and `--disable` is refused with one.
+The gateway answers a secondary sink it refuses with a 400 that carries no
+reason, so the name, the enterprise number (1 to 4294967295) and the filter's
+vocabulary are checked before the request and the refusal names the flag.
 
 The inherited classic loxilb surface — `port`, `conntrack`, `session`,
 `sessionulcl`, `policy`, `route`, `ipaddress`, `neighbor`, `fdb`, `vlan`,
