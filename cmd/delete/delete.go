@@ -70,6 +70,7 @@ Delete - Service type external load-balancer, Vlan, Vxlan, Qos Policies,
 	deleteCmd.AddCommand(NewDeleteBFDCmd(restOptions))
 	deleteCmd.AddCommand(NewDeleteAPIKeyCmd(restOptions))
 	deleteCmd.AddCommand(NewDeleteCertCmd(restOptions))
+	deleteCmd.AddCommand(NewDeleteAuditSinkCmd(restOptions))
 	deleteCmd.AddCommand(NewDeleteSNICmd(restOptions))
 	deleteCmd.AddCommand(NewDeleteOPACmd(restOptions))
 

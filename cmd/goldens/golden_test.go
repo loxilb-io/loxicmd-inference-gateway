@@ -184,6 +184,20 @@ const auditSinkBody = `{"enabled":true,"address":"siem.example.com:6514",` +
 
 const auditSinkOffBody = `{}`
 
+// auditNamedSinkBody mirrors GET /audit/sinks/{name} on a secondary sink
+// that filters and samples; auditStatusSinksBody is a status that names the
+// sinks, one of them still reading a sealed segment.
+const auditNamedSinkBody = `{"name":"siem2","address":"siem2.example.com:6514",` +
+	`"ca_bundle_path":"/etc/loxilb/siem2-ca.pem","facility":13,"enterprise_number":32473,` +
+	`"filter":{"streams":["data"],"services":["chat"],"outcome":"failed","data_sample":10},` +
+	`"state":"connected","cursor":{"segment_uuid":"seg-1","seq":1024},` +
+	`"xseq_high":88,"xseq_epoch":1735689600,"submitted":90,"filtered":934,"resent":2}`
+
+const auditStatusSinksBody = `{"available":true,"running":true,"boot_id":"boot-abc","seq_high":1024,` +
+	`"compliance_sink":true,"sinks":[{"name":"compliance","compliance":true,"state":"connected",` +
+	`"cursor":{"segment_uuid":"seg-2","seq":1020},"in_active_segment":true,"lag_records":4},` +
+	`{"name":"siem2","state":"disconnected","cursor":{"segment_uuid":"seg-1","seq":600},"lag_drops":2}]}`
+
 // goldenCase is one pinned invocation. Every case runs against a fake
 // gateway that answers with the given canned response.
 type goldenCase struct {
@@ -241,6 +255,23 @@ var goldenCases = []goldenCase{
 	{"set-audit-sink-no-ca", []string{"set", "audit-sink", "--address", "siem.example.com:6514"},
 		http.StatusNoContent, ""},
 	{"set-audit-sink-help", []string{"set", "audit-sink", "--help"}, http.StatusOK, ""},
+	// The secondary sinks: the same commands with a name, and a delete.
+	{"get-audit-status-sinks", []string{"get", "audit-status"}, http.StatusOK, auditStatusSinksBody},
+	{"get-audit-sink-named-human", []string{"get", "audit-sink", "siem2"}, http.StatusOK, auditNamedSinkBody},
+	{"get-audit-sink-named-json", []string{"get", "audit-sink", "siem2", "-o", "json"}, http.StatusOK, auditNamedSinkBody},
+	{"set-audit-sink-named", []string{"set", "audit-sink", "siem2", "--address", "siem2.example.com:6514",
+		"--ca-bundle", "/etc/loxilb/siem2-ca.pem", "--enterprise-number", "32473",
+		"--stream", "data", "--service", "chat", "--outcome", "failed", "--data-sample", "10"},
+		http.StatusNoContent, ""},
+	// Refused locally: a secondary sink without an enterprise number, a
+	// selection aimed at the compliance sink, and the reserved name.
+	{"set-audit-sink-named-no-pen", []string{"set", "audit-sink", "siem2", "--address", "siem2.example.com:6514",
+		"--ca-bundle", "/etc/loxilb/siem2-ca.pem"}, http.StatusNoContent, ""},
+	{"set-audit-sink-filter-no-name", []string{"set", "audit-sink", "--address", "siem.example.com:6514",
+		"--ca-bundle", "/etc/loxilb/siem-ca.pem", "--stream", "mgmt"}, http.StatusNoContent, ""},
+	{"delete-audit-sink", []string{"delete", "audit-sink", "siem2"}, http.StatusNoContent, ""},
+	{"delete-audit-sink-reserved", []string{"delete", "audit-sink", "compliance"}, http.StatusNoContent, ""},
+	{"delete-audit-sink-help", []string{"delete", "audit-sink", "--help"}, http.StatusOK, ""},
 
 	// The appliance namespace never contacts the gateway, so only its
 	// help surfaces are pinned here (the not-available markers are part

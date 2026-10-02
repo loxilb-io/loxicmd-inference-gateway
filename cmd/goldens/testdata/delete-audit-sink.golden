@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+Audit sink siem2 removed. Its place in the trail and its export sequence are kept; a sink set under the same name continues both.
+--- stderr ---

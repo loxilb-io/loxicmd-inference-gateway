@@ -1,0 +1,4 @@
+exit=2
+--- stdout ---
+--- stderr ---
+Error: the name "compliance" is reserved for the compliance sink; that sink is read and replaced with 'audit-sink' and no name (invalid-arguments)

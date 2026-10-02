@@ -1,0 +1,4 @@
+exit=0
+--- stdout ---
+{"name":"siem2","address":"siem2.example.com:6514","ca_bundle_path":"/etc/loxilb/siem2-ca.pem","facility":13,"enterprise_number":32473,"filter":{"streams":["data"],"services":["chat"],"outcome":"failed","data_sample":10},"state":"connected","cursor":{"segment_uuid":"seg-1","seq":1024},"xseq_high":88,"xseq_epoch":1735689600,"submitted":90,"filtered":934,"resent":2}
+--- stderr ---

@@ -26,10 +26,14 @@ func NewSetAuditSinkCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var opts lifecycle.AuditSinkSetOptions
 
 	var setAuditSinkCmd = &cobra.Command{
-		Use:   "audit-sink",
-		Short: "Replace the remote audit sink configuration",
-		Long: `Replace the configuration of the remote syslog sink the audit trail is
-forwarded to (POST /audit/sink).
+		Use:   "audit-sink [NAME]",
+		Short: "Replace an audit sink's configuration",
+		Long: `Replace the configuration of a remote syslog sink the audit trail is
+forwarded to.
+
+With no name this is the compliance sink (POST /audit/sink), the one that is
+sent every record. With a NAME it creates or replaces that secondary sink
+(PUT /audit/sinks/NAME), which follows the trail beside the compliance sink.
 
 This REPLACES the configuration; it does not patch it. The endpoint takes a
 whole sink, so every invocation sends one: a flag you leave out is sent as
@@ -53,6 +57,18 @@ substitutes 13, so facility 0 (kernel) cannot be selected through this API;
 the flag is documented as 1-23 rather than promising a value that does not
 arrive.
 
+A secondary sink's NAME is 1 to 64 of a-z, 0-9, '-' and '_'; 'compliance'
+is reserved. It numbers what it sends, and that export sequence travels
+beside each record under a private enterprise number, so --enterprise-number
+is required: none is built in. It may select what it is sent: --stream
+(mgmt, data, audit_system) and --service may be repeated, --outcome takes ok
+or failed, and --data-sample N keeps one data record in N. --service judges
+data records only, and only the data stream can be sampled. A flag left out
+selects nothing away. Replacing a secondary sink keeps its place in the
+trail and its export sequence. These flags are refused without a NAME: the
+compliance sink is sent every record, unnumbered. --disable is refused with
+one: a secondary sink is removed with 'loxicmd delete audit-sink NAME'.
+
 If the outcome of the change cannot be confirmed (timeout, broken
 connection), the command fails with reason 'recovery-required' and never
 claims success - verify with 'loxicmd get audit-sink'.
@@ -63,14 +79,20 @@ ex)
 		--server-name siem.corp.example.com --facility 13 --max-frame-bytes 8192
 	loxicmd set audit-sink --address siem.example.com:6514 --ca-bundle /etc/loxilb/siem-ca.pem \
 		--client-cert /etc/loxilb/gw.pem --client-key /etc/loxilb/gw-key.pem
-	loxicmd set audit-sink --disable`,
-		Args:          cobra.NoArgs,
+	loxicmd set audit-sink --disable
+	loxicmd set audit-sink siem2 --address siem2.example.com:6514 --ca-bundle /etc/loxilb/siem2-ca.pem \
+		--enterprise-number 32473 --stream mgmt --stream audit_system
+	loxicmd set audit-sink chat-fail --address siem2.example.com:6514 --ca-bundle /etc/loxilb/siem2-ca.pem \
+		--enterprise-number 32473 --stream data --service chat --outcome failed --data-sample 10`,
+		Args:          cobra.MaximumNArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = args
-			return lifecycle.AuditSinkSet(restOptions, cmd.OutOrStdout(),
-				restOptions.PrintOption == "json", opts)
+			jsonOut := restOptions.PrintOption == "json"
+			if len(args) == 1 {
+				return lifecycle.AuditNamedSinkSet(restOptions, cmd.OutOrStdout(), jsonOut, args[0], opts)
+			}
+			return lifecycle.AuditSinkSet(restOptions, cmd.OutOrStdout(), jsonOut, opts)
 		},
 	}
 	setAuditSinkCmd.Flags().BoolVar(&opts.Disable, "disable", false,
@@ -89,5 +111,15 @@ ex)
 		"Largest message the receiver accepts; a record that does not fit is shortened at a field boundary and marked (0 = no limit)")
 	setAuditSinkCmd.Flags().Int64Var(&opts.Facility, "facility", lifecycle.DefaultSyslogFacility,
 		"Syslog facility 1-23 (default 13, log audit; the gateway reads 0 as unset and uses 13)")
+	setAuditSinkCmd.Flags().Int64Var(&opts.EnterpriseNumber, "enterprise-number", 0,
+		"IANA private enterprise number the export sequence travels under (secondary sink: required)")
+	setAuditSinkCmd.Flags().StringArrayVar(&opts.Streams, "stream", nil,
+		"Secondary sink: keep records of this stream - mgmt, data or audit_system (repeatable; default all)")
+	setAuditSinkCmd.Flags().StringArrayVar(&opts.Services, "service", nil,
+		"Secondary sink: keep data records of this service (repeatable; default all)")
+	setAuditSinkCmd.Flags().StringVar(&opts.Outcome, "outcome", "",
+		"Secondary sink: keep records whose outcome is ok, or failed (default both)")
+	setAuditSinkCmd.Flags().Int64Var(&opts.DataSample, "data-sample", 0,
+		"Secondary sink: keep one data record in this many (0 and 1 keep all)")
 	return setAuditSinkCmd
 }

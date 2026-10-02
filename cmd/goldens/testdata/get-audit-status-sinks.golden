@@ -1,0 +1,13 @@
+exit=0
+--- stdout ---
+Audit: available, running
+  Boot id: boot-abc
+  Sequence high: 1024
+  Last write: none yet
+  Sealed on disk: 0 bytes
+  Projected retention: not projectable yet
+  Counters: all zero
+  Sinks:
+    compliance (compliance): connected, past seq 1020 in seg-2, 4 records behind
+    siem2: disconnected, past seq 600 in seg-1, still reading sealed segments, 2 segments LOST to retention before they were sent
+--- stderr ---

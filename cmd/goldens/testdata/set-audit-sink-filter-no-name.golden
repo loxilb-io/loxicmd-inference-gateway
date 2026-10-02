@@ -1,0 +1,4 @@
+exit=2
+--- stdout ---
+--- stderr ---
+Error: --stream applies to a named secondary sink ('loxicmd set audit-sink <NAME> ...'); the compliance sink is sent every record, unnumbered (invalid-arguments)
