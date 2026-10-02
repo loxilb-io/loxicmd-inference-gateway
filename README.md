@@ -207,6 +207,7 @@ The full, swagger-traceable reference lives in **[docs/COMMANDS.md](docs/COMMAND
 | `--output` | `-o` | output format (`json`, `wide`, or table) |
 | `--token` | | token for authenticated endpoints |
 | `--bearer` | | send the token as `Authorization: Bearer <token>` (default `true`; disable for classic loxilb raw-token targets) |
+| `--originator` | | name this invocation in the gateway's audit trail as `cli:<os user>@<host>` |
 | `--insecure` | `-k` | skip TLS certificate verification (https only) |
 | `--cacert` | | CA certificate (PEM) to verify the server (https only) |
 | `--cert` | | client certificate (PEM) for mutual TLS (https only) |
