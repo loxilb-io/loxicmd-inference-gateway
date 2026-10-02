@@ -24,6 +24,7 @@ Global Flags:
       --cert string         Client certificate (PEM) for mutual TLS (https only)
   -k, --insecure            Skip TLS certificate verification (https only)
       --key string          Client private key (PEM) for mutual TLS (https only)
+      --originator          Name this invocation in the gateway's audit trail as 'cli:<os user>@<host>', sent as the X-Loxilb-Originator header (for a service account driving the CLI)
   -o, --output string       Set output layer (ex.) wide, json)
   -p, --port int            Set API server port number (default 11111)
       --protocol string     Set API server http/https (default "http")

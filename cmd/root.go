@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/user"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/appliance"
 	"github.com/loxilb-io/loxicmd-inference-gateway/cmd/create"
@@ -79,6 +80,33 @@ var CompletionCmd = &cobra.Command{
 	},
 }
 
+// cliOriginator is the --originator value for this process: the OS account
+// it runs as and the host it runs on. A value that cannot be determined, or
+// that the gateway would drop, is an error: sending nothing would leave the
+// operator believing the invocation was named.
+func cliOriginator() (string, error) {
+	refuse := func(format string, a ...any) error {
+		return &exitcode.CLIError{
+			Code:          exitcode.Precondition,
+			Message:       "--originator: " + fmt.Sprintf(format, a...),
+			ComponentCode: "originator-unavailable",
+		}
+	}
+	u, err := user.Current()
+	if err != nil {
+		return "", refuse("cannot determine the OS user: %v", err)
+	}
+	host, err := os.Hostname()
+	if err != nil {
+		return "", refuse("cannot determine the host name: %v", err)
+	}
+	v, err := api.CLIOriginator(u.Username, host)
+	if err != nil {
+		return "", refuse("%v", err)
+	}
+	return v, nil
+}
+
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
@@ -95,6 +123,7 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	saveOptions := &dump.SaveOptions{}
 	applyOptions := &dump.ApplyOptions{}
 	var tokenFile string
+	var originator bool
 
 	// Secret handling for the API token (contracts/exit-codes.md rules
 	// apply): --token-file is the safe path — the file must satisfy the
@@ -104,6 +133,13 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	// shell history and process listings.
 	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		_ = args
+		if originator {
+			v, err := cliOriginator()
+			if err != nil {
+				return err
+			}
+			restOptions.Originator = v
+		}
 		if tokenFile != "" {
 			secret, err := backend.ReadSecretFile("token file", tokenFile)
 			if err != nil {
@@ -162,6 +198,7 @@ loxicmd aim to provide all of the configuation for the loxilb.`,
 	rootCmd.PersistentFlags().StringVarP(&restOptions.Token, "token", "", "", "Set Token for the API server (deprecated: the value is visible in shell history and process listings; use --token-file)")
 	rootCmd.PersistentFlags().StringVarP(&tokenFile, "token-file", "", "", "Read the API server token from an owner-only (0600) regular file; replaces the deprecated --token")
 	rootCmd.PersistentFlags().BoolVarP(&restOptions.BearerAuth, "bearer", "", true, "Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets)")
+	rootCmd.PersistentFlags().BoolVarP(&originator, "originator", "", false, "Name this invocation in the gateway's audit trail as 'cli:<os user>@<host>', sent as the X-Loxilb-Originator header (for a service account driving the CLI)")
 	rootCmd.PersistentFlags().BoolVarP(&restOptions.Insecure, "insecure", "k", false, "Skip TLS certificate verification (https only)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.CACertFile, "cacert", "", "", "CA certificate (PEM) to verify the server (https only)")
 	rootCmd.PersistentFlags().StringVarP(&restOptions.ClientCertFile, "cert", "", "", "Client certificate (PEM) for mutual TLS (https only)")

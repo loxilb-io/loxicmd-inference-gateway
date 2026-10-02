@@ -87,6 +87,9 @@ type RESTOptions struct {
 	// "Bearer ". The loxilb-inference-gateway JWT middleware expects this
 	// form; classic loxilb targets that accept a raw token can disable it.
 	BearerAuth bool
+	// Originator, when set, is sent on every request as the
+	// X-Loxilb-Originator header (see CLIOriginator).
+	Originator string
 	// TLS options (used when Protocol == "https").
 	Insecure       bool   // skip server certificate verification
 	CACertFile     string // PEM CA bundle to verify the server certificate
@@ -114,6 +117,7 @@ func (r *RESTClient) GET(ctx context.Context, getURL string) (*http.Response, er
 	}
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
+	r.setOriginatorHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -124,6 +128,7 @@ func (r *RESTClient) POST(ctx context.Context, postURL string, body []byte) (*ht
 	}
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
+	r.setOriginatorHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -134,6 +139,7 @@ func (r *RESTClient) DELETE(ctx context.Context, deleteURL string) (*http.Respon
 	}
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
+	r.setOriginatorHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -146,6 +152,7 @@ func (r *RESTClient) DELETEWithBody(ctx context.Context, deleteURL string, body 
 	}
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
+	r.setOriginatorHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -156,6 +163,7 @@ func (r *RESTClient) PATCH(ctx context.Context, patchURL string, body []byte) (*
 	}
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
+	r.setOriginatorHeader(req)
 	return r.Client.Do(req)
 }
 
@@ -168,6 +176,7 @@ func (r *RESTClient) PUT(ctx context.Context, putURL string, body []byte) (*http
 	}
 	req.Header.Set("Content-Type", "application/json")
 	r.setAuthHeader(req)
+	r.setOriginatorHeader(req)
 	return r.Client.Do(req)
 }
 

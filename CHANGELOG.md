@@ -67,6 +67,11 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   receiver's certificate is always verified and no mode disables that.
   `--disable` removes the sink and leaves the local trail running. An
   unconfirmed change reports `recovery-required`, never success.
+- `--originator`: send `X-Loxilb-Originator: cli:<os user>@<host>` on every
+  request, so the gateway's audit trail records the OS account and host an
+  invocation came from beside the account it authenticated as. Off by
+  default. A value the gateway would drop (not printable ASCII, over 256
+  bytes) or that cannot be determined is refused before any request is sent.
 
 ### Deprecated
 - `--token`: the literal token is visible in shell history and process

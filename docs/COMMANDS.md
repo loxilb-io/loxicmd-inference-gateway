@@ -49,6 +49,7 @@ These persistent flags apply to every command.
 | `--output` | `-o` | table | Output format: `json`, `wide`, or table |
 | `--token` | | | Bearer token for authenticated endpoints (falls back to `/tmp/loxilbtoken`) |
 | `--bearer` | | `true` | Send the token as `Authorization: Bearer <token>`; disable for classic loxilb raw-token targets |
+| `--originator` | | `false` | Send `X-Loxilb-Originator: cli:<os user>@<host>` so the gateway's audit trail names the OS account and host behind the invocation, beside the authenticated account and never in place of it. For a service account driving the CLI. The gateway marks the name trusted only when the authenticated account is allowed to delegate. Refused locally (`originator-unavailable`) when the user or host cannot be determined or would not survive the gateway's validation |
 | `--insecure` | `-k` | `false` | Skip TLS certificate verification (https only) |
 | `--cacert` | | | CA certificate (PEM) to verify the server (https only) |
 | `--cert` | | | Client certificate (PEM) for mutual TLS (https only) |
