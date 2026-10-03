@@ -17,7 +17,8 @@ BUILDINFO = $(shell date '+%Y_%m_%d')-$(shell git branch --show-current)-$(shell
 # itself; the workflow run identity and SOURCE_DATE_EPOCH are stamped only by
 # CI (.github/workflows/release.yml), so a local build reports them empty.
 SOURCEREV       = $(shell git rev-parse HEAD 2>/dev/null)
-GATEWAYCONTRACT = $(shell sed -n 's/.*"swagger_sha256": "\([0-9a-f]*\)".*/\1/p' testdata/contracts/gateway-api.json 2>/dev/null)
+GATEWAY_CONTRACT_MANIFEST ?= testdata/contracts/gateway-api.json
+GATEWAYCONTRACT = $(shell sed -n 's/.*"swagger_sha256": "\([0-9a-f]*\)".*/\1/p' $(GATEWAY_CONTRACT_MANIFEST) 2>/dev/null)
 LDFLAGS   = -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.Version=$(VERSION)' \
             -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=$(BUILDINFO)' \
             -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.SourceRevision=$(SOURCEREV)' \
