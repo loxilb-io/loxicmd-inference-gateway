@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -47,7 +48,10 @@ type gatewayContractField struct {
 
 func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
 	t.Helper()
-	path := filepath.Join("..", "..", "testdata", "contracts", "gateway-api.json")
+	path := os.Getenv("GATEWAY_CONTRACT_MANIFEST")
+	if path == "" {
+		path = filepath.Join("..", "..", "testdata", "contracts", "gateway-api.json")
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read contract manifest: %v", err)
@@ -65,9 +69,32 @@ func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
 	return manifest
 }
 
+func TestGatewayContractExternalProfile(t *testing.T) {
+	manifest := loadGatewayContractManifest(t)
+	manifest.Source.Repository = "https://example.com/gateway"
+	profile, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "gateway-api.json")
+	if err := os.WriteFile(path, profile, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GATEWAY_CONTRACT_MANIFEST", path)
+	got := loadGatewayContractManifest(t)
+	if !reflect.DeepEqual(got, manifest) {
+		t.Fatal("selected profile did not preserve its producer and consumed contract")
+	}
+	TestGatewayContractManifest(t)
+}
+
 func TestGatewayContractManifest(t *testing.T) {
 	manifest := loadGatewayContractManifest(t)
-	if manifest.Source.Repository != "https://github.com/loxilb-io/loxilb-inference-gateway" {
+	producer, err := url.Parse(manifest.Source.Repository)
+	if err != nil || producer.Scheme != "https" || producer.Host == "" || producer.User != nil || producer.Fragment != "" {
+		t.Fatalf("gateway contract repository must be a credential-free HTTPS URL: %q", manifest.Source.Repository)
+	}
+	if manifest.Source.Repository != "https://github.com/loxilb-io/loxilb-inference-gateway" && os.Getenv("GATEWAY_CONTRACT_MANIFEST") == "" {
 		t.Fatalf("gateway contract repository is not the approved producer: %q", manifest.Source.Repository)
 	}
 	if len(manifest.Source.Revision) != 40 {
@@ -106,7 +133,8 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 
 	manifest := loadGatewayContractManifest(t)
 
-	// The pinned revision and spec digests are PROVENANCE: they record the
+	// GATEWAY_CONTRACT_EXACT=1 requires equality for a selected build profile.
+	// In the default compatibility mode, these digests are PROVENANCE: they record the
 	// Gateway tree this contract was captured from. They are not the gate,
 	// and they are expected to lag -- the Gateway repository advances on its
 	// own schedule and nothing here is notified.
@@ -127,6 +155,9 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 		t.Fatalf("resolve Gateway checkout revision: %v", err)
 	}
 	if got := strings.TrimSpace(string(resolved)); got != manifest.Source.Revision {
+		if os.Getenv("GATEWAY_CONTRACT_EXACT") == "1" {
+			t.Fatalf("exact contract revision mismatch: got %s, want %s", got, manifest.Source.Revision)
+		}
 		t.Logf("Gateway checkout %s differs from the pinned contract revision %s; "+
 			"the assertions below decide whether the contract still holds",
 			got, manifest.Source.Revision)
@@ -145,6 +176,9 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 			wantDigest = manifest.Source.SwaggerExtrasSHA256
 		}
 		if gotDigest != wantDigest {
+			if os.Getenv("GATEWAY_CONTRACT_EXACT") == "1" {
+				t.Fatalf("exact %s digest mismatch: got %s, want %s", name, gotDigest, wantDigest)
+			}
 			// Provenance again, not a verdict: the spec has moved since the
 			// contract was captured. That is ordinary -- additions do not
 			// break a consumer. Reported so a failure below can be read
