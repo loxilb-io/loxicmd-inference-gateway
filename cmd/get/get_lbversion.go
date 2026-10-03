@@ -46,9 +46,9 @@ func NewGetVersionCmd(restOptions *api.RESTOptions) *cobra.Command {
 			if err != nil {
 				return exitcode.Unavailablef("get lbversion: %v", err)
 			}
+			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusOK {
-				PrintGetVersionResult(resp, *restOptions)
-				return nil
+				return PrintGetVersionResult(resp, *restOptions)
 			}
 			return exitcode.FromHTTPStatus("get lbversion", resp.StatusCode)
 		},
@@ -57,25 +57,23 @@ func NewGetVersionCmd(restOptions *api.RESTOptions) *cobra.Command {
 	return GetLBVersionCmd
 }
 
-func PrintGetVersionResult(resp *http.Response, o api.RESTOptions) {
+func PrintGetVersionResult(resp *http.Response, o api.RESTOptions) error {
 	Versionresp := api.LBVersionGet{}
 	var data [][]string
 	resultByte, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Error: Failed to read HTTP response: (%s)\n", err.Error())
-		return
+		return exitcode.Unavailablef("get lbversion: read response: %v", err)
 	}
 
 	if err := json.Unmarshal(resultByte, &Versionresp); err != nil {
-		fmt.Printf("Error: Failed to unmarshal HTTP response: (%s)\n", err.Error())
-		return
+		return &exitcode.CLIError{Code: exitcode.ContractMismatch, Message: fmt.Sprintf("get lbversion: decode response: %v", err)}
 	}
 
 	// if json options enable, it print as a json format.
 	if o.PrintOption == "json" {
 		resultIndent, _ := json.MarshalIndent(Versionresp, "", "    ")
 		fmt.Println(string(resultIndent))
-		return
+		return nil
 	}
 
 	// Table Init
@@ -86,6 +84,7 @@ func PrintGetVersionResult(resp *http.Response, o api.RESTOptions) {
 
 	// Rendering the load balance data to table
 	TableShow(data, table)
+	return nil
 }
 
 func lbProductDisplay(product string) string {
