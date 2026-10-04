@@ -19,6 +19,22 @@ class GatewayContractSelectorTest < Minitest::Test
     _, _, status = Open3.capture3("make", "-n", "build", "PRODUCT_MODEL=general kcmvp", chdir: ROOT)
     refute status.success?
   end
+  def test_explicit_profile_is_validated_and_stamped
+    Dir.mktmpdir do |tmp|
+      source = JSON.parse(File.read(File.join(ROOT, "testdata/contracts/gateway-api.json")))
+      source["source"]["repository"] = "https://example.com/gateway"
+      path = File.join(tmp, "gateway-api.json")
+      File.write(path, JSON.generate(source))
+      out, err, status = Open3.capture3("ruby", "scripts/gateway-contract.rb", "general", path, chdir: ROOT)
+      assert status.success?, err
+      assert_equal source.dig("source", "swagger_sha256"), out.strip
+      source["source"]["repository"] = "https://user:secret@example.com/gateway"
+      File.write(path, JSON.generate(source))
+      out, _, status = Open3.capture3("ruby", "scripts/gateway-contract.rb", "general", path, chdir: ROOT)
+      refute status.success?
+      assert_empty out
+    end
+  end
   def test_wrong_model_contract_cannot_be_stamped
     Dir.mktmpdir do |tmp|
       FileUtils.mkdir_p(File.join(tmp,"scripts"))

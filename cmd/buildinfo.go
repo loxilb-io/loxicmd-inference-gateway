@@ -27,7 +27,7 @@ var (
 	// SourceRevision is the full git commit SHA the binary was built from.
 	SourceRevision string
 	// GatewayContract identifies the gateway API contract this CLI was
-	// built against: the swagger_sha256 of testdata/contracts/gateway-api.json.
+	// built against: the swagger_sha256 of the selected build manifest.
 	GatewayContract string
 	// BuildWorkflow is the CI workflow run that produced the binary
 	// (owner/repo/run-id), empty for local builds.

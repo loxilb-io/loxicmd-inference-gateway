@@ -2,6 +2,10 @@ package get
 
 import (
 	"encoding/json"
+	"errors"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -31,5 +35,30 @@ func TestLBVersionJSONCompatibility(t *testing.T) {
 	}
 	if !strings.Contains(string(gateway), `"product":"loxilb-inference-gateway"`) {
 		t.Fatalf("gateway JSON omitted product: %s", gateway)
+	}
+}
+
+type brokenVersionBody struct{}
+
+func (brokenVersionBody) Read([]byte) (int, error) { return 0, io.ErrUnexpectedEOF }
+func (brokenVersionBody) Close() error             { return nil }
+
+func TestLBVersionResponseFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body io.ReadCloser
+		code exitcode.Code
+	}{
+		{"malformed", io.NopCloser(strings.NewReader(`{"version":`)), exitcode.ContractMismatch},
+		{"wrong-type", io.NopCloser(strings.NewReader(`{"version":42}`)), exitcode.ContractMismatch},
+		{"read-error", brokenVersionBody{}, exitcode.Unavailable},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := PrintGetVersionResult(&http.Response{Body: tc.body}, api.RESTOptions{PrintOption: "json"})
+			var classified *exitcode.CLIError
+			if !errors.As(err, &classified) || classified.Code != tc.code {
+				t.Fatalf("got %v, want code %d", err, tc.code)
+			}
+		})
 	}
 }

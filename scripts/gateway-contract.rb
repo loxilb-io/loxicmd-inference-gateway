@@ -1,13 +1,22 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 require "json"
+require "uri"
 model = ARGV.shift || "general"
-abort "usage: gateway-contract.rb [general|kcmvp]" unless ARGV.empty? && %w[general kcmvp].include?(model)
+override = ARGV.shift
+abort "usage: gateway-contract.rb [general|kcmvp] [MANIFEST]" unless ARGV.empty? && %w[general kcmvp].include?(model)
 base = File.expand_path("../testdata/contracts", __dir__)
 path = model == "general" ? File.join(base, "gateway-api.json") : File.join(base, "models", model, "gateway-api.json")
+path = override if override
 manifest = JSON.parse(File.binread(path))
 origin = model == "general" ? "https://github.com/loxilb-io/loxilb-inference-gateway" : "https://github.com/netlox-io/loxilb-igw"
-abort "wrong-model contract" unless manifest["model"] == model && manifest.dig("source", "repository") == origin
+if override
+  abort "wrong-model contract" if manifest["model"] && manifest["model"] != model
+  producer = URI.parse(manifest.dig("source", "repository"))
+  abort "invalid producer URL" unless producer.scheme == "https" && producer.host && !producer.userinfo && !producer.fragment
+else
+  abort "wrong-model contract" unless manifest["model"] == model && manifest.dig("source", "repository") == origin
+end
 abort "unpinned contract" unless manifest.dig("source", "revision").to_s.match?(/\A[0-9a-f]{40}\z/)
 digest = manifest.dig("source", "swagger_sha256")
 abort "missing contract digest" unless digest.to_s.match?(/\A[0-9a-f]{64}\z/)

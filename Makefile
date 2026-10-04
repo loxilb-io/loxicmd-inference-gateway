@@ -23,10 +23,12 @@ ifneq ($(PRODUCT_MODEL),kcmvp)
 $(error PRODUCT_MODEL must be general or kcmvp)
 endif
 endif
-GATEWAYCONTRACT := $(shell ruby scripts/gateway-contract.rb $(PRODUCT_MODEL) || printf REFUSED)
+GATEWAY_CONTRACT_MANIFEST ?=
+GATEWAYCONTRACT := $(shell ruby scripts/gateway-contract.rb $(PRODUCT_MODEL) $(GATEWAY_CONTRACT_MANIFEST) || printf REFUSED)
 ifeq ($(GATEWAYCONTRACT),REFUSED)
 $(error selected Gateway contract is missing or invalid)
 endif
+
 LDFLAGS   = -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.Version=$(VERSION)' \
             -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=$(BUILDINFO)' \
             -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.SourceRevision=$(SOURCEREV)' \
