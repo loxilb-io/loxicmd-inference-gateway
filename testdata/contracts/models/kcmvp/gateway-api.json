@@ -1,9 +1,9 @@
 {
   "source": {
-    "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "210f42ad99acf44944b688d7e83f512c060fb9cc",
-    "swagger_sha256": "da62fd2dfd81d8f8d668dd2371dc39451783399f139462f9b5301042d868d46b",
-    "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
+    "repository": "https://github.com/netlox-io/loxilb-igw",
+    "revision": "d2339d1daabbcc5e5e4c571f452358960a316ad9",
+    "swagger_sha256": "6fdf9f1756d68991ff8ddd15a2eb87220d16e1a3b0c5b162cf3c77f42789a056",
+    "swagger_extras_sha256": "f97e6db527b91161d6b12afd20c170e03ca23304fbd195d61c894d61760750cd"
   },
   "operations": [
     {
@@ -552,5 +552,5 @@
       "type": "string"
     }
   ],
-  "model": "general"
+  "model": "kcmvp"
 }

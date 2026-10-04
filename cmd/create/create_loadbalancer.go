@@ -114,6 +114,7 @@ type CreateLoadBalancerOptions struct {
 	SockMapMode       string
 	// SSE.
 	SseMode              bool
+	JWTAuthProfile       string
 	APIKeyAuth           string
 	MaxStreamDurationSec int32
 	BackendKeepaliveSec  int32
@@ -524,7 +525,8 @@ ex)
 	createLbCmd.Flags().StringVar(&o.SockMapMode, "sockmap-mode", "", "Directional sockmap acceleration: off|request|response|both")
 	// SSE.
 	createLbCmd.Flags().BoolVar(&o.SseMode, "sse-mode", false, "Enable SSE streaming mode (suppresses idle timeout during text/event-stream)")
-	createLbCmd.Flags().StringVar(&o.APIKeyAuth, "api-key-auth", "", "Data-plane X-Api-Key policy: disabled|required (default: disabled)")
+	createLbCmd.Flags().StringVar(&o.JWTAuthProfile, "jwt-auth-profile", "", "Existing named Gateway JWT trust profile; required for jwt|apikey-or-jwt")
+	createLbCmd.Flags().StringVar(&o.APIKeyAuth, "api-key-auth", "", "Data-plane credential policy: disabled|required|jwt|apikey-or-jwt (omitted: preserve/unmanaged)")
 	createLbCmd.Flags().Int32Var(&o.MaxStreamDurationSec, "max-stream-duration", 0, "Max SSE stream duration in seconds (0 = system cap)")
 	createLbCmd.Flags().Int32Var(&o.BackendKeepaliveSec, "backend-keepalive-interval", 0, "Backend TCP keepalive interval in seconds during stream (0 = off)")
 	createLbCmd.Flags().BoolVar(&o.CbEnable, "cb-enable", false, "Enable the per-endpoint circuit breaker")
@@ -739,7 +741,7 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 	sel := SelectToNum(o.Select)
 	return o.ModelName != "" || o.PathPrefix != "" || o.PathMatchMode != "" ||
 		o.SessionHeaderName != "" || o.TraceType != "" || o.SockMapMode != "" ||
-		o.SseMode || o.APIKeyAuth != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 || o.CbEnable ||
+		o.SseMode || o.APIKeyAuth != "" || o.JWTAuthProfile != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 || o.CbEnable ||
 		o.ChwblPrefixHashLevel != 0 || o.ChwblPrefixHashFlags != 0 || o.ChwblMeanLoadFactor != 0 ||
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
 		o.PdDisaggMode || o.PdCacheAwareMode || o.PdSessionTtlSec != 0 ||
@@ -766,9 +768,16 @@ const (
 // building the request.
 func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 	switch o.APIKeyAuth {
-	case "", "disabled", "required":
+	case "", "disabled", "required", "jwt", "apikey-or-jwt":
 	default:
-		return fmt.Errorf("--api-key-auth must be one of disabled|required")
+		return fmt.Errorf("--api-key-auth must be one of disabled|required|jwt|apikey-or-jwt")
+	}
+	if o.APIKeyAuth == "jwt" || o.APIKeyAuth == "apikey-or-jwt" {
+		if strings.TrimSpace(o.JWTAuthProfile) == "" || len(o.JWTAuthProfile) > 63 {
+			return fmt.Errorf("--jwt-auth-profile requires a configured profile name of at most 63 bytes for JWT modes")
+		}
+	} else if o.JWTAuthProfile != "" {
+		return fmt.Errorf("--jwt-auth-profile requires --api-key-auth jwt|apikey-or-jwt")
 	}
 	switch o.SockMapMode {
 	case "", "off", "request", "response", "both":
@@ -1003,6 +1012,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	// SSE.
 	s.SseMode = o.SseMode
 	s.APIKeyAuth = o.APIKeyAuth
+	s.JWTAuthProfile = o.JWTAuthProfile
 	s.MaxStreamDurationSec = o.MaxStreamDurationSec
 	s.BackendKeepaliveSec = o.BackendKeepaliveSec
 	s.CbEnable = o.CbEnable

@@ -165,6 +165,7 @@ type LoadBalancerService struct {
 
 	// SSE streaming.
 	SseMode              bool   `json:"sse_mode,omitempty"                       yaml:"sse_mode,omitempty"`
+	JWTAuthProfile       string `json:"jwt_auth_profile,omitempty"               yaml:"jwt_auth_profile,omitempty"`
 	APIKeyAuth           string `json:"api_key_auth,omitempty"                   yaml:"api_key_auth,omitempty"`
 	MaxStreamDurationSec int32  `json:"max_stream_duration_sec,omitempty"        yaml:"max_stream_duration_sec,omitempty"`
 	BackendKeepaliveSec  int32  `json:"backend_keepalive_interval_sec,omitempty" yaml:"backend_keepalive_interval_sec,omitempty"`
