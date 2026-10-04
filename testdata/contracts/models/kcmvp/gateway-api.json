@@ -1,8 +1,8 @@
 {
   "source": {
     "repository": "https://github.com/netlox-io/loxilb-igw",
-    "revision": "94ce9a466d219a3bdabb9b635537689ac7a463b8",
-    "swagger_sha256": "11cd731094ea270e3c17e7b2e0090c0cbe6e3a998aae3fc971eed41ced71f32e",
+    "revision": "d2339d1daabbcc5e5e4c571f452358960a316ad9",
+    "swagger_sha256": "6fdf9f1756d68991ff8ddd15a2eb87220d16e1a3b0c5b162cf3c77f42789a056",
     "swagger_extras_sha256": "f97e6db527b91161d6b12afd20c170e03ca23304fbd195d61c894d61760750cd"
   },
   "operations": [

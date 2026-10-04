@@ -1,8 +1,8 @@
 {
   "source": {
     "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "9872446455338d8e2da9ca69eb23109b7e61623a",
-    "swagger_sha256": "7cf9cc2b36a6a7852111c0897c9f32716a6e33d5a1898f4cd71410fcc5af5a79",
+    "revision": "210f42ad99acf44944b688d7e83f512c060fb9cc",
+    "swagger_sha256": "da62fd2dfd81d8f8d668dd2371dc39451783399f139462f9b5301042d868d46b",
     "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
   },
   "operations": [
