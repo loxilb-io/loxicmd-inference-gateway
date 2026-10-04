@@ -125,7 +125,7 @@ jobs:
           SDE="$(git log -1 --pretty=%ct)"
           # The gateway API contract this CLI consumes, from the pinned
           # manifest (verified against the gateway spec by build.yml).
-          CONTRACT="$(sed -n 's/.*"swagger_sha256": "\([0-9a-f]*\)".*/\1/p' testdata/contracts/gateway-api.json)"
+          CONTRACT="$(ruby scripts/gateway-contract.rb general)"
           if [ -z "$CONTRACT" ]; then
             echo "::error::could not read the gateway contract digest from testdata/contracts/gateway-api.json"
             exit 1

@@ -20,6 +20,7 @@ import (
 )
 
 type gatewayContractManifest struct {
+	Model  string `json:"model"`
 	Source struct {
 		Repository          string `json:"repository"`
 		Revision            string `json:"revision"`
@@ -47,7 +48,17 @@ type gatewayContractField struct {
 
 func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
 	t.Helper()
+	model := os.Getenv("PRODUCT_MODEL")
+	if model == "" {
+		model = "general"
+	}
+	if model != "general" && model != "kcmvp" {
+		t.Fatalf("unknown Product model %q", model)
+	}
 	path := filepath.Join("..", "..", "testdata", "contracts", "gateway-api.json")
+	if model == "kcmvp" {
+		path = filepath.Join("..", "..", "testdata", "contracts", "models", model, "gateway-api.json")
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read contract manifest: %v", err)
@@ -67,7 +78,11 @@ func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
 
 func TestGatewayContractManifest(t *testing.T) {
 	manifest := loadGatewayContractManifest(t)
-	if manifest.Source.Repository != "https://github.com/loxilb-io/loxilb-inference-gateway" {
+	expected := map[string]string{"general": "https://github.com/loxilb-io/loxilb-inference-gateway", "kcmvp": "https://github.com/netlox-io/loxilb-igw"}
+	if manifest.Model != "general" && manifest.Model != "kcmvp" {
+		t.Fatal("explicit valid model required")
+	}
+	if manifest.Source.Repository != expected[manifest.Model] {
 		t.Fatalf("gateway contract repository is not the approved producer: %q", manifest.Source.Repository)
 	}
 	if len(manifest.Source.Revision) != 40 {

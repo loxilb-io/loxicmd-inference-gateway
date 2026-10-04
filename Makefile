@@ -17,7 +17,16 @@ BUILDINFO = $(shell date '+%Y_%m_%d')-$(shell git branch --show-current)-$(shell
 # itself; the workflow run identity and SOURCE_DATE_EPOCH are stamped only by
 # CI (.github/workflows/release.yml), so a local build reports them empty.
 SOURCEREV       = $(shell git rev-parse HEAD 2>/dev/null)
-GATEWAYCONTRACT = $(shell sed -n 's/.*"swagger_sha256": "\([0-9a-f]*\)".*/\1/p' testdata/contracts/gateway-api.json 2>/dev/null)
+PRODUCT_MODEL ?= general
+ifneq ($(PRODUCT_MODEL),general)
+ifneq ($(PRODUCT_MODEL),kcmvp)
+$(error PRODUCT_MODEL must be general or kcmvp)
+endif
+endif
+GATEWAYCONTRACT := $(shell ruby scripts/gateway-contract.rb $(PRODUCT_MODEL) || printf REFUSED)
+ifeq ($(GATEWAYCONTRACT),REFUSED)
+$(error selected Gateway contract is missing or invalid)
+endif
 LDFLAGS   = -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.Version=$(VERSION)' \
             -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.BuildInfo=$(BUILDINFO)' \
             -X 'github.com/loxilb-io/loxicmd-inference-gateway/cmd.SourceRevision=$(SOURCEREV)' \

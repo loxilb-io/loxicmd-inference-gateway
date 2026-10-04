@@ -77,7 +77,7 @@ func assertAbsent(t *testing.T, m map[string]any, keys ...string) {
 func TestClassicLB_NoAIKeys(t *testing.T) {
 	m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.1", Select: "rr"})
 	assertAbsent(t, m,
-		"model_name", "sse_mode", "api_key_auth", "kvExactMode", "kvBlockSize", "kvHashAlgo",
+		"model_name", "sse_mode", "api_key_auth", "jwt_auth_profile", "kvExactMode", "kvBlockSize", "kvHashAlgo",
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
 		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType", "sockMapMode",
@@ -787,5 +787,31 @@ func TestFcExposeHeadersReadback(t *testing.T) {
 	fe := s.FcEffective
 	if fe == nil || fe.Source == nil || fe.ExposeHeaders != "on" || fe.Source.ExposeHeaders != "rule" {
 		t.Fatalf("fc_effective = %+v", fe)
+	}
+}
+
+func TestJWTPolicyProfileWireAndValidation(t *testing.T) {
+	for _, policy := range []string{"jwt", "apikey-or-jwt"} {
+		options := &CreateLoadBalancerOptions{ExternalIP: "192.0.2.18", Mode: "fullproxy", APIKeyAuth: policy, JWTAuthProfile: "configured-profile"}
+		if err := validateLBAIOptions(options); err != nil {
+			t.Fatal(err)
+		}
+		wire := serviceMap(t, options)
+		assertKey(t, wire, "api_key_auth", policy)
+		assertKey(t, wire, "jwt_auth_profile", "configured-profile")
+		for _, invalid := range []string{"", "   ", string(make([]byte, 64))} {
+			options.JWTAuthProfile = invalid
+			if validateLBAIOptions(options) == nil {
+				t.Fatal("JWT mode accepted invalid profile")
+			}
+		}
+	}
+	for _, policy := range []string{"", "disabled", "required"} {
+		if validateLBAIOptions(&CreateLoadBalancerOptions{Mode: "fullproxy", APIKeyAuth: policy, JWTAuthProfile: "configured-profile"}) == nil {
+			t.Fatal("non-JWT policy accepted profile")
+		}
+	}
+	if validateLBAIOptions(&CreateLoadBalancerOptions{Mode: "onearm", APIKeyAuth: "jwt", JWTAuthProfile: "configured-profile"}) == nil {
+		t.Fatal("JWT policy accepted outside fullproxy")
 	}
 }
