@@ -80,7 +80,7 @@ func TestClassicLB_NoAIKeys(t *testing.T) {
 		"model_name", "sse_mode", "api_key_auth", "jwt_auth_profile", "kvExactMode", "kvBlockSize", "kvHashAlgo",
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
-		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "kvEngineType", "sockMapMode",
+		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "pd_prefill_timeout_sec", "kvEngineType", "sockMapMode",
 		"connectionLimit", "fc_max_queue_depth", "fc_max_queue_wait_ms", "fc_effective")
 }
 
@@ -239,6 +239,39 @@ func TestResilienceAndBootstrapServiceArguments(t *testing.T) {
 	})
 	assertKey(t, m, "cb_enable", true)
 	assertKey(t, m, "pdBootstrapPort", 8998)
+}
+
+// --pd-prefill-timeout reaches the wire only when set, is bounded to the
+// gateway's 0..3600 and is refused on a rule without P/D orchestration.
+func TestPdPrefillTimeoutServiceArgument(t *testing.T) {
+	pd := CreateLoadBalancerOptions{
+		ExternalIP: "192.0.2.18", Mode: "fullproxy", PdDisaggMode: true,
+		EpRoles: []string{"prefill", "decode"},
+	}
+
+	unset := pd
+	assertAbsent(t, serviceMap(t, &unset), "pd_prefill_timeout_sec")
+
+	for _, sec := range []int32{1, 30, 3600} {
+		o := pd
+		o.PdPrefillTimeoutSec = sec
+		if err := validateLBAIOptions(&o); err != nil {
+			t.Fatalf("%d on a P/D rule rejected: %v", sec, err)
+		}
+		assertKey(t, serviceMap(t, &o), "pd_prefill_timeout_sec", int(sec))
+	}
+
+	for _, sec := range []int32{-1, 3601, 65541} {
+		o := pd
+		o.PdPrefillTimeoutSec = sec
+		if err := validateLBAIOptions(&o); err == nil {
+			t.Errorf("%d accepted, want a range rejection", sec)
+		}
+	}
+
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{Mode: "fullproxy", PdPrefillTimeoutSec: 30}); err == nil {
+		t.Error("accepted without --pd-disagg")
+	}
 }
 
 func TestAdditionalEngineServiceArguments(t *testing.T) {
