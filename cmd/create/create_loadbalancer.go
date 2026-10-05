@@ -132,6 +132,7 @@ type CreateLoadBalancerOptions struct {
 	PdCacheThreshold      int32
 	PdBalanceAbsThreshold int32
 	PdBootstrapPort       int32
+	PdPrefillTimeoutSec   int32
 	// KV-cache-aware routing.
 	KvExactMode   int64
 	KvBlockSize   int64
@@ -543,6 +544,7 @@ ex)
 	createLbCmd.Flags().Int32Var(&o.PdCacheThreshold, "pd-cache-threshold", 0, "P/D cache-match threshold 0-100 (default 20)")
 	createLbCmd.Flags().Int32Var(&o.PdBalanceAbsThreshold, "pd-balance-abs-threshold", 0, "P/D absolute connection imbalance threshold (default 3)")
 	createLbCmd.Flags().Int32Var(&o.PdBootstrapPort, "pd-bootstrap-port", 0, "SGLang P/D bootstrap port (0 = engine default 8998)")
+	createLbCmd.Flags().Int32Var(&o.PdPrefillTimeoutSec, "pd-prefill-timeout", 0, "P/D prefill wait bound in seconds, 0..3600 (0 = gateway default 30)")
 	// KV-cache-aware routing.
 	createLbCmd.Flags().Int64Var(&o.KvExactMode, "kv-exact-mode", 0, "KV-cache exact routing: 0=off, 1=zmq P/D, 3=zmq single-role")
 	createLbCmd.Flags().Int64Var(&o.KvBlockSize, "kv-block-size", 0, "KV token block size (default 16; must match engine)")
@@ -746,6 +748,7 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
 		o.PdDisaggMode || o.PdCacheAwareMode || o.PdSessionTtlSec != 0 ||
 		o.PdCacheThreshold != 0 || o.PdBalanceAbsThreshold != 0 || o.PdBootstrapPort != 0 ||
+		o.PdPrefillTimeoutSec != 0 ||
 		o.KvExactMode != 0 || o.KvBlockSize != 0 || o.KvHashAlgo != "" || o.KvZmqPort != 0 ||
 		o.KvWarmupSec != 0 || o.KvEngineType != "" || o.KvDpRankCount != 0 ||
 		len(o.EpRoles) > 0 || len(o.NixlPorts) > 0 ||
@@ -913,6 +916,12 @@ func validateKVEngineOptions(o *CreateLoadBalancerOptions) error {
 	if o.PdBootstrapPort != 0 && !(o.PdDisaggMode && engine == "sglang") {
 		return fmt.Errorf("--pd-bootstrap-port requires --pd-disagg and --kv-engine-type=sglang")
 	}
+	if o.PdPrefillTimeoutSec < 0 || o.PdPrefillTimeoutSec > 3600 {
+		return fmt.Errorf("--pd-prefill-timeout must be within 0..3600")
+	}
+	if o.PdPrefillTimeoutSec != 0 && !o.PdDisaggMode {
+		return fmt.Errorf("--pd-prefill-timeout requires --pd-disagg")
+	}
 	if o.PdDisaggMode {
 		hasPrefill, hasDecode := false, false
 		for _, role := range o.EpRoles {
@@ -1029,6 +1038,7 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.PdCacheThreshold = o.PdCacheThreshold
 	s.PdBalanceAbsThreshold = o.PdBalanceAbsThreshold
 	s.PdBootstrapPort = o.PdBootstrapPort
+	s.PdPrefillTimeoutSec = o.PdPrefillTimeoutSec
 	// KV.
 	s.KvExactMode = o.KvExactMode
 	s.KvBlockSize = o.KvBlockSize

@@ -185,6 +185,7 @@ type LoadBalancerService struct {
 	PdCacheThreshold      int32 `json:"pd_cache_threshold,omitempty"       yaml:"pd_cache_threshold,omitempty"`
 	PdBalanceAbsThreshold int32 `json:"pd_balance_abs_threshold,omitempty" yaml:"pd_balance_abs_threshold,omitempty"`
 	PdBootstrapPort       int32 `json:"pdBootstrapPort,omitempty"          yaml:"pdBootstrapPort,omitempty"`
+	PdPrefillTimeoutSec   int32 `json:"pd_prefill_timeout_sec,omitempty"   yaml:"pd_prefill_timeout_sec,omitempty"`
 
 	// KV-cache-aware exact routing (camelCase keys, per swagger).
 	KvExactMode   int64  `json:"kvExactMode,omitempty"   yaml:"kvExactMode,omitempty"`

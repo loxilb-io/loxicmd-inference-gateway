@@ -183,14 +183,15 @@ loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
 | Access / resilience | `--api-key-auth disabled\|required`, `--cb-enable` |
 | SSE | `--sse-mode`, `--max-stream-duration`, `--backend-keepalive-interval` |
 | CHWBL | `--chwbl-hash-level 1\|2\|3`, `--chwbl-load-factor`, `--chwbl-replication` |
-| P/D disagg | `--pd-disagg`, `--pd-cache-aware`, `--pd-session-ttl`, `--pd-cache-threshold`, `--pd-balance-abs-threshold`, `--pd-bootstrap-port`; per-endpoint `--ep-role prefill\|decode\|normal`, `--nixl-port` |
+| P/D disagg | `--pd-disagg`, `--pd-cache-aware`, `--pd-session-ttl`, `--pd-cache-threshold`, `--pd-balance-abs-threshold`, `--pd-bootstrap-port`, `--pd-prefill-timeout`; per-endpoint `--ep-role prefill\|decode\|normal`, `--nixl-port` |
 | KV-cache | `--kv-exact-mode 0\|1\|3`, `--kv-zmq-port`, `--kv-hash-algo sha256_cbor\|xxhash_cbor\|sha256_sglang\|blockhash_trtllm`, `--kv-engine-type vllm\|sglang\|trtllm\|llamacpp`, `--kv-dp-ranks`, `--kv-warmup`, `--kv-block-size` |
 | mTLS | `--mtls-frontend`, `--mtls-backend` (bundle: client-cert-mode, ca-path, cert/key, verify-server-cert, require-client-cn/cn-pattern) |
 | HSTS | `--hsts-max-age`, `--hsts-include-subdomains` |
 
 Validation: AI flags require `--mode fullproxy`; `--pd-cache-aware` requires
 `--pd-disagg`; P/D requires both prefill and decode roles;
-`--pd-bootstrap-port` is SGLang P/D-only; `--kv-engine-type` is immutable per
+`--pd-bootstrap-port` is SGLang P/D-only; `--pd-prefill-timeout` is P/D-only
+and bounded to 0..3600 seconds; `--kv-engine-type` is immutable per
 VIP on the server. llama.cpp does not support exact KV or P/D mode.
 
 ---

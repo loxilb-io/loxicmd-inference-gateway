@@ -1,8 +1,8 @@
 {
   "source": {
     "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "9972b0a89bd1690fce9ee1c1c776e3f070b88220",
-    "swagger_sha256": "da62fd2dfd81d8f8d668dd2371dc39451783399f139462f9b5301042d868d46b",
+    "revision": "080d8b1b76b7f380d083e19ffb3bc32eb29754fc",
+    "swagger_sha256": "1b39ef451e69672755124b15f5e3f07ab0a81dfbf9931b1665e3aada46929c46",
     "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
   },
   "operations": [
@@ -155,6 +155,15 @@
       "property_path": [
         "serviceArguments",
         "pdBootstrapPort"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "pd_prefill_timeout_sec"
       ],
       "type": "integer"
     },
