@@ -1,8 +1,8 @@
 {
   "source": {
     "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "8e1a642843ba23980a88c0031dc35bf681f335f2",
-    "swagger_sha256": "3684843ed628a07a0451dc54297cee1c9fbe001b49a736fb9ad06b13bdc8d21a",
+    "revision": "338429fcdea5b95d23a5728d36bcd1bd090091f2",
+    "swagger_sha256": "fdf763fa8ed8a6524db34806354b4bdd090f441e21ee68f6354bac78c460e2cd",
     "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
   },
   "operations": [
@@ -206,6 +206,82 @@
         "ca",
         "client"
       ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "status"
+      ],
+      "type": "string",
+      "enum": [
+        "applied",
+        "pending",
+        "failed",
+        "unsupported"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "verify"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "ca"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "client_cert"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "client_cert_id"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "server_name"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_effective",
+        "generation"
+      ],
+      "type": "integer"
     },
     {
       "spec": "swagger.yml",
