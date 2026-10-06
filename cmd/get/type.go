@@ -23,9 +23,9 @@ var (
 	RATELIMIT_TITLE         = []string{"Tenant", "RPS", "Tokens/Min", "Burst %", "Models", "Updated"}
 	RATELIMIT_WIDE_TITLE    = []string{"Tenant", "RPS", "Tokens/Min", "Burst %", "Model Limits", "Updated"}
 	KVINVENTORY_TITLE       = []string{"Block Idx", "Hash (uint64)"}
-	CERT_TITLE              = []string{"Cert ID", "Hostnames"}
+	CERT_TITLE              = []string{"Cert ID", "Usage", "Hostnames"}
 	SNI_TITLE               = []string{"Hostname", "Cert Path", "RefCount"}
-	LOADBALANCER_WIDE_TITLE = []string{"Ext IP", "Sec IPs", "Sources", "Host", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "Endpoint", "EPort", "Weight", "State", "Counters", "Gate", "Max Out", "Adaptive", "Tenants", "Headers"}
+	LOADBALANCER_WIDE_TITLE = []string{"Ext IP", "Sec IPs", "Sources", "Host", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "Endpoint", "EPort", "Weight", "State", "Counters", "Gate", "Max Out", "Adaptive", "Tenants", "Headers", "Backend TLS"}
 	SESSION_TITLE           = []string{"ident", "session IP"}
 	SESSION_WIDE_TITLE      = []string{"ident", "session IP", "access Network Tunnel", "core Network Tunnel"}
 	PORT_WIDE_TITLE         = []string{"index", "portname", "MAC", "link/state", "mtu", "isActive/bpf\nPort type", "Statistics", "L3Info", "L2Info", "Sync"}

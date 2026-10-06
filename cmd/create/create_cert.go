@@ -32,22 +32,54 @@ type CreateCertOptions struct {
 	CertFile  string
 	KeyFile   string
 	ChainFile string
+	Usage     string
+}
+
+// certCreateBody checks the files a usage needs and builds the upload. A CA
+// bundle has no key; a server or client certificate needs one.
+func certCreateBody(o *CreateCertOptions, certPem, keyPem, chainPem string) (any, error) {
+	switch o.Usage {
+	case "", api.CertUsageServer, api.CertUsageClient:
+		if o.KeyFile == "" {
+			return nil, exitcode.Usagef("--cert-file and --key-file are required")
+		}
+		return api.CertModel{CertID: o.CertID, Usage: o.Usage, CertPem: certPem, KeyPem: keyPem, ChainPem: chainPem}, nil
+	case api.CertUsageCA:
+		if o.KeyFile != "" {
+			return nil, exitcode.Usagef("--usage ca takes a certificate bundle and no --key-file")
+		}
+		return api.CACertModel{CertID: o.CertID, Usage: o.Usage, CertPem: certPem, ChainPem: chainPem}, nil
+	}
+	return nil, exitcode.Usagef("--usage must be one of server|ca|client")
 }
 
 func NewCreateCertCmd(restOptions *api.RESTOptions) *cobra.Command {
 	o := CreateCertOptions{}
 
 	var createCertCmd = &cobra.Command{
-		Use:   "cert --cert-file=<pem> --key-file=<pem> [--chain-file=<pem>] [--cert-id=<id>]",
+		Use:   "cert --cert-file=<pem> [--key-file=<pem>] [--chain-file=<pem>] [--cert-id=<id>] [--usage=<server|ca|client>]",
 		Short: "Create (upload) a TLS certificate",
 		Long: `Upload a TLS certificate (leaf + private key, optional chain) to the gateway.
 If --cert-id is omitted the server mints one. The private key is never returned on get.
 
+--usage says what the entry is for:
+  server  (default) terminates TLS on a listener
+  ca      a CA bundle a backend certificate is verified against; no --key-file
+  client  the certificate the gateway presents to a backend
+
+A load-balancer rule names a ca entry with --backend-ca-cert-id and a client
+entry with --backend-client-cert-id.
+
 ex)
-	loxicmd create cert --cert-file=server.crt --key-file=server.key --chain-file=chain.pem --cert-id=web`,
+	loxicmd create cert --cert-file=server.crt --key-file=server.key --chain-file=chain.pem --cert-id=web
+	loxicmd create cert --usage=ca --cert-file=backend-ca.pem --cert-id=backend-ca
+	loxicmd create cert --usage=client --cert-file=client.crt --key-file=client.key --cert-id=backend-client`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if o.CertFile == "" || o.KeyFile == "" {
-				return exitcode.Usagef("--cert-file and --key-file are required")
+			if o.CertFile == "" {
+				return exitcode.Usagef("--cert-file is required")
+			}
+			if _, err := certCreateBody(&o, "", "", ""); err != nil {
+				return err
 			}
 			// An unreadable input file is a missing precondition, per the
 			// taxonomy's file-read row.
@@ -55,17 +87,20 @@ ex)
 			if err != nil {
 				return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --cert-file: %v", err)}
 			}
-			keyPem, err := os.ReadFile(o.KeyFile)
-			if err != nil {
-				return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --key-file: %v", err)}
+			var keyPem, chainPem []byte
+			if o.KeyFile != "" {
+				if keyPem, err = os.ReadFile(o.KeyFile); err != nil {
+					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --key-file: %v", err)}
+				}
 			}
-			model := api.CertModel{CertID: o.CertID, CertPem: string(certPem), KeyPem: string(keyPem)}
 			if o.ChainFile != "" {
-				chainPem, err := os.ReadFile(o.ChainFile)
-				if err != nil {
+				if chainPem, err = os.ReadFile(o.ChainFile); err != nil {
 					return &exitcode.CLIError{Code: exitcode.Precondition, Message: fmt.Sprintf("reading --chain-file: %v", err)}
 				}
-				model.ChainPem = string(chainPem)
+			}
+			model, err := certCreateBody(&o, string(certPem), string(keyPem), string(chainPem))
+			if err != nil {
+				return err
 			}
 
 			client := api.NewLoxiClient(restOptions)
@@ -94,7 +129,8 @@ ex)
 	}
 	createCertCmd.Flags().StringVar(&o.CertID, "cert-id", "", "Certificate ID (optional; server mints one if omitted)")
 	createCertCmd.Flags().StringVar(&o.CertFile, "cert-file", "", "Leaf certificate PEM file (required)")
-	createCertCmd.Flags().StringVar(&o.KeyFile, "key-file", "", "Private key PEM file (required)")
+	createCertCmd.Flags().StringVar(&o.KeyFile, "key-file", "", "Private key PEM file (required, except with --usage ca)")
 	createCertCmd.Flags().StringVar(&o.ChainFile, "chain-file", "", "Intermediate chain PEM file")
+	createCertCmd.Flags().StringVar(&o.Usage, "usage", "", "What the entry is for: server (default), ca or client")
 	return createCertCmd
 }

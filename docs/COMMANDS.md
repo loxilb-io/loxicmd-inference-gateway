@@ -185,7 +185,8 @@ loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
 | CHWBL | `--chwbl-hash-level 1\|2\|3`, `--chwbl-load-factor`, `--chwbl-replication` |
 | P/D disagg | `--pd-disagg`, `--pd-cache-aware`, `--pd-session-ttl`, `--pd-cache-threshold`, `--pd-balance-abs-threshold`, `--pd-bootstrap-port`, `--pd-prefill-timeout`; per-endpoint `--ep-role prefill\|decode\|normal`, `--nixl-port` |
 | KV-cache | `--kv-exact-mode 0\|1\|3`, `--kv-zmq-port`, `--kv-hash-algo sha256_cbor\|xxhash_cbor\|sha256_sglang\|blockhash_trtllm`, `--kv-engine-type vllm\|sglang\|trtllm\|llamacpp`, `--kv-dp-ranks`, `--kv-warmup`, `--kv-block-size` |
-| mTLS | `--mtls-frontend`, `--mtls-backend` (bundle: client-cert-mode, ca-path, cert/key, verify-server-cert, require-client-cn/cn-pattern) |
+| mTLS (frontend) | `--mtls-client-cert-mode disabled\|optional\|required`, `--mtls-client-ca-path`, `--mtls-require-client-cn`, `--mtls-client-cn-pattern`, `--mtls-client-crl-path` |
+| Backend TLS | `--backend-ca-cert-id` (verify the backend against a registered CA), `--backend-client-cert-id` (present a registered client certificate), `--backend-tls-server-name` (SNI and name match; default: the endpoint address is matched) |
 | HSTS | `--hsts-max-age`, `--hsts-include-subdomains` |
 
 Validation: AI flags require `--mode fullproxy`; `--pd-cache-aware` requires
@@ -270,6 +271,38 @@ loxicmd delete sni --hostname=api.example.com     # DELETE carries the hostname 
 
 The `--cert-file`/`--key-file` flags on `create cert` are distinct from the
 global `--cert`/`--key` TLS client flags.
+
+### Backend TLS (verify the backend, present a client certificate)
+
+A rule with `--mode fullproxy --security e2ehttps` re-encrypts toward its
+backends. By default the backend certificate is not verified. Backend material
+is registered once and named by ID on the rule:
+
+```bash
+# A CA bundle has no key; a client entry needs one.
+loxicmd create cert --usage=ca     --cert-id=backend-ca     --cert-file=backend-ca.pem
+loxicmd create cert --usage=client --cert-id=backend-client --cert-file=client.crt --key-file=client.key
+
+loxicmd create lb 20.20.20.1 --tcp=443:8443 --endpoints=10.0.0.5:1 \
+  --mode=fullproxy --security=e2ehttps \
+  --backend-ca-cert-id=backend-ca --backend-client-cert-id=backend-client
+
+loxicmd get lb -o wide     # "Backend TLS" column: what the listener has installed
+```
+
+`--backend-ca-cert-id` turns verification on. The backend certificate must
+carry the endpoint address as an IP SAN, or, with `--backend-tls-server-name`,
+that DNS name, which is also sent as SNI. The `Backend TLS` column reads
+`applied: verify, client` when the listener runs what the rule asks for,
+`failed: ...` with what it runs instead, `pending` before the listener exists
+and `unsupported` on a gateway built without client-certificate support. The
+installed certificate IDs and server name are in `get lb -o json`
+(`backend_tls_effective`).
+
+The path flags `--mtls-backend-ca-path`, `--mtls-backend-cert-path`,
+`--mtls-backend-key-path` and `--mtls-backend-verify-server` are retired: the
+gateway takes backend material by registered ID only. For one release they are
+refused with the flag that replaces them.
 
 ---
 

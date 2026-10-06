@@ -77,7 +77,11 @@ ex)
 			}
 			table := TableInit()
 			table.SetHeader(CERT_TITLE)
-			TableShow([][]string{{cert.CertID, strings.Join(cert.Hostnames, ",")}}, table)
+			usage := cert.Usage
+			if usage == "" {
+				usage = api.CertUsageServer
+			}
+			TableShow([][]string{{cert.CertID, usage, strings.Join(cert.Hostnames, ",")}}, table)
 			return nil
 		},
 	}

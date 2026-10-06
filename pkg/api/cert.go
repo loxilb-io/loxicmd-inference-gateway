@@ -21,12 +21,34 @@ type Cert struct {
 	CommonAPI
 }
 
+// Certificate usages of the registry. A server entry terminates TLS on a
+// listener; a ca entry is a bundle a backend certificate is verified against
+// and has no key; a client entry is what the gateway presents to a backend.
+const (
+	CertUsageServer = "server"
+	CertUsageCA     = "ca"
+	CertUsageClient = "client"
+)
+
 // CertModel is the Cert schema. certPem/keyPem are required on POST/PUT; keyPem
-// is never returned on GET; hostnames is output-only.
+// is never returned on GET; hostnames is output-only. usage is server when
+// omitted.
 type CertModel struct {
 	CertID    string   `json:"certId,omitempty"`
+	Usage     string   `json:"usage,omitempty"`
 	CertPem   string   `json:"certPem,omitempty"`
 	KeyPem    string   `json:"keyPem,omitempty"`
 	ChainPem  string   `json:"chainPem,omitempty"`
 	Hostnames []string `json:"hostnames,omitempty"`
+}
+
+// CACertModel is the body that registers a CA bundle. The schema requires
+// the keyPem member on every upload and a bundle has no key, so the member
+// is sent empty.
+type CACertModel struct {
+	CertID   string `json:"certId,omitempty"`
+	Usage    string `json:"usage"`
+	CertPem  string `json:"certPem"`
+	KeyPem   string `json:"keyPem"`
+	ChainPem string `json:"chainPem,omitempty"`
 }
