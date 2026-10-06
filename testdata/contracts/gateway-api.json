@@ -1,8 +1,8 @@
 {
   "source": {
     "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "080d8b1b76b7f380d083e19ffb3bc32eb29754fc",
-    "swagger_sha256": "1b39ef451e69672755124b15f5e3f07ab0a81dfbf9931b1665e3aada46929c46",
+    "revision": "8e1a642843ba23980a88c0031dc35bf681f335f2",
+    "swagger_sha256": "3684843ed628a07a0451dc54297cee1c9fbe001b49a736fb9ad06b13bdc8d21a",
     "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
   },
   "operations": [
@@ -166,6 +166,46 @@
         "pd_prefill_timeout_sec"
       ],
       "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_ca_cert_id"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_client_cert_id"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "backend_tls_server_name"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "Cert",
+      "property_path": [
+        "usage"
+      ],
+      "type": "string",
+      "enum": [
+        "server",
+        "ca",
+        "client"
+      ]
     },
     {
       "spec": "swagger.yml",

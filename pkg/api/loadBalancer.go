@@ -204,6 +204,31 @@ type LoadBalancerService struct {
 	// Mutual TLS (nested; mode=4 only).
 	MtlsFrontend *MtlsFrontend `json:"mtls_frontend,omitempty" yaml:"mtls_frontend,omitempty"`
 	MtlsBackend  *MtlsBackend  `json:"mtls_backend,omitempty"  yaml:"mtls_backend,omitempty"`
+
+	// Backend TLS (mode=4 with security=2 only): the registered CA the
+	// backend certificate is verified against, the registered client
+	// certificate the gateway presents, and the name sent as SNI and matched
+	// against the backend certificate.
+	BackendCaCertId      string `json:"backend_ca_cert_id,omitempty"      yaml:"backend_ca_cert_id,omitempty"`
+	BackendClientCertId  string `json:"backend_client_cert_id,omitempty"  yaml:"backend_client_cert_id,omitempty"`
+	BackendTLSServerName string `json:"backend_tls_server_name,omitempty" yaml:"backend_tls_server_name,omitempty"`
+	// Backend TLS policy the gateway reports on GET as installed; never sent
+	// on create.
+	BackendTLSEffective *BackendTLSEffective `json:"backend_tls_effective,omitempty" yaml:"backend_tls_effective,omitempty"`
+}
+
+// BackendTLSEffective is the backend TLS policy a rule's listener has
+// installed, as the gateway reports it on GET. Status is applied, pending,
+// failed or unsupported; the other members describe what the listener runs,
+// not what the rule asks for.
+type BackendTLSEffective struct {
+	Status       string `json:"status,omitempty"         yaml:"status,omitempty"`
+	Verify       bool   `json:"verify"                   yaml:"verify"`
+	CA           string `json:"ca,omitempty"             yaml:"ca,omitempty"`
+	ClientCert   bool   `json:"client_cert"              yaml:"client_cert"`
+	ClientCertID string `json:"client_cert_id,omitempty" yaml:"client_cert_id,omitempty"`
+	ServerName   string `json:"server_name,omitempty"    yaml:"server_name,omitempty"`
+	Generation   uint32 `json:"generation"               yaml:"generation"`
 }
 
 // MtlsFrontend configures client-certificate authentication toward downstream

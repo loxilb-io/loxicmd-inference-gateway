@@ -1,6 +1,6 @@
 exit=0
 --- stdout ---
-| CERT ID | HOSTNAMES |
-|---------|-----------|
-|         |           |
+| CERT ID | USAGE  | HOSTNAMES |
+|---------|--------|-----------|
+|         | server |           |
 --- stderr ---

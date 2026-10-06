@@ -17,6 +17,7 @@ package create
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
@@ -81,7 +82,8 @@ func TestClassicLB_NoAIKeys(t *testing.T) {
 		"pd_disagg_mode", "chwbl_prefix_hash_level", "path_match_mode",
 		"mtls_frontend", "mtls_backend", "hsts_max_age", "trace_type",
 		"max_stream_duration_sec", "cb_enable", "pdBootstrapPort", "pd_prefill_timeout_sec", "kvEngineType", "sockMapMode",
-		"connectionLimit", "fc_max_queue_depth", "fc_max_queue_wait_ms", "fc_effective")
+		"connectionLimit", "fc_max_queue_depth", "fc_max_queue_wait_ms", "fc_effective",
+		"backend_ca_cert_id", "backend_client_cert_id", "backend_tls_server_name", "backend_tls_effective")
 }
 
 // --connection-limit is an L4 attribute, sent only when set: a classic rule
@@ -376,7 +378,8 @@ func TestMTLSServiceArguments(t *testing.T) {
 		ExternalIP: "192.0.2.15", Mode: "fullproxy", Security: "e2ehttps",
 		MtlsClientCertMode: "required", MtlsClientCAPath: "/opt/ca.pem",
 		MtlsRequireClientCN: true, MtlsClientCNPattern: "*.corp.example.com",
-		MtlsBackendVerifyServer: true, MtlsBackendCAPath: "/opt/backend-ca.pem",
+		BackendCaCertId: "backend-ca", BackendClientCertId: "backend-client",
+		BackendTLSServerName: "be.example.com",
 	})
 	fe, ok := m["mtls_frontend"].(map[string]any)
 	if !ok {
@@ -391,7 +394,83 @@ func TestMTLSServiceArguments(t *testing.T) {
 		t.Fatalf("mtls_backend missing or wrong type: %v", m["mtls_backend"])
 	}
 	assertKey(t, be, "verify_server_cert", true)
-	assertKey(t, be, "backend_ca_path", "/opt/backend-ca.pem")
+	assertAbsent(t, be, "backend_ca_path", "client_cert_path", "client_key_path", "client_cert_data", "client_key_data")
+	assertKey(t, m, "backend_ca_cert_id", "backend-ca")
+	assertKey(t, m, "backend_client_cert_id", "backend-client")
+	assertKey(t, m, "backend_tls_server_name", "be.example.com")
+	assertAbsent(t, m, "backend_tls_effective")
+}
+
+// Naming a CA is what asks for verification; a client certificate or a
+// server name alone leaves the leg unverified, and no option sends nothing.
+func TestBackendTLSServiceArguments(t *testing.T) {
+	base := CreateLoadBalancerOptions{ExternalIP: "192.0.2.19", Mode: "fullproxy", Security: "e2ehttps"}
+
+	assertAbsent(t, serviceMap(t, &base), "mtls_backend", "backend_ca_cert_id", "backend_client_cert_id",
+		"backend_tls_server_name", "backend_tls_effective")
+
+	client := base
+	client.BackendClientCertId = "backend-client"
+	m := serviceMap(t, &client)
+	assertKey(t, m, "backend_client_cert_id", "backend-client")
+	assertAbsent(t, m, "mtls_backend", "backend_ca_cert_id", "backend_tls_server_name")
+
+	ca := base
+	ca.BackendCaCertId = "backend-ca"
+	if err := validateLBAIOptions(&ca); err != nil {
+		t.Fatalf("a CA on an e2ehttps fullproxy rule rejected: %v", err)
+	}
+	m = serviceMap(t, &ca)
+	be, ok := m["mtls_backend"].(map[string]any)
+	if !ok {
+		t.Fatalf("mtls_backend missing or wrong type: %v", m["mtls_backend"])
+	}
+	assertKey(t, be, "verify_server_cert", true)
+	assertKey(t, m, "backend_ca_cert_id", "backend-ca")
+	assertAbsent(t, m, "backend_client_cert_id", "backend_tls_server_name")
+
+	for name, o := range map[string]CreateLoadBalancerOptions{
+		"terminated listener": {Mode: "fullproxy", Security: "https", BackendCaCertId: "backend-ca"},
+		"plain listener":      {Mode: "fullproxy", BackendTLSServerName: "be.example.com"},
+		"not a proxy":         {Security: "e2ehttps", BackendClientCertId: "backend-client"},
+	} {
+		if err := validateLBAIOptions(&o); err == nil {
+			t.Errorf("%s: accepted, want a rejection naming the mode and security", name)
+		}
+	}
+}
+
+// Each retired path flag is refused before a request is sent, with the flag
+// that replaces it, and reaches the wire under no name.
+func TestRetiredBackendPathFlags(t *testing.T) {
+	base := CreateLoadBalancerOptions{ExternalIP: "192.0.2.20", Mode: "fullproxy", Security: "e2ehttps",
+		BackendCaCertId: "backend-ca"}
+	for name, c := range map[string]struct {
+		set  func(*CreateLoadBalancerOptions)
+		want string
+	}{
+		"--mtls-backend-ca-path":       {func(o *CreateLoadBalancerOptions) { o.MtlsBackendCAPath = "/opt/ca.pem" }, "--backend-ca-cert-id"},
+		"--mtls-backend-cert-path":     {func(o *CreateLoadBalancerOptions) { o.MtlsBackendClientCertPath = "/opt/c.pem" }, "--backend-client-cert-id"},
+		"--mtls-backend-key-path":      {func(o *CreateLoadBalancerOptions) { o.MtlsBackendClientKeyPath = "/opt/k.pem" }, "--backend-client-cert-id"},
+		"--mtls-backend-verify-server": {func(o *CreateLoadBalancerOptions) { o.MtlsBackendVerifyServer = true }, "--backend-ca-cert-id"},
+	} {
+		o := base
+		c.set(&o)
+		err := validateLBAIOptions(&o)
+		if err == nil {
+			t.Errorf("%s accepted, want it refused", name)
+			continue
+		}
+		if !strings.Contains(err.Error(), name) || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%s: %q, want it to name the flag and %s", name, err, c.want)
+		}
+		be, _ := serviceMap(t, &o)["mtls_backend"].(map[string]any)
+		assertAbsent(t, be, "backend_ca_path", "client_cert_path", "client_key_path")
+	}
+	// On a rule that asks for nothing else, too.
+	if err := validateLBAIOptions(&CreateLoadBalancerOptions{MtlsBackendCAPath: "/opt/ca.pem"}); err == nil {
+		t.Error("--mtls-backend-ca-path accepted on a plain rule")
+	}
 }
 
 func TestSelectToNum_AI(t *testing.T) {

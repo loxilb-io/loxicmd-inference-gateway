@@ -159,6 +159,10 @@ type CreateLoadBalancerOptions struct {
 	MtlsBackendCAPath         string
 	MtlsBackendClientCertPath string
 	MtlsBackendClientKeyPath  string
+	// Backend TLS by registered certificate ID.
+	BackendCaCertId      string
+	BackendClientCertId  string
+	BackendTLSServerName string
 }
 
 type CreateLoadBalancerResult struct {
@@ -567,10 +571,16 @@ ex)
 	createLbCmd.Flags().StringVar(&o.MtlsClientCNPattern, "mtls-client-cn-pattern", "", "mTLS frontend client CN glob pattern")
 	createLbCmd.Flags().StringVar(&o.MtlsClientCRLPath, "mtls-client-crl-path", "", "mTLS frontend CRL path")
 	// mTLS backend (security=e2ehttps only).
-	createLbCmd.Flags().BoolVar(&o.MtlsBackendVerifyServer, "mtls-backend-verify-server", false, "mTLS backend: verify backend server certificate")
-	createLbCmd.Flags().StringVar(&o.MtlsBackendCAPath, "mtls-backend-ca-path", "", "mTLS backend CA path (empty = system store)")
-	createLbCmd.Flags().StringVar(&o.MtlsBackendClientCertPath, "mtls-backend-cert-path", "", "mTLS backend client certificate path")
-	createLbCmd.Flags().StringVar(&o.MtlsBackendClientKeyPath, "mtls-backend-key-path", "", "mTLS backend client key path")
+	createLbCmd.Flags().StringVar(&o.BackendCaCertId, "backend-ca-cert-id", "", "Backend TLS: ID of the registered CA ('create cert --usage ca') the backend certificate is verified against; turns verification on")
+	createLbCmd.Flags().StringVar(&o.BackendClientCertId, "backend-client-cert-id", "", "Backend TLS: ID of the registered client certificate ('create cert --usage client') presented to the backend")
+	createLbCmd.Flags().StringVar(&o.BackendTLSServerName, "backend-tls-server-name", "", "Backend TLS: DNS name sent as SNI and matched against the backend certificate (default: the endpoint address is matched)")
+	// Retired: the gateway takes backend TLS material by registered ID only.
+	// The flags stay for one release so that a script is told what replaces
+	// them.
+	createLbCmd.Flags().BoolVar(&o.MtlsBackendVerifyServer, "mtls-backend-verify-server", false, "Retired: use --backend-ca-cert-id")
+	createLbCmd.Flags().StringVar(&o.MtlsBackendCAPath, "mtls-backend-ca-path", "", "Retired: use --backend-ca-cert-id")
+	createLbCmd.Flags().StringVar(&o.MtlsBackendClientCertPath, "mtls-backend-cert-path", "", "Retired: use --backend-client-cert-id")
+	createLbCmd.Flags().StringVar(&o.MtlsBackendClientKeyPath, "mtls-backend-key-path", "", "Retired: use --backend-client-cert-id")
 
 	return createLbCmd
 }
@@ -725,10 +735,33 @@ func lbMtlsFrontendRequested(o *CreateLoadBalancerOptions) bool {
 		o.MtlsClientCNPattern != "" || o.MtlsClientCRLPath != ""
 }
 
-// lbMtlsBackendRequested reports whether any mTLS backend option is set.
-func lbMtlsBackendRequested(o *CreateLoadBalancerOptions) bool {
-	return o.MtlsBackendVerifyServer || o.MtlsBackendCAPath != "" ||
-		o.MtlsBackendClientCertPath != "" || o.MtlsBackendClientKeyPath != ""
+// lbBackendTLSRequested reports whether any backend TLS option is set.
+func lbBackendTLSRequested(o *CreateLoadBalancerOptions) bool {
+	return o.BackendCaCertId != "" || o.BackendClientCertId != "" || o.BackendTLSServerName != ""
+}
+
+// validateBackendTLSOptions refuses the retired path flags, naming what
+// replaces each, and a backend TLS option on a rule whose backend leg is not
+// TLS. Whether an ID names a registered certificate of the right usage is the
+// gateway's to judge.
+func validateBackendTLSOptions(o *CreateLoadBalancerOptions) error {
+	const upload = "the gateway takes backend TLS material by registered ID"
+	if o.MtlsBackendCAPath != "" {
+		return fmt.Errorf("--mtls-backend-ca-path is retired, %s: register the CA with 'create cert --usage ca' and name it with --backend-ca-cert-id", upload)
+	}
+	if o.MtlsBackendClientCertPath != "" || o.MtlsBackendClientKeyPath != "" {
+		return fmt.Errorf("--mtls-backend-cert-path and --mtls-backend-key-path are retired, %s: register the pair with 'create cert --usage client' and name it with --backend-client-cert-id", upload)
+	}
+	if o.MtlsBackendVerifyServer {
+		return fmt.Errorf("--mtls-backend-verify-server is retired: --backend-ca-cert-id names the CA and turns verification on")
+	}
+	if !lbBackendTLSRequested(o) {
+		return nil
+	}
+	if ModeToNum(o.Mode) != 4 || SecStringToNum(o.Security) != 2 {
+		return fmt.Errorf("--backend-ca-cert-id, --backend-client-cert-id and --backend-tls-server-name require '--mode fullproxy --security e2ehttps'")
+	}
+	return nil
 }
 
 // lbAIRequested reports whether any inference-gateway option that requires L7
@@ -753,7 +786,7 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 		o.KvWarmupSec != 0 || o.KvEngineType != "" || o.KvDpRankCount != 0 ||
 		len(o.EpRoles) > 0 || len(o.NixlPorts) > 0 ||
 		o.HstsMaxAge != 0 || o.HstsIncludeSubdomains || o.HstsPreload ||
-		lbMtlsFrontendRequested(o) || lbMtlsBackendRequested(o) ||
+		lbMtlsFrontendRequested(o) || lbBackendTLSRequested(o) ||
 		sel == 8 || sel == 9 || sel == 10
 }
 
@@ -788,6 +821,9 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 		return fmt.Errorf("--sockmap-mode must be one of off|request|response|both")
 	}
 	if err := validateFcQueueOptions(o); err != nil {
+		return err
+	}
+	if err := validateBackendTLSOptions(o); err != nil {
 		return err
 	}
 	if !lbAIRequested(o) {
@@ -1061,14 +1097,14 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 			ClientCRLPath:   o.MtlsClientCRLPath,
 		}
 	}
-	if lbMtlsBackendRequested(o) {
-		s.MtlsBackend = &api.MtlsBackend{
-			VerifyServerCert: o.MtlsBackendVerifyServer,
-			BackendCAPath:    o.MtlsBackendCAPath,
-			ClientCertPath:   o.MtlsBackendClientCertPath,
-			ClientKeyPath:    o.MtlsBackendClientKeyPath,
-		}
+	// Backend TLS. A CA is what verification is against, so naming one
+	// asks for verification.
+	if o.BackendCaCertId != "" {
+		s.MtlsBackend = &api.MtlsBackend{VerifyServerCert: true}
 	}
+	s.BackendCaCertId = o.BackendCaCertId
+	s.BackendClientCertId = o.BackendClientCertId
+	s.BackendTLSServerName = o.BackendTLSServerName
 }
 
 func LoadbalancerAPICall(restOptions *api.RESTOptions, lbModel api.LoadBalancerModel) (*http.Response, error) {
