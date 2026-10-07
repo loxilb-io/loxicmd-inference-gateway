@@ -236,3 +236,14 @@ Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE).
 
 - [loxilb-inference-gateway](https://github.com/loxilb-io/loxilb-inference-gateway) — the inference gateway this CLI drives
 - [loxilb](https://github.com/loxilb-io/loxilb) — the core eBPF load balancer
+
+### Appliance host operations
+
+`loxicmd appliance --help` lists the supported host interface: status, network
+validation, public-address configuration, local gateway registration, credential
+bootstrap, diagnostics, logs, and backup key creation/create/verify.
+Whole-appliance restore, update, rollback, and factory reset are excluded from
+this release and are not exposed as CLI commands or completions. Operators
+perform whole-appliance maintenance using the Product operator manual.
+Gateway configuration snapshot/restore commands are separate supported API
+operations; they do not restore an entire appliance.

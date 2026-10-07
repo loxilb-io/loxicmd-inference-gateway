@@ -43,8 +43,8 @@ import (
 func ApplianceCmd(restOptions *api.RESTOptions) *cobra.Command {
 	applianceCmd := &cobra.Command{
 		Use:   "appliance",
-		Short: "Read and drive the appliance host lifecycle (via the host backend)",
-		Long: `Host lifecycle commands, dispatched to the appliance backend installed
+		Short: "Manage supported appliance host operations",
+		Long: `Supported host operations, dispatched to the appliance backend installed
 with the product. These run host-locally: they do not need the gateway API
 and keep working while the gateway container is stopped or unhealthy.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -63,18 +63,14 @@ and keep working while the gateway container is stopped or unhealthy.`,
 	applianceCmd.AddCommand(diagnosticsCmd(restOptions))
 	applianceCmd.AddCommand(logsCmd(restOptions))
 	applianceCmd.AddCommand(backupCmd(restOptions))
-	applianceCmd.AddCommand(restoreCmd(restOptions))
-	applianceCmd.AddCommand(updateCmd(restOptions))
-	applianceCmd.AddCommand(rollbackCmd(restOptions))
-	applianceCmd.AddCommand(factoryResetCmd(restOptions))
 	return applianceCmd
 }
 
 func statusCmd(restOptions *api.RESTOptions) *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
-		Short: "Read the complete appliance lifecycle state (read-only)",
-		Long: `Reads the appliance lifecycle state from the host backend: product
+		Short: "Read appliance host status (read-only)",
+		Long: `Reads appliance status from the host backend: product
 release, first-boot marker, per-plane liveness and readiness, network
 profile and interface roles, and active operations. Read-only: no option
 changes host state.
