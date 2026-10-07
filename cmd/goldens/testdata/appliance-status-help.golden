@@ -1,6 +1,6 @@
 exit=0
 --- stdout ---
-Reads the appliance lifecycle state from the host backend: product
+Reads appliance status from the host backend: product
 release, first-boot marker, per-plane liveness and readiness, network
 profile and interface roles, and active operations. Read-only: no option
 changes host state.
