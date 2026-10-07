@@ -66,3 +66,22 @@ func TestCertCreateBody(t *testing.T) {
 		}
 	}
 }
+
+// The ID printed is the one the gateway answers with, so an ID it minted is
+// shown. A gateway that answers without a body leaves the ID that was asked for.
+func TestCertCreatedID(t *testing.T) {
+	for _, c := range []struct {
+		name, body, requested, want string
+	}{
+		{"minted by the gateway", `{"certId":"2f1c7c1e-minted"}`, "", "2f1c7c1e-minted"},
+		{"named, and answered", `{"certId":"web"}`, "web", "web"},
+		{"named, no body", ``, "web", "web"},
+		{"not named, no body", ``, "", ""},
+		{"a body that is not the answer", `{"code":201}`, "web", "web"},
+		{"a body that is not JSON", `created`, "", ""},
+	} {
+		if got := certCreatedID([]byte(c.body), c.requested); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
+	}
+}
