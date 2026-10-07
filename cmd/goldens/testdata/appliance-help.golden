@@ -1,6 +1,6 @@
 exit=0
 --- stdout ---
-Host lifecycle commands, dispatched to the appliance backend installed
+Supported host operations, dispatched to the appliance backend installed
 with the product. These run host-locally: they do not need the gateway API
 and keep working while the gateway container is stopped or unhealthy.
 
@@ -12,15 +12,11 @@ Available Commands:
   backup         Encrypted appliance backups
   credentials    Initial appliance credentials
   diagnostics    Appliance support diagnostics
-  factory-reset  Plan and execute a safety-preserving factory reset
   gateway        Local gateway registration in OAM
   logs           Retrieve bounded, redacted logs for an approved component
   network        Appliance network checks (read-only)
   public-address Appliance public address (CSP 1:1 NAT) management
-  restore        Plan and execute an authenticated appliance restore
-  rollback       Plan, execute, and inspect a governed appliance rollback
-  status         Read the complete appliance lifecycle state (read-only)
-  update         Plan, execute, and inspect a signed appliance update
+  status         Read appliance host status (read-only)
 
 Flags:
   -h, --help   help for appliance
