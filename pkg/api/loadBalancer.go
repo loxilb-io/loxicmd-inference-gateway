@@ -196,6 +196,18 @@ type LoadBalancerService struct {
 	KvEngineType  string `json:"kvEngineType,omitempty"  yaml:"kvEngineType,omitempty"`
 	KvDpRankCount int32  `json:"kvDpRankCount,omitempty" yaml:"kvDpRankCount,omitempty"`
 
+	// Member timeouts in milliseconds (0 = the gateway's default).
+	TimeoutMemberConnect uint32 `json:"timeoutMemberConnect,omitempty" yaml:"timeoutMemberConnect,omitempty"`
+	TimeoutMemberData    uint32 `json:"timeoutMemberData,omitempty"    yaml:"timeoutMemberData,omitempty"`
+	TimeoutTcpInspect    uint32 `json:"timeoutTcpInspect,omitempty"    yaml:"timeoutTcpInspect,omitempty"`
+
+	// TLS hardening of the listener and the backend leg (https listeners
+	// only). The gateway reports them on GET, so a rule that is read and
+	// sent back keeps them.
+	AlpnProtocols []string `json:"alpn_protocols,omitempty" yaml:"alpn_protocols,omitempty"`
+	TLSCiphers    string   `json:"tls_ciphers,omitempty"    yaml:"tls_ciphers,omitempty"`
+	TLSVersions   []string `json:"tls_versions,omitempty"   yaml:"tls_versions,omitempty"`
+
 	// HSTS (https listeners only).
 	HstsMaxAge            uint32 `json:"hsts_max_age,omitempty"            yaml:"hsts_max_age,omitempty"`
 	HstsIncludeSubdomains bool   `json:"hsts_include_subdomains,omitempty" yaml:"hsts_include_subdomains,omitempty"`

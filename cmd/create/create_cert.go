@@ -16,6 +16,7 @@
 package create
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -51,6 +52,19 @@ func certCreateBody(o *CreateCertOptions, certPem, keyPem, chainPem string) (any
 		return api.CACertModel{CertID: o.CertID, Usage: o.Usage, CertPem: certPem, ChainPem: chainPem}, nil
 	}
 	return nil, exitcode.Usagef("--usage must be one of server|ca|client")
+}
+
+// certCreatedID is the ID a created certificate is stored under: the one
+// the gateway answers with, which is the only way to learn an ID it minted.
+// A gateway that answers without a body leaves the ID the request named.
+func certCreatedID(body []byte, requested string) string {
+	var created struct {
+		CertID string `json:"certId"`
+	}
+	if json.Unmarshal(body, &created) == nil && created.CertID != "" {
+		return created.CertID
+	}
+	return requested
 }
 
 func NewCreateCertCmd(restOptions *api.RESTOptions) *cobra.Command {
@@ -119,8 +133,8 @@ ex)
 				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
 				return ce
 			}
-			if o.CertID != "" {
-				fmt.Printf("Certificate '%s' created.\n", o.CertID)
+			if id := certCreatedID(body, o.CertID); id != "" {
+				fmt.Printf("Certificate '%s' created.\n", id)
 			} else {
 				fmt.Printf("Certificate created.\n")
 			}

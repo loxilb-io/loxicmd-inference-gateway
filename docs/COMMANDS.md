@@ -272,6 +272,10 @@ loxicmd delete sni --hostname=api.example.com     # DELETE carries the hostname 
 The `--cert-file`/`--key-file` flags on `create cert` are distinct from the
 global `--cert`/`--key` TLS client flags.
 
+Without `--cert-id` the gateway mints the ID, and `create cert` prints the one
+it answers with. A gateway that answers without a body does not report a
+minted ID.
+
 ### Backend TLS (verify the backend, present a client certificate)
 
 A rule with `--mode fullproxy --security e2ehttps` re-encrypts toward its

@@ -83,6 +83,13 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   invocation came from beside the account it authenticated as. Off by
   default. A value the gateway would drop (not printable ASCII, over 256
   bytes) or that cannot be determined is refused before any request is sent.
+- `create cert` prints the ID the gateway answers with, so an ID the gateway
+  minted (no `--cert-id`) is shown. A gateway that answers without a body
+  leaves the output as it was.
+- `get lb -o json|yaml` keeps a rule's member timeouts (`timeoutMemberConnect`,
+  `timeoutMemberData`, `timeoutTcpInspect`) and TLS hardening values
+  (`alpn_protocols`, `tls_ciphers`, `tls_versions`), which the gateway now
+  reports.
 
 ### Deprecated
 - `--token`: the literal token is visible in shell history and process
