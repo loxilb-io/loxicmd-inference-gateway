@@ -1,9 +1,9 @@
 {
   "source": {
     "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "6af1dc1c4258c360449b93f5c5ec68a62334a5da",
-    "swagger_sha256": "9932ef4a04644b5631c47102bc4bdce519c1a4fa4acedde542812aeb51aad0d5",
-    "swagger_extras_sha256": "5e36fc44f7bcae7588611893ef158e68e0f26c2a0e67d0a9fc719ab3c026c3bc"
+    "revision": "7a58e59b1c18b0eaab8b12a8bc57076618d9d5d3",
+    "swagger_sha256": "9b4e9266d3fef238c105976b37ac6998e6628f4561b5f1f7d179233aa24aa756",
+    "swagger_extras_sha256": "7d7d336f949d574ff8d71502def05c4b1cd4a8d53e8716dbcc6f878d3a19c132"
   },
   "operations": [
     {
@@ -121,6 +121,36 @@
         "delete",
         "get",
         "post"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "path": "/config/ai/objective",
+      "methods": [
+        "get",
+        "post"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "path": "/config/ai/objective/{name}",
+      "methods": [
+        "delete"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "path": "/config/ai/netidentity",
+      "methods": [
+        "get",
+        "post"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "path": "/config/ai/netidentity/{name}",
+      "methods": [
+        "delete"
       ]
     }
   ],
@@ -675,6 +705,966 @@
         "jwt_auth_profile"
       ],
       "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_wake_policy"
+      ],
+      "type": "string",
+      "enum": [
+        "strict",
+        "weighted",
+        "inherit"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_band_weights"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_band_min_share_pct"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_critical_reserve_pct"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_band_wait_ms"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_band_queue_pct"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_shed_queue"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off",
+        "inherit"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_tenant_wake"
+      ],
+      "type": "string",
+      "enum": [
+        "fifo",
+        "rr",
+        "inherit"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_llmd_headers"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off",
+        "inherit"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "ai_default_reservation"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off",
+        "inherit"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "ai_default_max_tokens"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "ai_objective_strict"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "tenant_slots"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "wake_policy"
+      ],
+      "type": "string",
+      "enum": [
+        "strict",
+        "weighted"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "wake_policy_effective"
+      ],
+      "type": "string",
+      "enum": [
+        "strict",
+        "weighted"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "weights_in_use"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "shed_queue"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "shed_queue_effective"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "tenant_wake"
+      ],
+      "type": "string",
+      "enum": [
+        "fifo",
+        "rr"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "tenant_wake_effective"
+      ],
+      "type": "string",
+      "enum": [
+        "fifo",
+        "rr"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "band_fallback_reason"
+      ],
+      "type": "string",
+      "enum": [
+        "none",
+        "sockmap_request",
+        "zero_weight",
+        "no_queue"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "llmd_headers"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "bands_configured"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "bands"
+      ],
+      "type": "object"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "bands",
+        "critical_reserve_pct"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "bands",
+        "critical_reserve_units"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "default_reservation"
+      ],
+      "type": "string",
+      "enum": [
+        "on",
+        "off"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "default_max_tokens"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "reservation_clamped_burst"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "reservation_clamped_budget"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "reservation_epoch"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "reservation_held_claims"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "reservation_held_truncated"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "reservation_held"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "config_source"
+      ],
+      "type": "string",
+      "enum": [
+        "store",
+        "lkg",
+        "none"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "store_reachable"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "store_last_read"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "default_reservation"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "default_max_tokens"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "wake_policy"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "band_weights"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "band_min_share_pct"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "critical_reserve_pct"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "band_wait_ms"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "band_queue_pct"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "shed_queue"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "tenant_wake"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "fc_effective",
+        "source",
+        "llmd_headers"
+      ],
+      "type": "string",
+      "enum": [
+        "rule",
+        "env",
+        "default"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "inflight"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "queued"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "wait_ms"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "queue_pct"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "min_share_pct"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "floor_units"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "weight"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "FcBandEffective",
+      "property_path": [
+        "weight_pct"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "AIObjectiveEntry",
+      "property_path": [
+        "name"
+      ],
+      "type": "string",
+      "required": true
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "AIObjectiveEntry",
+      "property_path": [
+        "services"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "AIObjectiveEntry",
+      "property_path": [
+        "priority"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "AIObjectiveEntry",
+      "property_path": [
+        "updated_at"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "name"
+      ],
+      "type": "string",
+      "required": true
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "match"
+      ],
+      "type": "object",
+      "required": true
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "match",
+        "cidr"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "match",
+        "ingress_if"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "match",
+        "vlan"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "match",
+        "vni"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "match",
+        "ipsec_tunnel"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "services"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "tenant"
+      ],
+      "type": "string",
+      "required": true
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "allowed_models"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "enforce"
+      ],
+      "type": "string",
+      "enum": [
+        "advisory",
+        "strict"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "credential"
+      ],
+      "type": "string",
+      "enum": [
+        "none",
+        "network"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "forward_identity"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "priority_class"
+      ],
+      "type": "string",
+      "enum": [
+        "standard",
+        "critical",
+        "sheddable"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "NetIdentityEntry",
+      "property_path": [
+        "fail_mode"
+      ],
+      "type": "string",
+      "enum": [
+        "neutral",
+        "closed"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeyCreateRequest",
+      "property_path": [
+        "priority_class"
+      ],
+      "type": "string",
+      "enum": [
+        "standard",
+        "critical",
+        "sheddable"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeyCreateRequest",
+      "property_path": [
+        "default_objective"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeyCreateRequest",
+      "property_path": [
+        "allowed_objectives"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "priority_class"
+      ],
+      "type": "string",
+      "enum": [
+        "standard",
+        "critical",
+        "sheddable"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "default_objective"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "allowed_objectives"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "TenantRateLimitMod",
+      "property_path": [
+        "priority_class"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "TenantRateLimitMod",
+      "property_path": [
+        "default_objective"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "TenantRateLimitMod",
+      "property_path": [
+        "allowed_objectives"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "TenantRateLimitEntry",
+      "property_path": [
+        "priority_class"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "TenantRateLimitEntry",
+      "property_path": [
+        "default_objective"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "TenantRateLimitEntry",
+      "property_path": [
+        "allowed_objectives"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "VersionGetEntry",
+      "property_path": [
+        "features"
+      ],
+      "type": "array"
     }
   ],
   "model": "general"

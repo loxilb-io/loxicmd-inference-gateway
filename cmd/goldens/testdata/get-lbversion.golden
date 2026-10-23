@@ -3,4 +3,5 @@ exit=0
 | PRODUCT | LOXILB VERSION | LOXILB BUILD INFO |
 |---------|----------------|-------------------|
 | loxilb  |                |                   |
+features: -
 --- stderr ---

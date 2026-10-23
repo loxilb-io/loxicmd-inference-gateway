@@ -142,6 +142,26 @@ printf '%s' "$EXISTING_API_KEY" | ./loxicmd create apikey \
   --burst-pct=125 --model-limit=llama-70b=1200 --model-limit=mistral-7b=800
 ./loxicmd get ratelimit tenant-a
 
+# Priority on keys and tenants: the cap, the default objective, the allowed hints
+./loxicmd set ratelimit --tenant-id=tenant-a --priority-class=critical \
+  --default-objective=interactive --allowed-objectives=interactive,batch
+./loxicmd set apikey <key-id> --priority-class=sheddable
+
+# Objectives (named request priorities) and network-identity bindings
+./loxicmd create objective interactive --priority=10
+./loxicmd get objective
+./loxicmd create netidentity lab --tenant=tenant-a --cidr=10.10.0.0/16
+./loxicmd get netidentity -o wide
+
+# Priority bands on a service, and the per-band state the gate reports
+./loxicmd create lb 192.0.2.20 --tcp=2020:8000 --mode=fullproxy --fc-mode=enforce \
+  --fc-max-outstanding=8 --fc-wake-policy=weighted --fc-band-weights=8:3:1 \
+  --fc-critical-reserve-pct=10 --endpoints=203.0.113.1:1
+./loxicmd get lb --bands
+
+# What the gateway advertises (commands that need a feature check this first)
+./loxicmd get lbversion
+
 # Opt a fullproxy service into X-Api-Key enforcement (disabled by default)
 ./loxicmd create lb 192.0.2.20 --tcp=2020:8000 --mode=fullproxy \
   --model-name=llama-70b --api-key-auth=required --cb-enable \
@@ -215,6 +235,18 @@ The full, swagger-traceable reference lives in **[docs/COMMANDS.md](docs/COMMAND
 | `--timeout` | `-t` | request timeout in seconds |
 
 Run `./loxicmd help` or `./loxicmd <command> --help` for full details.
+
+### Command table (inference gateway at 7a58e59)
+
+| Command | Gateway path | Notes |
+|---|---|---|
+| `create lb` | `POST /config/loadbalancer` | twelve priority band / reservation flags (`--fc-wake-policy`, `--fc-band-weights`, `--fc-band-min-share-pct`, `--fc-band-queue-pct`, `--fc-band-wait-ms`, `--fc-critical-reserve-pct`, `--fc-shed-queue`, `--fc-tenant-wake`, `--fc-llmd-headers`, `--ai-default-reservation`, `--ai-default-max-tokens`, `--ai-objective-strict`); create or replace, no `set lb` |
+| `get lb` | `GET /config/loadbalancer/all` | `-o wide` adds the Bands column, `--bands` the per-band table, `-o json` the whole `fc_effective` |
+| `create apikey`, `set apikey`, `get apikey -o wide` | `/config/ai/apikey` (+ PATCH) | `--priority-class`, `--default-objective`, `--allowed-objectives` |
+| `set ratelimit`, `get ratelimit -o wide` | `/config/ai/tenant/ratelimit` | the same three flags; a class flag alone leaves the limits |
+| `create objective`, `get objective`, `delete objective` | `POST`/`GET /config/ai/objective`, `DELETE /config/ai/objective/{name}` | no `set`: the gateway has no PUT or PATCH, POST replaces |
+| `create netidentity`, `get netidentity`, `delete netidentity` | `POST`/`GET /config/ai/netidentity`, `DELETE /config/ai/netidentity/{name}` | no `set`, as above |
+| `get lbversion` | `GET /version` | prints `features`; exit `9` `FEATURE_UNAVAILABLE` when a command's feature is not offered ([contracts/exit-codes.md](contracts/exit-codes.md)) |
 
 ## Community & Governance
 

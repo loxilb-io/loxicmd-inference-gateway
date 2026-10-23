@@ -41,52 +41,72 @@ func TestExitTaxonomy(t *testing.T) {
 		wantExit int
 		// wantStderr must appear on stderr — the only failure stream.
 		wantStderr string
+		// version, when given, is what GET /version answers (the feature
+		// gate reads it before the command sends).
+		version string
 	}{
-		{"missing-args-is-usage", []string{"delete", "vlan"}, http.StatusOK, successBody, 2, "Error:"},
-		{"invalid-value-is-usage", []string{"delete", "vlan", "not-a-vid"}, http.StatusOK, successBody, 2, "not valid"},
-		{"unknown-flag-is-usage", []string{"delete", "vlan", "100", "--frobnicate"}, http.StatusOK, successBody, 2, "unknown flag"},
-		{"unknown-subcommand-is-usage", []string{"delete", "vlans", "100"}, http.StatusOK, successBody, 2, "unknown command"},
-		{"unauthorized-is-auth", []string{"delete", "vlan", "100"}, http.StatusUnauthorized, `{}`, 3, "401"},
-		{"absent-target-is-precondition", []string{"delete", "vlan", "100"}, http.StatusNotFound, `{}`, 4, "404"},
-		{"refusing-service-is-unavailable", []string{"delete", "vlan", "100"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
-		{"peer-validation-is-contract-mismatch", []string{"delete", "vlan", "100"}, http.StatusBadRequest, `{}`, 6, "400"},
-		{"server-error-is-failed", []string{"delete", "vlan", "100"}, http.StatusInternalServerError, `{}`, 7, "500"},
-		{"unreachable-is-unavailable", []string{"delete", "vlan", "100"}, 0, "", 5, "Error:"},
+		{"missing-args-is-usage", []string{"delete", "vlan"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"invalid-value-is-usage", []string{"delete", "vlan", "not-a-vid"}, http.StatusOK, successBody, 2, "not valid", ""},
+		{"unknown-flag-is-usage", []string{"delete", "vlan", "100", "--frobnicate"}, http.StatusOK, successBody, 2, "unknown flag", ""},
+		{"unknown-subcommand-is-usage", []string{"delete", "vlans", "100"}, http.StatusOK, successBody, 2, "unknown command", ""},
+		{"unauthorized-is-auth", []string{"delete", "vlan", "100"}, http.StatusUnauthorized, `{}`, 3, "401", ""},
+		{"absent-target-is-precondition", []string{"delete", "vlan", "100"}, http.StatusNotFound, `{}`, 4, "404", ""},
+		{"refusing-service-is-unavailable", []string{"delete", "vlan", "100"}, http.StatusServiceUnavailable, `{}`, 5, "503", ""},
+		{"peer-validation-is-contract-mismatch", []string{"delete", "vlan", "100"}, http.StatusBadRequest, `{}`, 6, "400", ""},
+		{"server-error-is-failed", []string{"delete", "vlan", "100"}, http.StatusInternalServerError, `{}`, 7, "500", ""},
+		{"unreachable-is-unavailable", []string{"delete", "vlan", "100"}, 0, "", 5, "Error:", ""},
 
 		// The create family rides the same table after its own
 		// conversion; one row per failure class it can produce.
-		{"create-missing-args-is-usage", []string{"create", "vlan"}, http.StatusOK, successBody, 2, "Error:"},
-		{"create-invalid-value-is-usage", []string{"create", "vlan", "not-a-vid"}, http.StatusOK, successBody, 2, "Error:"},
-		{"create-unknown-subcommand-is-usage", []string{"create", "vlans", "100"}, http.StatusOK, successBody, 2, "unknown command"},
-		{"create-bare-parent-is-usage", []string{"create"}, http.StatusOK, successBody, 2, "Error:"},
-		{"create-unauthorized-is-auth", []string{"create", "vlan", "100"}, http.StatusUnauthorized, `{}`, 3, "401"},
-		{"create-refusing-service-is-unavailable", []string{"create", "vlan", "100"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
-		{"create-peer-validation-is-contract-mismatch", []string{"create", "vlan", "100"}, http.StatusBadRequest, `{}`, 6, "400"},
-		{"create-server-error-is-failed", []string{"create", "vlan", "100"}, http.StatusInternalServerError, `{}`, 7, "500"},
-		{"create-unreachable-is-unavailable", []string{"create", "vlan", "100"}, 0, "", 5, "Error:"},
-		{"create-missing-required-flag-is-usage", []string{"create", "sni"}, http.StatusOK, successBody, 2, "Error:"},
-		{"create-cobra-required-flag-is-usage", []string{"create", "firewall"}, http.StatusOK, successBody, 2, "required flag"},
-		{"create-unreadable-file-is-precondition", []string{"create", "cert", "--cert-file=/nonexistent/no.crt", "--key-file=/nonexistent/no.key"}, http.StatusOK, successBody, 4, "reading --cert-file"},
+		{"create-missing-args-is-usage", []string{"create", "vlan"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"create-invalid-value-is-usage", []string{"create", "vlan", "not-a-vid"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"create-unknown-subcommand-is-usage", []string{"create", "vlans", "100"}, http.StatusOK, successBody, 2, "unknown command", ""},
+		{"create-bare-parent-is-usage", []string{"create"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"create-unauthorized-is-auth", []string{"create", "vlan", "100"}, http.StatusUnauthorized, `{}`, 3, "401", ""},
+		{"create-refusing-service-is-unavailable", []string{"create", "vlan", "100"}, http.StatusServiceUnavailable, `{}`, 5, "503", ""},
+		{"create-peer-validation-is-contract-mismatch", []string{"create", "vlan", "100"}, http.StatusBadRequest, `{}`, 6, "400", ""},
+		{"create-server-error-is-failed", []string{"create", "vlan", "100"}, http.StatusInternalServerError, `{}`, 7, "500", ""},
+		{"create-unreachable-is-unavailable", []string{"create", "vlan", "100"}, 0, "", 5, "Error:", ""},
+		{"create-missing-required-flag-is-usage", []string{"create", "sni"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"create-cobra-required-flag-is-usage", []string{"create", "firewall"}, http.StatusOK, successBody, 2, "required flag", ""},
+		{"create-unreadable-file-is-precondition", []string{"create", "cert", "--cert-file=/nonexistent/no.crt", "--key-file=/nonexistent/no.key"}, http.StatusOK, successBody, 4, "reading --cert-file", ""},
 
 		// The get, set, and apply families ride the same table after
 		// their conversion. The get family's non-200 fallthrough used to
 		// exit zero silently; these rows pin that it cannot again.
-		{"get-bare-parent-is-usage", []string{"get"}, http.StatusOK, `{}`, 2, "Error:"},
-		{"get-unknown-subcommand-is-usage", []string{"get", "vlans"}, http.StatusOK, `{}`, 2, "unknown command"},
-		{"get-missing-args-is-usage", []string{"get", "cert"}, http.StatusOK, `{}`, 2, "Error:"},
-		{"get-unauthorized-is-auth", []string{"get", "vlan"}, http.StatusUnauthorized, `{}`, 3, "401"},
-		{"get-absent-target-is-precondition", []string{"get", "vlan"}, http.StatusNotFound, `{}`, 4, "404"},
-		{"get-refusing-service-is-unavailable", []string{"get", "vlan"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
-		{"get-server-error-is-failed", []string{"get", "vlan"}, http.StatusInternalServerError, `{}`, 7, "500"},
-		{"get-unreachable-is-unavailable", []string{"get", "vlan"}, 0, "", 5, "Error:"},
-		{"get-v2-error-is-classified", []string{"get", "opa"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
-		{"set-bare-parent-is-usage", []string{"set"}, http.StatusOK, successBody, 2, "Error:"},
-		{"set-missing-mode-flag-is-usage", []string{"set", "gpu"}, http.StatusOK, successBody, 2, "Error:"},
-		{"set-unauthorized-is-auth", []string{"set", "metrics", "--enable"}, http.StatusUnauthorized, `{}`, 3, "401"},
-		{"set-v2-error-is-classified", []string{"set", "gpu", "--enable"}, http.StatusServiceUnavailable, `{}`, 5, "503"},
-		{"set-server-error-is-failed", []string{"set", "log-level", "debug"}, http.StatusInternalServerError, `{}`, 7, "500"},
-		{"set-unreachable-is-unavailable", []string{"set", "log-level", "debug"}, 0, "", 5, "Error:"},
-		{"apply-no-options-is-usage", []string{"apply"}, http.StatusOK, successBody, 2, "Error:"},
+		{"get-bare-parent-is-usage", []string{"get"}, http.StatusOK, `{}`, 2, "Error:", ""},
+		{"get-unknown-subcommand-is-usage", []string{"get", "vlans"}, http.StatusOK, `{}`, 2, "unknown command", ""},
+		{"get-missing-args-is-usage", []string{"get", "cert"}, http.StatusOK, `{}`, 2, "Error:", ""},
+		{"get-unauthorized-is-auth", []string{"get", "vlan"}, http.StatusUnauthorized, `{}`, 3, "401", ""},
+		{"get-absent-target-is-precondition", []string{"get", "vlan"}, http.StatusNotFound, `{}`, 4, "404", ""},
+		{"get-refusing-service-is-unavailable", []string{"get", "vlan"}, http.StatusServiceUnavailable, `{}`, 5, "503", ""},
+		{"get-server-error-is-failed", []string{"get", "vlan"}, http.StatusInternalServerError, `{}`, 7, "500", ""},
+		{"get-unreachable-is-unavailable", []string{"get", "vlan"}, 0, "", 5, "Error:", ""},
+		{"get-v2-error-is-classified", []string{"get", "opa"}, http.StatusServiceUnavailable, `{}`, 5, "503", ""},
+		{"set-bare-parent-is-usage", []string{"set"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"set-missing-mode-flag-is-usage", []string{"set", "gpu"}, http.StatusOK, successBody, 2, "Error:", ""},
+		{"set-unauthorized-is-auth", []string{"set", "metrics", "--enable"}, http.StatusUnauthorized, `{}`, 3, "401", ""},
+		{"set-v2-error-is-classified", []string{"set", "gpu", "--enable"}, http.StatusServiceUnavailable, `{}`, 5, "503", ""},
+		{"set-server-error-is-failed", []string{"set", "log-level", "debug"}, http.StatusInternalServerError, `{}`, 7, "500", ""},
+		{"set-unreachable-is-unavailable", []string{"set", "log-level", "debug"}, 0, "", 5, "Error:", ""},
+		{"apply-no-options-is-usage", []string{"apply"}, http.StatusOK, successBody, 2, "Error:", ""},
+
+		// FEATURE_UNAVAILABLE (exit 9), one row per trigger: a peer that is
+		// not a loxilb-inference-gateway; the gateway's router refusing the
+		// feature's path; and the reserved one, a gateway that does not
+		// advertise the token, which today warns and sends.
+		{"create-lb-bad-triple-is-usage", []string{"create", "lb", "192.0.2.20", "--tcp=8000:8000", "--endpoints=203.0.113.1:1", "--fc-band-weights=8:3"}, http.StatusOK, successBody, 2, "not three whole numbers", gatewayVersionBody},
+		{"create-lb-band-range-is-usage", []string{"create", "lb", "192.0.2.20", "--tcp=8000:8000", "--endpoints=203.0.113.1:1", "--fc-critical-reserve-pct=101"}, http.StatusOK, successBody, 2, "within 0..100", gatewayVersionBody},
+		{"create-lb-band-400-is-verbatim", []string{"create", "lb", "192.0.2.20", "--tcp=8000:8000", "--endpoints=203.0.113.1:1", "--fc-wake-policy=weighted", "--fc-band-weights=8:0:1"}, http.StatusBadRequest,
+			`{"code":400,"fields":["fc_band_weights"],"message":"Malformed arguments for API call","result":"fc_wake_policy weighted needs fc_band_weights of at least 1 for every band"}`, 6, `"result":"fc_wake_policy weighted needs fc_band_weights of at least 1 for every band"`, gatewayVersionBody},
+		{"feature-not-a-gateway-is-feature-unavailable", []string{"create", "objective", "batch"}, http.StatusOK, `{"version":"0.9.8"}`, 9, "does not advertise objectives", ""},
+		{"feature-not-a-gateway-lb-flag-is-feature-unavailable", []string{"create", "lb", "192.0.2.20", "--tcp=8000:8000", "--endpoints=203.0.113.1:1", "--fc-wake-policy=strict"}, http.StatusOK, successBody, 9, "does not advertise bands", ""},
+		{"feature-path-404-is-feature-unavailable", []string{"get", "netidentity"}, http.StatusNotFound,
+			`{"code":404,"message":"path /netlox/v1/config/ai/netidentity was not found"}`, 9, "does not advertise netidentity", gatewayVersionBody},
+		{"feature-item-404-is-precondition", []string{"delete", "objective", "nope"}, http.StatusNotFound,
+			`{"code":404,"message":"Resource not found"}`, 4, "404", gatewayVersionBody},
+		{"feature-missing-token-warns-and-sends", []string{"create", "objective", "batch"}, http.StatusBadRequest,
+			`{"code":400,"fields":["name"],"message":"Malformed arguments for API call","result":"name: must not begin with tier:"}`, 6, "warning: gateway does not advertise objectives", gatewayVersionBody},
 	}
 
 	for _, tc := range cases {
@@ -98,7 +118,7 @@ func TestExitTaxonomy(t *testing.T) {
 				host, port = gw.hostPort(t)
 				gw.server.Close()
 			} else {
-				gw := newFakeGateway(t, tc.status, tc.body)
+				gw := newFakeGatewayVersioned(t, tc.status, tc.body, tc.version)
 				host, port = gw.hostPort(t)
 			}
 			args := append([]string{"-s", host, "-p", port}, tc.args...)

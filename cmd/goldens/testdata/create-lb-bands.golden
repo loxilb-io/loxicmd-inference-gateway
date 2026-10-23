@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+Success
+--- stderr ---
+warning: gateway does not advertise bands; sending anyway, the gateway's answer decides
+warning: gateway does not advertise reservation; sending anyway, the gateway's answer decides
+warning: gateway does not advertise objectives; sending anyway, the gateway's answer decides

@@ -90,6 +90,46 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   `timeoutMemberData`, `timeoutTcpInspect`) and TLS hardening values
   (`alpn_protocols`, `tls_ciphers`, `tls_versions`), which the gateway now
   reports.
+- Gateway sync with loxilb-inference-gateway 7a58e59 (the consumed contract
+  is pinned to it):
+  - `create lb` takes the priority bands and the default reservation:
+    `--fc-wake-policy`, `--fc-band-weights`, `--fc-band-min-share-pct`,
+    `--fc-band-queue-pct`, `--fc-band-wait-ms` (band triples in the gateway's
+    `critical:standard:sheddable` form, `0:0:0` resets),
+    `--fc-critical-reserve-pct`, `--fc-shed-queue`, `--fc-tenant-wake`,
+    `--fc-llmd-headers`, `--ai-default-reservation`, `--ai-default-max-tokens`
+    and `--ai-objective-strict`. Validation is format only (enum membership,
+    each value's own range); the rules between values are the gateway's 400,
+    printed with the body as received. `get lb -o wide` adds a Bands column
+    (the wake policy as configured beside the one the gate runs, with the
+    gateway's reason), `get lb --bands` prints the per-band table (inflight,
+    queued, wait window, queue share, floor, weight, sources), and `-o json`
+    carries the whole extended `fc_effective` (bands, reservation counters and
+    held claims, class config source, key-store state). A value the gateway
+    did not report prints `-`, never `0`.
+  - `create apikey`, `set apikey` and `set ratelimit` take `--priority-class`
+    (the cap), `--default-objective` and `--allowed-objectives`; `get apikey
+    -o wide` and `get ratelimit -o wide` show them. On the update paths an
+    empty value clears the stored one and an omitted flag keeps it.
+  - `create|get|delete objective` (`/config/ai/objective`) and
+    `create|get|delete netidentity` (`/config/ai/netidentity`), modelled on
+    the swagger definitions field for field. Neither has a `set`: the gateway
+    offers POST (create or replace), GET and DELETE only.
+  - `get lbversion` prints the feature tokens the gateway advertises
+    (`VersionGetEntry.features`).
+  - Exit `9` `FEATURE_UNAVAILABLE` ([contracts/exit-codes.md](contracts/exit-codes.md)):
+    a command that needs a gateway feature reads `/version` first and refuses,
+    sending nothing, when the peer is not a loxilb-inference-gateway, or when
+    the gateway answers 404 for the objective or netidentity path itself. A
+    gateway that does not advertise the feature's token gets one stderr
+    warning and the request is sent, since gateways up to 7a58e59 advertise
+    only `api_key_auth` and `jwt_auth_profile`.
+
+### Changed
+- `create lb`, `create apikey`, `set apikey`, `set ratelimit` and the
+  objective and netidentity commands print a 400 with the gateway's body as
+  received, so the field it names and the reason it gives are shown, not only
+  its generic message.
 
 ### Deprecated
 - `--token`: the literal token is visible in shell history and process

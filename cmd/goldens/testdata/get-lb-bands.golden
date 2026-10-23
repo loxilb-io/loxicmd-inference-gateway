@@ -1,0 +1,11 @@
+exit=0
+--- stdout ---
+chat 192.0.2.20:8000/tcp  wake policy: weighted (effective: strict, reason: zero_weight)  shed queue: on  tenant wake: fifo  critical reserve: 10% (1 units)  config source: store
+|   BAND    | INFLIGHT | QUEUED | WAIT(MS) | QUEUE % | MIN SHARE % | FLOOR UNITS | WEIGHT | WEIGHT % |             SOURCE             |
+|           |          |        |          |         |             |             |        |          |   (WEIGHT/FLOOR/WAIT/QUEUE)    |
+|-----------|----------|--------|----------|---------|-------------|-------------|--------|----------|--------------------------------|
+| critical  |        1 |      0 |        0 |       0 |           0 |           0 |      8 |       89 | rule/default/env/default       |
+| standard  |        3 |      2 |     5000 |      50 |          20 |           2 |      0 |        0 | rule/default/env/default       |
+| sheddable |        0 |      0 |     1000 |      20 |           0 |           0 |      1 |       11 | rule/default/env/default       |
+--- stderr ---
+warning: gateway does not advertise bands; sending anyway, the gateway's answer decides
