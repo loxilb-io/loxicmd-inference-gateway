@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
@@ -31,22 +32,31 @@ import (
 func NewSetAPIKeyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	var allowedModels []string
 	var enabled bool
+	var priorityClass, defaultObjective string
+	var allowedObjectives []string
 
 	var setAPIKeyCmd = &cobra.Command{
-		Use:   "apikey <KEY-ID> [--allowed-models=<m>,] [--enabled]",
+		Use:   "apikey <KEY-ID> [--allowed-models=<m>,] [--enabled] [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,]",
 		Short: "Update an inference-gateway API key",
-		Long: `Update the allowed model list and/or enabled state of an API key (PATCH).
-Only the flags you set are changed.
+		Long: `Update the allowed model list, enabled state and/or priority of an API key
+(PATCH). Only the flags you set are changed; an empty --priority-class,
+--default-objective or --allowed-objectives clears the stored value.
 
 ex)
 	loxicmd set apikey lxb_abc123 --allowed-models=mistral-7b
-	loxicmd set apikey lxb_abc123 --enabled=false`,
+	loxicmd set apikey lxb_abc123 --enabled=false
+	loxicmd set apikey lxb_abc123 --priority-class=critical --default-objective=batch`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return exitcode.Usagef("set apikey needs <KEY-ID> arg")
 			}
-			if !cmd.Flags().Changed("allowed-models") && !cmd.Flags().Changed("enabled") {
-				return exitcode.Usagef("set at least one of --allowed-models or --enabled")
+			if !cmd.Flags().Changed("allowed-models") && !cmd.Flags().Changed("enabled") &&
+				!cmd.Flags().Changed("priority-class") && !cmd.Flags().Changed("default-objective") &&
+				!cmd.Flags().Changed("allowed-objectives") {
+				return exitcode.Usagef("set at least one of --allowed-models, --enabled, --priority-class, --default-objective or --allowed-objectives")
+			}
+			if cmd.Flags().Changed("priority-class") && priorityClass != "" && !api.IsPriorityClass(priorityClass) {
+				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
 			}
 			req := api.AIApiKeyPatchRequest{}
 			if cmd.Flags().Changed("allowed-models") {
@@ -55,6 +65,16 @@ ex)
 			if cmd.Flags().Changed("enabled") {
 				e := enabled
 				req.Enabled = &e
+			}
+			if cmd.Flags().Changed("priority-class") {
+				req.PriorityClass = &priorityClass
+			}
+			if cmd.Flags().Changed("default-objective") {
+				req.DefaultObjective = &defaultObjective
+			}
+			if cmd.Flags().Changed("allowed-objectives") {
+				list := append([]string{}, allowedObjectives...)
+				req.AllowedObjectives = &list
 			}
 
 			client := api.NewLoxiClient(restOptions)
@@ -81,5 +101,8 @@ ex)
 	}
 	setAPIKeyCmd.Flags().StringSliceVar(&allowedModels, "allowed-models", allowedModels, "Replacement allowed model list")
 	setAPIKeyCmd.Flags().BoolVar(&enabled, "enabled", true, "Enable or disable the key")
+	setAPIKeyCmd.Flags().StringVar(&priorityClass, "priority-class", "", "The highest priority class a request with this key may have: standard, critical or sheddable; empty clears it (no cap from the key)")
+	setAPIKeyCmd.Flags().StringVar(&defaultObjective, "default-objective", "", "The objective a request with this key gets when it names none; empty clears it")
+	setAPIKeyCmd.Flags().StringSliceVar(&allowedObjectives, "allowed-objectives", nil, "The objectives a request with this key may ask for by header, out of the ones its tenant allows; at most 64; empty clears the list")
 	return setAPIKeyCmd
 }

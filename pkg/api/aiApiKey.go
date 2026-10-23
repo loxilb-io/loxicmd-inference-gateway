@@ -33,6 +33,26 @@ type AIApiKeyCreateRequest struct {
 	TokensPerMin  int64    `json:"tokens_per_min,omitempty"`
 	ExpiresAt     string   `json:"expires_at,omitempty"`
 	Enabled       *bool    `json:"enabled,omitempty"`
+	// The key's priority: the highest class a request with it may have
+	// (a cap, never a raise), the objective it gets when it names none,
+	// and the objectives it may ask for by header, out of the tenant's.
+	PriorityClass     string   `json:"priority_class,omitempty"`
+	DefaultObjective  string   `json:"default_objective,omitempty"`
+	AllowedObjectives []string `json:"allowed_objectives,omitempty"`
+}
+
+// PriorityClasses are the priority classes a key, tenant, JWT profile or
+// network identity may cap a request at.
+var PriorityClasses = []string{"standard", "critical", "sheddable"}
+
+// IsPriorityClass reports whether s names one of PriorityClasses.
+func IsPriorityClass(s string) bool {
+	for _, c := range PriorityClasses {
+		if c == s {
+			return true
+		}
+	}
+	return false
 }
 
 // AIApiKeyCreateResponse is the 201 response. raw_key is the plaintext key and
@@ -55,11 +75,20 @@ type AIApiKeySummary struct {
 	CreatedAt     string   `json:"created_at"`
 	ExpiresAt     string   `json:"expires_at"`
 	Enabled       bool     `json:"enabled"`
+	// Absent when the key sets none.
+	PriorityClass     string   `json:"priority_class,omitempty"`
+	DefaultObjective  string   `json:"default_objective,omitempty"`
+	AllowedObjectives []string `json:"allowed_objectives,omitempty"`
 }
 
 // AIApiKeyPatchRequest is the PATCH /config/ai/apikey/{key_id} body
-// (swagger-extras raw middleware). Both fields optional.
+// (swagger-extras raw middleware). Every field is optional: omitted leaves
+// the stored value. The class fields are pointers because an empty string
+// (or an empty list) clears the stored value, while nil stays off the wire.
 type AIApiKeyPatchRequest struct {
-	AllowedModels []string `json:"allowed_models,omitempty"`
-	Enabled       *bool    `json:"enabled,omitempty"`
+	AllowedModels     []string  `json:"allowed_models,omitempty"`
+	Enabled           *bool     `json:"enabled,omitempty"`
+	PriorityClass     *string   `json:"priority_class,omitempty"`
+	DefaultObjective  *string   `json:"default_objective,omitempty"`
+	AllowedObjectives *[]string `json:"allowed_objectives,omitempty"`
 }

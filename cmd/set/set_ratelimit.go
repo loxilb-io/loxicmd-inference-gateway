@@ -36,13 +36,20 @@ type SetRateLimitOptions struct {
 	TokensPerMin int64
 	BurstPct     int64
 	ModelLimits  []string
+	// Priority: written only when its flag is given; an empty value clears.
+	PriorityClass        string
+	DefaultObjective     string
+	AllowedObjectives    []string
+	PriorityClassSet     bool
+	DefaultObjectiveSet  bool
+	AllowedObjectivesSet bool
 }
 
 func NewSetRateLimitCmd(restOptions *api.RESTOptions) *cobra.Command {
 	o := SetRateLimitOptions{}
 
 	var setRateLimitCmd = &cobra.Command{
-		Use:   "ratelimit --tenant-id=<tenant> [--rps=<n>] [--tokens-per-min=<n>] [--burst-pct=<n>] [--model-limit=<model>=<tokens>]...",
+		Use:   "ratelimit --tenant-id=<tenant> [--rps=<n>] [--tokens-per-min=<n>] [--burst-pct=<n>] [--model-limit=<model>=<tokens>]... [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,]",
 		Short: "Set a tenant's inference-gateway rate limit",
 		Long: `Create or update the rate limit for a tenant.
 
@@ -50,8 +57,14 @@ Tenant quotas are enforced for requests admitted through a load-balancer
 service configured with --api-key-auth=required. A model token value of zero
 removes that model-specific quota.
 
+The priority fields are written only when their flag is given, and a body
+that names one with no limit writes the class alone: a plain
+--priority-class leaves the limits as they are. An empty value clears the
+stored one.
+
 ex)
-	loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000`,
+	loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000
+	loxicmd set ratelimit --tenant-id=tenant-a --priority-class=critical --allowed-objectives=batch,interactive`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if o.TenantID == "" {
 				return exitcode.Usagef("--tenant-id is required")
@@ -66,10 +79,17 @@ ex)
 			if err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
+			o.PriorityClassSet = cmd.Flags().Changed("priority-class")
+			o.DefaultObjectiveSet = cmd.Flags().Changed("default-objective")
+			o.AllowedObjectivesSet = cmd.Flags().Changed("allowed-objectives")
+			if o.PriorityClassSet && o.PriorityClass != "" && !api.IsPriorityClass(o.PriorityClass) {
+				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
+			}
 			req := api.AITenantRateLimitMod{
 				TenantID: o.TenantID, Rps: o.Rps, TokensPerMin: o.TokensPerMin,
 				BurstPct: o.BurstPct, ModelLimits: modelLimits,
 			}
+			applyTenantPriority(&req, &o)
 
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -98,7 +118,28 @@ ex)
 	setRateLimitCmd.Flags().Int64Var(&o.TokensPerMin, "tokens-per-min", 0, "Tokens per minute")
 	setRateLimitCmd.Flags().Int64Var(&o.BurstPct, "burst-pct", 0, "Token-bucket capacity as a percent of tokens/min (0 = server default)")
 	setRateLimitCmd.Flags().StringArrayVar(&o.ModelLimits, "model-limit", nil, "Per-model token quota MODEL=TOKENS; repeatable; TOKENS=0 removes")
+	setRateLimitCmd.Flags().StringVar(&o.PriorityClass, "priority-class", "", "The highest priority class a request of this tenant may have: standard, critical or sheddable; empty clears it (a tenant that sets no class is held at standard)")
+	setRateLimitCmd.Flags().StringVar(&o.DefaultObjective, "default-objective", "", "The objective a request of this tenant gets when it names none, or one it may not use; empty clears it")
+	setRateLimitCmd.Flags().StringSliceVar(&o.AllowedObjectives, "allowed-objectives", nil, "The objectives a request of this tenant may raise itself to by header, and the body tiers (tier:priority, tier:fast, tier:flex); at most 64; empty clears the list")
 	return setRateLimitCmd
+}
+
+// applyTenantPriority puts the priority fields on the wire only when their
+// flag was given: nil stays off it so the stored value is kept, an empty
+// string or list is sent so it clears.
+func applyTenantPriority(req *api.AITenantRateLimitMod, o *SetRateLimitOptions) {
+	if o.PriorityClassSet {
+		v := o.PriorityClass
+		req.PriorityClass = &v
+	}
+	if o.DefaultObjectiveSet {
+		v := o.DefaultObjective
+		req.DefaultObjective = &v
+	}
+	if o.AllowedObjectivesSet {
+		list := append([]string{}, o.AllowedObjectives...)
+		req.AllowedObjectives = &list
+	}
 }
 
 func parseTenantModelLimits(values []string) ([]api.AITenantModelRateLimit, error) {

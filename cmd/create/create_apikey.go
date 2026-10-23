@@ -42,6 +42,10 @@ type CreateAPIKeyOptions struct {
 	Enabled       bool
 	APIKeyFile    string
 	APIKeyStdin   bool
+	// Priority: the cap, the default objective and the allowed hints.
+	PriorityClass     string
+	DefaultObjective  string
+	AllowedObjectives []string
 }
 
 const (
@@ -53,7 +57,7 @@ func NewCreateAPIKeyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	o := CreateAPIKeyOptions{}
 
 	var createAPIKeyCmd = &cobra.Command{
-		Use:   "apikey --tenant-id=<tenant> [--name=<name>] [--api-key-file=<path>|--api-key-stdin] [--allowed-models=<m>,] [--rps=<n>] [--burst=<n>] [--tokens-per-min=<n>] [--expires-at=<RFC3339>] [--enabled]",
+		Use:   "apikey --tenant-id=<tenant> [--name=<name>] [--api-key-file=<path>|--api-key-stdin] [--allowed-models=<m>,] [--rps=<n>] [--burst=<n>] [--tokens-per-min=<n>] [--expires-at=<RFC3339>] [--enabled] [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,]",
 		Short: "Create an inference-gateway API key",
 		Long: `Create a per-tenant inference-gateway API key.
 
@@ -72,6 +76,9 @@ ex)
 			if o.TenantID == "" {
 				return exitcode.Usagef("--tenant-id is required")
 			}
+			if o.PriorityClass != "" && !api.IsPriorityClass(o.PriorityClass) {
+				return exitcode.Invalidf("--priority-class must be one of %s", strings.Join(api.PriorityClasses, "|"))
+			}
 			importedKey, imported, err := readImportedAPIKey(&o, cmd.InOrStdin())
 			if err != nil {
 				return err
@@ -87,6 +94,10 @@ ex)
 				TokensPerMin:  o.TokensPerMin,
 				ExpiresAt:     o.ExpiresAt,
 				Enabled:       &enabled,
+				// Priority.
+				PriorityClass:     o.PriorityClass,
+				DefaultObjective:  o.DefaultObjective,
+				AllowedObjectives: o.AllowedObjectives,
 			}
 
 			client := api.NewLoxiClient(restOptions)
@@ -130,6 +141,9 @@ ex)
 	createAPIKeyCmd.Flags().BoolVar(&o.Enabled, "enabled", true, "Whether the key is enabled")
 	createAPIKeyCmd.Flags().StringVar(&o.APIKeyFile, "api-key-file", "", "Read an existing API key from a file")
 	createAPIKeyCmd.Flags().BoolVar(&o.APIKeyStdin, "api-key-stdin", false, "Read an existing API key from stdin")
+	createAPIKeyCmd.Flags().StringVar(&o.PriorityClass, "priority-class", "", "The highest priority class a request with this key may have: standard, critical or sheddable; it can only lower what the key's tenant allows (omitted: no cap from the key)")
+	createAPIKeyCmd.Flags().StringVar(&o.DefaultObjective, "default-objective", "", "The objective a request with this key gets when it names none, or one it may not use")
+	createAPIKeyCmd.Flags().StringSliceVar(&o.AllowedObjectives, "allowed-objectives", nil, "The objectives a request with this key may ask for by header, out of the ones its tenant allows; at most 64 (empty: the key narrows nothing)")
 
 	return createAPIKeyCmd
 }
