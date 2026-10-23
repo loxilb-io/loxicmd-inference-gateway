@@ -29,6 +29,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -364,6 +365,9 @@ ex)
 			if err := validateLBAIOptions(&o); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
 			}
+			if err := requireLBFeatures(restOptions, &o, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
 
 			ProtoPortpair := make(map[string][]string)
 			// TCP LoadBalancer
@@ -501,7 +505,13 @@ ex)
 					// --kv-hash-algo enum), classified by its status.
 					body, _ := io.ReadAll(resp.Body)
 					ce := exitcode.FromHTTPStatus("create lb", resp.StatusCode)
-					ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+					if resp.StatusCode == http.StatusBadRequest {
+						// The gateway's 400 names the field and the reason
+						// beside its message: printed as received.
+						ce.Message = api.NewAPIError(resp.StatusCode, body).Verbatim()
+					} else {
+						ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+					}
 					return ce
 				}
 				PrintCreateResult(resp, *restOptions)
@@ -1003,6 +1013,35 @@ func validateFcBandOptions(o *CreateLoadBalancerOptions) error {
 	}
 	if o.AiDefaultMaxTokens > aiDefaultTokenCeiling {
 		return fmt.Errorf("--ai-default-max-tokens must be within 0..%d", aiDefaultTokenCeiling)
+	}
+	return nil
+}
+
+// lbBandsRequested reports whether any priority band flag was given.
+func lbBandsRequested(o *CreateLoadBalancerOptions) bool {
+	return o.FcWakePolicy != "" || o.FcBandWeightsSet || o.FcBandMinSharePctSet || o.FcCriticalReservePctSet ||
+		o.FcBandWaitMsSet || o.FcBandQueuePctSet || o.FcShedQueue != "" || o.FcTenantWake != "" || o.FcLlmdHeaders != ""
+}
+
+// requireLBFeatures gates the band, reservation and objective flags on
+// what the gateway advertises (contracts/exit-codes.md, FEATURE_UNAVAILABLE):
+// a flag given for a feature the peer does not offer is refused before the
+// request; nothing is read when none is given.
+func requireLBFeatures(restOptions *api.RESTOptions, o *CreateLoadBalancerOptions, stderr io.Writer) error {
+	if lbBandsRequested(o) {
+		if err := featuregate.Require(restOptions, featuregate.Bands, stderr); err != nil {
+			return err
+		}
+	}
+	if o.AiDefaultReservation != "" || o.AiDefaultMaxTokensSet {
+		if err := featuregate.Require(restOptions, featuregate.Reservation, stderr); err != nil {
+			return err
+		}
+	}
+	if o.AiObjectiveStrictSet {
+		if err := featuregate.Require(restOptions, featuregate.Objectives, stderr); err != nil {
+			return err
+		}
 	}
 	return nil
 }

@@ -23,4 +23,11 @@ type LBVersionGet struct {
 	BuildInfo string `json:"buildInfo"`
 	Version   string `json:"version"`
 	Product   string `json:"product,omitempty"`
+	// Gateway-only capabilities this build implements, as stable tokens;
+	// absent on builds that predate the field.
+	Features []string `json:"features,omitempty"`
 }
+
+// GatewayProduct is what a loxilb-inference-gateway reports in product;
+// upstream loxilb and gateway builds predating the field omit it.
+const GatewayProduct = "loxilb-inference-gateway"

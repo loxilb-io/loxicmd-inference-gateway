@@ -24,6 +24,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -45,6 +46,9 @@ ex)
 			if len(args) > 1 {
 				return exitcode.Usagef("get netidentity takes at most one NAME")
 			}
+			if err := featuregate.Require(restOptions, featuregate.NetIdentity, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := aiContext(restOptions)
 			if cancel != nil {
@@ -57,9 +61,7 @@ ex)
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK {
-				ce := exitcode.FromHTTPStatus("get netidentity", resp.StatusCode)
-				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
-				return ce
+				return featuregate.Classify("get netidentity", featuregate.NetIdentity, resp.StatusCode, body)
 			}
 			list := api.NetIdentityList{}
 			if err := json.Unmarshal(body, &list); err != nil {

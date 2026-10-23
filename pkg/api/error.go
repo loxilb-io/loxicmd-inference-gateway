@@ -40,6 +40,16 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("server returned %d", e.StatusCode)
 }
 
+// Verbatim is the failure line with the body as the gateway sent it,
+// for answers whose detail lives beside the message (the gateway's 400
+// names the field in fields and the reason in result).
+func (e *APIError) Verbatim() string {
+	if e.Body == "" {
+		return fmt.Sprintf("server returned %d", e.StatusCode)
+	}
+	return fmt.Sprintf("server returned %d: %s", e.StatusCode, e.Body)
+}
+
 // errorMessageKeys are the fields, in priority order, that the various loxilb /
 // inference-gateway error envelopes use to carry a human-readable message.
 var errorMessageKeys = []string{

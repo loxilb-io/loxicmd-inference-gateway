@@ -25,6 +25,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -57,6 +58,11 @@ ex)
 			}
 			if cmd.Flags().Changed("priority-class") && priorityClass != "" && !api.IsPriorityClass(priorityClass) {
 				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
+			}
+			if cmd.Flags().Changed("priority-class") || cmd.Flags().Changed("default-objective") || cmd.Flags().Changed("allowed-objectives") {
+				if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+					return err
+				}
 			}
 			req := api.AIApiKeyPatchRequest{}
 			if cmd.Flags().Changed("allowed-models") {
@@ -93,6 +99,9 @@ ex)
 			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 				ce := exitcode.FromHTTPStatus("set apikey", resp.StatusCode)
 				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				if resp.StatusCode == http.StatusBadRequest {
+					ce.Message = api.NewAPIError(resp.StatusCode, body).Verbatim()
+				}
 				return ce
 			}
 			fmt.Printf("API key '%s' updated.\n", args[0])

@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 	"io"
 	"net/http"
 	"os"
@@ -46,8 +47,12 @@ with --servName), the per-band table the gateway reports in fc_effective:
 inflight, queued, wait window, queue share, floor and weight in force, with
 where each knob came from. -o json carries the whole fc_effective.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = cmd
 			_ = args
+			if bands {
+				if err := featuregate.Require(restOptions, featuregate.Bands, cmd.ErrOrStderr()); err != nil {
+					return err
+				}
+			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc

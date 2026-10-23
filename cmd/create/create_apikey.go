@@ -27,6 +27,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -79,6 +80,11 @@ ex)
 			if o.PriorityClass != "" && !api.IsPriorityClass(o.PriorityClass) {
 				return exitcode.Invalidf("--priority-class must be one of %s", strings.Join(api.PriorityClasses, "|"))
 			}
+			if o.PriorityClass != "" || o.DefaultObjective != "" || len(o.AllowedObjectives) > 0 {
+				if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+					return err
+				}
+			}
 			importedKey, imported, err := readImportedAPIKey(&o, cmd.InOrStdin())
 			if err != nil {
 				return err
@@ -115,6 +121,9 @@ ex)
 			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 				ce := exitcode.FromHTTPStatus("create apikey", resp.StatusCode)
 				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				if resp.StatusCode == http.StatusBadRequest {
+					ce.Message = api.NewAPIError(resp.StatusCode, body).Verbatim()
+				}
 				return ce
 			}
 

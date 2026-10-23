@@ -23,6 +23,7 @@ import (
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -84,7 +85,17 @@ func PrintGetVersionResult(resp *http.Response, o api.RESTOptions) error {
 
 	// Rendering the load balance data to table
 	TableShow(data, table)
+	fmt.Println(versionFeaturesLine(Versionresp.Features))
 	return nil
+}
+
+// versionFeaturesLine prints the feature tokens the gateway advertises,
+// "-" when it advertises none (a build that predates the field).
+func versionFeaturesLine(features []string) string {
+	if len(features) == 0 {
+		return "features: -"
+	}
+	return "features: " + strings.Join(features, ", ")
 }
 
 func lbProductDisplay(product string) string {

@@ -26,6 +26,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -85,6 +86,11 @@ ex)
 			if o.PriorityClassSet && o.PriorityClass != "" && !api.IsPriorityClass(o.PriorityClass) {
 				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
 			}
+			if o.PriorityClassSet || o.DefaultObjectiveSet || o.AllowedObjectivesSet {
+				if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+					return err
+				}
+			}
 			req := api.AITenantRateLimitMod{
 				TenantID: o.TenantID, Rps: o.Rps, TokensPerMin: o.TokensPerMin,
 				BurstPct: o.BurstPct, ModelLimits: modelLimits,
@@ -107,6 +113,9 @@ ex)
 			if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 				ce := exitcode.FromHTTPStatus("set ratelimit", resp.StatusCode)
 				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+				if resp.StatusCode == http.StatusBadRequest {
+					ce.Message = api.NewAPIError(resp.StatusCode, body).Verbatim()
+				}
 				return ce
 			}
 			fmt.Printf("Rate limit for tenant '%s' set.\n", o.TenantID)

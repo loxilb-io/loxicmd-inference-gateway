@@ -24,6 +24,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -60,6 +61,9 @@ ex)
 			}
 			entry := api.AIObjectiveEntry{Name: args[0], Priority: o.Priority, Services: o.Services}
 
+			if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := aiContext(restOptions)
 			if cancel != nil {
@@ -72,9 +76,7 @@ ex)
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-				ce := exitcode.FromHTTPStatus("create objective", resp.StatusCode)
-				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
-				return ce
+				return featuregate.Classify("create objective", featuregate.Objectives, resp.StatusCode, body)
 			}
 			return printOperationResult(cmd.OutOrStdout(), body, restOptions.PrintOption)
 		},

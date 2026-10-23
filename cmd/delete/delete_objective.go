@@ -22,6 +22,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -41,6 +42,9 @@ ex)
 			if len(args) != 1 {
 				return exitcode.Usagef("delete objective needs <NAME> arg")
 			}
+			if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+				return err
+			}
 			client := api.NewLoxiClient(restOptions)
 			ctx, cancel := aiContext(restOptions)
 			if cancel != nil {
@@ -53,9 +57,7 @@ ex)
 			defer resp.Body.Close()
 			body, _ := io.ReadAll(resp.Body)
 			if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
-				ce := exitcode.FromHTTPStatus("delete objective", resp.StatusCode)
-				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
-				return ce
+				return featuregate.Classify("delete objective", featuregate.Objectives, resp.StatusCode, body)
 			}
 			fmt.Fprintf(cmd.OutOrStdout(), "Objective '%s' deleted.\n", args[0])
 			return nil
