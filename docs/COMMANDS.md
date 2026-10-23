@@ -243,6 +243,10 @@ loxicmd get apikey --tenant-id=tenant-a          # list; raw_key/hash never show
 loxicmd get apikey <key-id>                       # one
 loxicmd set apikey <key-id> --allowed-models=mistral-7b   # PATCH
 loxicmd set apikey <key-id> --enabled=false
+# The three rate fields of the PATCH body (swagger-extras): a flag given is sent with
+# its value, 0 included (no per-key request limit / burst of one second's allowance /
+# no token quota); a flag not given keeps the stored value.
+loxicmd set apikey <key-id> --rate-limit-rps=20 --burst-size=40 --tokens-per-min=5000
 loxicmd delete apikey <key-id>
 
 # Tenant rate limit — swagger /config/ai/tenant/ratelimit   (cicd: ai-apikey)

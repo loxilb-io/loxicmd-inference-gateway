@@ -84,10 +84,16 @@ type AIApiKeySummary struct {
 // AIApiKeyPatchRequest is the PATCH /config/ai/apikey/{key_id} body
 // (swagger-extras raw middleware). Every field is optional: omitted leaves
 // the stored value. The class fields are pointers because an empty string
-// (or an empty list) clears the stored value, while nil stays off the wire.
+// (or an empty list) clears the stored value, while nil stays off the wire;
+// the three rate fields are pointers because zero is a value the swagger
+// gives a meaning to (no per-key limit, burst equal to one second's
+// allowance, no token quota), not "unset".
 type AIApiKeyPatchRequest struct {
 	AllowedModels     []string  `json:"allowed_models,omitempty"`
 	Enabled           *bool     `json:"enabled,omitempty"`
+	RateLimitRps      *int64    `json:"rate_limit_rps,omitempty"`
+	BurstSize         *int64    `json:"burst_size,omitempty"`
+	TokensPerMin      *int64    `json:"tokens_per_min,omitempty"`
 	PriorityClass     *string   `json:"priority_class,omitempty"`
 	DefaultObjective  *string   `json:"default_objective,omitempty"`
 	AllowedObjectives *[]string `json:"allowed_objectives,omitempty"`

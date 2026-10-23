@@ -111,6 +111,13 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
     (the cap), `--default-objective` and `--allowed-objectives`; `get apikey
     -o wide` and `get ratelimit -o wide` show them. On the update paths an
     empty value clears the stored one and an omitted flag keeps it.
+  - `set apikey` takes `--rate-limit-rps`, `--burst-size` and
+    `--tokens-per-min`, the three rate fields the swagger-extras
+    `PATCH /config/ai/apikey/{key_id}` body carries. A flag given goes on
+    the wire with its value, `0` included (the swagger gives zero a meaning:
+    no per-key request limit, a burst of one second's allowance, no token
+    quota); a flag not given keeps the stored value. Changing a key's limit
+    no longer means deleting and recreating the key.
   - `create|get|delete objective` (`/config/ai/objective`) and
     `create|get|delete netidentity` (`/config/ai/netidentity`), modelled on
     the swagger definitions field for field. Neither has a `set`: the gateway

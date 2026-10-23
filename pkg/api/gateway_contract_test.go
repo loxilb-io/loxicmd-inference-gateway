@@ -38,13 +38,33 @@ type gatewayContractOperation struct {
 	Methods []string `json:"methods"`
 }
 
+// gatewayContractField is one property this CLI reads or writes. It lives
+// either in a named definition (Definition) or in the inline body schema
+// of one operation (Body), as the swagger-extras PATCH bodies do; exactly
+// one of the two is set.
 type gatewayContractField struct {
-	Spec         string   `json:"spec"`
-	Definition   string   `json:"definition"`
-	PropertyPath []string `json:"property_path"`
-	Type         string   `json:"type"`
-	Enum         []string `json:"enum,omitempty"`
-	Required     bool     `json:"required,omitempty"`
+	Spec         string               `json:"spec"`
+	Definition   string               `json:"definition,omitempty"`
+	Body         *gatewayContractBody `json:"body,omitempty"`
+	PropertyPath []string             `json:"property_path"`
+	Type         string               `json:"type"`
+	Enum         []string             `json:"enum,omitempty"`
+	Required     bool                 `json:"required,omitempty"`
+}
+
+// gatewayContractBody names the operation whose body parameter's inline
+// schema holds the field.
+type gatewayContractBody struct {
+	Path   string `json:"path"`
+	Method string `json:"method"`
+}
+
+// where names the field's container for messages and the duplicate check.
+func (f gatewayContractField) where() string {
+	if f.Body != nil {
+		return f.Body.Method + " " + f.Body.Path + " body"
+	}
+	return f.Definition
 }
 
 func loadGatewayContractManifest(t *testing.T) gatewayContractManifest {
@@ -136,7 +156,10 @@ func TestGatewayContractManifest(t *testing.T) {
 	}
 	seen := make(map[string]bool)
 	for _, field := range manifest.Fields {
-		key := field.Spec + ":" + field.Definition + ":" + strings.Join(field.PropertyPath, ".")
+		if (field.Definition == "") == (field.Body == nil) {
+			t.Fatalf("contract field %s must name exactly one of definition and body", strings.Join(field.PropertyPath, "."))
+		}
+		key := field.Spec + ":" + field.where() + ":" + strings.Join(field.PropertyPath, ".")
 		if seen[key] {
 			t.Fatalf("duplicate contract field %s", key)
 		}
@@ -224,16 +247,22 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 
 	for _, field := range manifest.Fields {
 		spec := requireContractSpec(t, specs, field.Spec)
-		segments := []string{"definitions", field.Definition, "properties"}
+		var container map[interface{}]interface{}
+		if field.Body != nil {
+			container = contractBodySchema(t, spec, field.Body)
+		} else {
+			container = contractMapAt(t, spec, "definitions", field.Definition)
+		}
+		segments := []string{"properties"}
 		for i, property := range field.PropertyPath {
 			segments = append(segments, property)
 			if i != len(field.PropertyPath)-1 {
 				segments = append(segments, "properties")
 			}
 		}
-		node := contractMapAt(t, spec, segments...)
+		node := contractMapAt(t, container, segments...)
 		if got := fmt.Sprint(node["type"]); got != field.Type {
-			t.Errorf("%s %s.%s type=%q, want %q", field.Spec, field.Definition,
+			t.Errorf("%s %s.%s type=%q, want %q", field.Spec, field.where(),
 				strings.Join(field.PropertyPath, "."), got, field.Type)
 		}
 		if len(field.Enum) > 0 {
@@ -242,22 +271,47 @@ func TestGatewayContractAgainstCheckout(t *testing.T) {
 			sort.Strings(got)
 			sort.Strings(want)
 			if !reflect.DeepEqual(got, want) {
-				t.Errorf("%s %s.%s enum=%v, want %v", field.Spec, field.Definition,
+				t.Errorf("%s %s.%s enum=%v, want %v", field.Spec, field.where(),
 					strings.Join(field.PropertyPath, "."), got, want)
 			}
 		}
 		if field.Required {
 			if len(field.PropertyPath) != 1 {
 				t.Fatalf("required contract check only supports top-level properties: %s.%s",
-					field.Definition, strings.Join(field.PropertyPath, "."))
+					field.where(), strings.Join(field.PropertyPath, "."))
 			}
-			definition := contractMapAt(t, spec, "definitions", field.Definition)
+			definition := container
 			required := contractEnum(definition["required"])
 			if !containsContractValue(required, field.PropertyPath[0]) {
 				t.Errorf("%s %s.%s must be required", field.Spec, field.Definition, field.PropertyPath[0])
 			}
 		}
 	}
+}
+
+// contractBodySchema returns the inline schema of the operation's body
+// parameter (in: body), where the swagger-extras PATCH bodies keep their
+// properties instead of a named definition.
+func contractBodySchema(t *testing.T, spec map[interface{}]interface{}, body *gatewayContractBody) map[interface{}]interface{} {
+	t.Helper()
+	operation := contractMapAt(t, spec, "paths", body.Path, body.Method)
+	parameters, ok := operation["parameters"].([]interface{})
+	if !ok {
+		t.Fatalf("%s %s has no parameters", body.Method, body.Path)
+	}
+	for _, raw := range parameters {
+		parameter, ok := raw.(map[interface{}]interface{})
+		if !ok || parameter["in"] != "body" {
+			continue
+		}
+		schema, ok := parameter["schema"].(map[interface{}]interface{})
+		if !ok {
+			t.Fatalf("%s %s body parameter has no schema object", body.Method, body.Path)
+		}
+		return schema
+	}
+	t.Fatalf("%s %s has no body parameter", body.Method, body.Path)
+	return nil
 }
 
 func containsContractValue(values []string, want string) bool {

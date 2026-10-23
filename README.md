@@ -135,6 +135,7 @@ printf '%s' "$EXISTING_API_KEY" | ./loxicmd create apikey \
 ./loxicmd get apikey --tenant-id=tenant-a
 ./loxicmd set apikey <key-id> --allowed-models=mistral-7b     # PATCH
 ./loxicmd set apikey <key-id> --enabled=false
+./loxicmd set apikey <key-id> --rate-limit-rps=20 --burst-size=40 --tokens-per-min=5000
 ./loxicmd delete apikey <key-id>
 
 # Per-tenant rate limit, burst capacity, and model quota
@@ -247,7 +248,7 @@ Run `./loxicmd help` or `./loxicmd <command> --help` for full details.
 |---|---|---|
 | `create lb` | `POST /config/loadbalancer` | twelve priority band / reservation flags (`--fc-wake-policy`, `--fc-band-weights`, `--fc-band-min-share-pct`, `--fc-band-queue-pct`, `--fc-band-wait-ms`, `--fc-critical-reserve-pct`, `--fc-shed-queue`, `--fc-tenant-wake`, `--fc-llmd-headers`, `--ai-default-reservation`, `--ai-default-max-tokens`, `--ai-objective-strict`); create or replace, no `set lb` |
 | `get lb` | `GET /config/loadbalancer/all` | `-o wide` adds the Bands column, `--bands` the per-band table, `-o json` the whole `fc_effective` |
-| `create apikey`, `set apikey`, `get apikey -o wide` | `/config/ai/apikey` (+ PATCH) | `--priority-class`, `--default-objective`, `--allowed-objectives` |
+| `create apikey`, `set apikey`, `get apikey -o wide` | `/config/ai/apikey` (+ PATCH) | `--priority-class`, `--default-objective`, `--allowed-objectives`; `set apikey` also `--rate-limit-rps`, `--burst-size`, `--tokens-per-min` (a flag given is sent, `0` included; omitted keeps) |
 | `set ratelimit`, `get ratelimit -o wide` | `/config/ai/tenant/ratelimit` | the same three flags; a class flag alone leaves the limits |
 | `create objective`, `get objective`, `delete objective` | `POST`/`GET /config/ai/objective`, `DELETE /config/ai/objective/{name}` | no `set`: the gateway has no PUT or PATCH, POST replaces |
 | `create netidentity`, `get netidentity`, `delete netidentity` | `POST`/`GET /config/ai/netidentity`, `DELETE /config/ai/netidentity/{name}` | no `set`, as above |

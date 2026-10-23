@@ -35,6 +35,17 @@ func TestPriorityFieldsOnTheWire(t *testing.T) {
 	if string(b) != `{}` {
 		t.Fatalf("patch keep body %s", b)
 	}
+	// The three rate fields: a pointer to zero is sent as 0 (the swagger
+	// gives zero a meaning), nil stays off the wire.
+	zero, rps, tpm := int64(0), int64(20), int64(5000)
+	b, _ = json.Marshal(AIApiKeyPatchRequest{RateLimitRps: &rps, BurstSize: &zero, TokensPerMin: &tpm})
+	if string(b) != `{"rate_limit_rps":20,"burst_size":0,"tokens_per_min":5000}` {
+		t.Fatalf("patch rate body %s", b)
+	}
+	b, _ = json.Marshal(AIApiKeyPatchRequest{BurstSize: &zero})
+	if string(b) != `{"burst_size":0}` {
+		t.Fatalf("patch one rate body %s", b)
+	}
 
 	class := "critical"
 	b, _ = json.Marshal(AITenantRateLimitMod{TenantID: "t", PriorityClass: &class, AllowedObjectives: &none})

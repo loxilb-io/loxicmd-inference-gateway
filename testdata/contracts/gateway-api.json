@@ -1782,6 +1782,63 @@
     },
     {
       "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "rate_limit_rps"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "burst_size"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "tokens_per_min"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger-extras.yml",
+      "body": {
+        "path": "/config/ai/apikey/{key_id}",
+        "method": "patch"
+      },
+      "property_path": [
+        "rate_limit_rps"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger-extras.yml",
+      "body": {
+        "path": "/config/ai/apikey/{key_id}",
+        "method": "patch"
+      },
+      "property_path": [
+        "burst_size"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger-extras.yml",
+      "body": {
+        "path": "/config/ai/apikey/{key_id}",
+        "method": "patch"
+      },
+      "property_path": [
+        "tokens_per_min"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
       "definition": "TenantRateLimitMod",
       "property_path": [
         "priority_class"

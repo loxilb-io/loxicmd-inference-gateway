@@ -28,35 +28,59 @@ import (
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
+// SetAPIKeyOptions holds the values of the set apikey flags; which of them
+// were given is read from the flag set, since every one is optional and an
+// omitted flag leaves the stored value.
+type SetAPIKeyOptions struct {
+	AllowedModels     []string
+	Enabled           bool
+	RateLimitRps      int64
+	BurstSize         int64
+	TokensPerMin      int64
+	PriorityClass     string
+	DefaultObjective  string
+	AllowedObjectives []string
+}
+
+// setAPIKeyFlags are the patchable fields, in the swagger's order.
+var setAPIKeyFlags = []string{"allowed-models", "enabled", "rate-limit-rps", "burst-size", "tokens-per-min", "priority-class", "default-objective", "allowed-objectives"}
+
 func NewSetAPIKeyCmd(restOptions *api.RESTOptions) *cobra.Command {
-	var allowedModels []string
-	var enabled bool
-	var priorityClass, defaultObjective string
-	var allowedObjectives []string
+	o := SetAPIKeyOptions{}
 
 	var setAPIKeyCmd = &cobra.Command{
-		Use:   "apikey <KEY-ID> [--allowed-models=<m>,] [--enabled] [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,]",
+		Use:   "apikey <KEY-ID> [--allowed-models=<m>,] [--enabled] [--rate-limit-rps=<n>] [--burst-size=<n>] [--tokens-per-min=<n>] [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,]",
 		Short: "Update an inference-gateway API key",
-		Long: `Update the allowed model list, enabled state and/or priority of an API key
-(PATCH). Only the flags you set are changed; an empty --priority-class,
---default-objective or --allowed-objectives clears the stored value.
+		Long: `Update the allowed model list, enabled state, rate limits and/or priority
+of an API key (PATCH /config/ai/apikey/{key_id}). Only the flags you set
+are changed; an empty --priority-class, --default-objective or
+--allowed-objectives clears the stored value. A rate flag given as 0 is
+sent as 0, which the gateway reads as no per-key request limit, a burst
+equal to one second's allowance, or no per-key token quota; a rate flag
+not given keeps the stored value. The data plane rebuilds the key's bucket
+when the limit changes, so the next request is decided against the new
+value.
 
 ex)
 	loxicmd set apikey lxb_abc123 --allowed-models=mistral-7b
 	loxicmd set apikey lxb_abc123 --enabled=false
+	loxicmd set apikey lxb_abc123 --rate-limit-rps=20 --burst-size=40 --tokens-per-min=5000
 	loxicmd set apikey lxb_abc123 --priority-class=critical --default-objective=batch`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return exitcode.Usagef("set apikey needs <KEY-ID> arg")
 			}
-			if !cmd.Flags().Changed("allowed-models") && !cmd.Flags().Changed("enabled") &&
-				!cmd.Flags().Changed("priority-class") && !cmd.Flags().Changed("default-objective") &&
-				!cmd.Flags().Changed("allowed-objectives") {
-				return exitcode.Usagef("set at least one of --allowed-models, --enabled, --priority-class, --default-objective or --allowed-objectives")
+			given := false
+			for _, name := range setAPIKeyFlags {
+				given = given || cmd.Flags().Changed(name)
 			}
-			if cmd.Flags().Changed("priority-class") && priorityClass != "" && !api.IsPriorityClass(priorityClass) {
+			if !given {
+				return exitcode.Usagef("set at least one of --%s", strings.Join(setAPIKeyFlags, ", --"))
+			}
+			if cmd.Flags().Changed("priority-class") && o.PriorityClass != "" && !api.IsPriorityClass(o.PriorityClass) {
 				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
 			}
 			if cmd.Flags().Changed("priority-class") || cmd.Flags().Changed("default-objective") || cmd.Flags().Changed("allowed-objectives") {
@@ -64,24 +88,7 @@ ex)
 					return err
 				}
 			}
-			req := api.AIApiKeyPatchRequest{}
-			if cmd.Flags().Changed("allowed-models") {
-				req.AllowedModels = allowedModels
-			}
-			if cmd.Flags().Changed("enabled") {
-				e := enabled
-				req.Enabled = &e
-			}
-			if cmd.Flags().Changed("priority-class") {
-				req.PriorityClass = &priorityClass
-			}
-			if cmd.Flags().Changed("default-objective") {
-				req.DefaultObjective = &defaultObjective
-			}
-			if cmd.Flags().Changed("allowed-objectives") {
-				list := append([]string{}, allowedObjectives...)
-				req.AllowedObjectives = &list
-			}
+			req := apiKeyPatch(cmd.Flags(), &o)
 
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
@@ -108,10 +115,53 @@ ex)
 			return nil
 		},
 	}
-	setAPIKeyCmd.Flags().StringSliceVar(&allowedModels, "allowed-models", allowedModels, "Replacement allowed model list")
-	setAPIKeyCmd.Flags().BoolVar(&enabled, "enabled", true, "Enable or disable the key")
-	setAPIKeyCmd.Flags().StringVar(&priorityClass, "priority-class", "", "The highest priority class a request with this key may have: standard, critical or sheddable; empty clears it (no cap from the key)")
-	setAPIKeyCmd.Flags().StringVar(&defaultObjective, "default-objective", "", "The objective a request with this key gets when it names none; empty clears it")
-	setAPIKeyCmd.Flags().StringSliceVar(&allowedObjectives, "allowed-objectives", nil, "The objectives a request with this key may ask for by header, out of the ones its tenant allows; at most 64; empty clears the list")
+	f := setAPIKeyCmd.Flags()
+	f.StringSliceVar(&o.AllowedModels, "allowed-models", nil, "Replacement allowed model list")
+	f.BoolVar(&o.Enabled, "enabled", true, "Enable or disable the key")
+	f.Int64Var(&o.RateLimitRps, "rate-limit-rps", 0, "Requests per second allowed on this key; 0 is an explicit no per-key request limit, not unset")
+	f.Int64Var(&o.BurstSize, "burst-size", 0, "Bucket capacity for --rate-limit-rps; 0 means the enforcement path falls back to the rate as the capacity, so burst equals one second's allowance")
+	f.Int64Var(&o.TokensPerMin, "tokens-per-min", 0, "LLM tokens per minute allowed on this key; 0 is an explicit no per-key token quota. Enforced post-hoc: a charge that puts the bucket in debt denies the next request, not the one in flight")
+	f.StringVar(&o.PriorityClass, "priority-class", "", "The highest priority class a request with this key may have: standard, critical or sheddable; empty clears it (no cap from the key)")
+	f.StringVar(&o.DefaultObjective, "default-objective", "", "The objective a request with this key gets when it names none; empty clears it")
+	f.StringSliceVar(&o.AllowedObjectives, "allowed-objectives", nil, "The objectives a request with this key may ask for by header, out of the ones its tenant allows; at most 64; empty clears the list")
 	return setAPIKeyCmd
+}
+
+// apiKeyPatch builds the PATCH body from the flags that were given: each
+// one goes on the wire with its value, a zero included; a flag not given
+// stays off the wire and the gateway keeps the stored value.
+func apiKeyPatch(flags *pflag.FlagSet, o *SetAPIKeyOptions) api.AIApiKeyPatchRequest {
+	req := api.AIApiKeyPatchRequest{}
+	if flags.Changed("allowed-models") {
+		req.AllowedModels = o.AllowedModels
+	}
+	if flags.Changed("enabled") {
+		e := o.Enabled
+		req.Enabled = &e
+	}
+	if flags.Changed("rate-limit-rps") {
+		v := o.RateLimitRps
+		req.RateLimitRps = &v
+	}
+	if flags.Changed("burst-size") {
+		v := o.BurstSize
+		req.BurstSize = &v
+	}
+	if flags.Changed("tokens-per-min") {
+		v := o.TokensPerMin
+		req.TokensPerMin = &v
+	}
+	if flags.Changed("priority-class") {
+		v := o.PriorityClass
+		req.PriorityClass = &v
+	}
+	if flags.Changed("default-objective") {
+		v := o.DefaultObjective
+		req.DefaultObjective = &v
+	}
+	if flags.Changed("allowed-objectives") {
+		list := append([]string{}, o.AllowedObjectives...)
+		req.AllowedObjectives = &list
+	}
+	return req
 }

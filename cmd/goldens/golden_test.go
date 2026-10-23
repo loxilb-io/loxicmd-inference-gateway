@@ -449,6 +449,7 @@ var goldenCases = []goldenCase{
 	{"get-vlan", []string{"get", "vlan"}, http.StatusOK, `{}`, ""},
 	{"get-vxlan", []string{"get", "vxlan"}, http.StatusOK, `{}`, ""},
 	{"set-apikey", []string{"set", "apikey", "lxb_abc123", "--enabled=false"}, http.StatusOK, successBody, ""},
+	{"set-apikey-rate", []string{"set", "apikey", "lxb_abc123", "--rate-limit-rps=20", "--burst-size=0", "--tokens-per-min=5000"}, http.StatusNoContent, "", ""},
 	{"set-bfd", []string{"set", "bfd", "32.32.32.2", "--interval=200000"}, http.StatusOK, successBody, ""},
 	{"set-dpu", []string{"set", "dpu", "--action", "unregister", "--plugin", "doca"}, http.StatusOK, successBody, ""},
 	{"set-gpu", []string{"set", "gpu", "--enable"}, http.StatusOK, successBody, ""},
