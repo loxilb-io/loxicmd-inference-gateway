@@ -79,7 +79,7 @@ ex)
 			}
 			entry := netIdentityEntry(args[0], &o)
 
-			if err := featuregate.Require(restOptions, featuregate.NetIdentity, cmd.ErrOrStderr()); err != nil {
+			if err := featuregate.Require(restOptions, featuregate.NetIdentity, "create netidentity", cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 			client := api.NewLoxiClient(restOptions)

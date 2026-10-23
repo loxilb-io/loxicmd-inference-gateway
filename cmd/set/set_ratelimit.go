@@ -87,7 +87,7 @@ ex)
 				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
 			}
 			if o.PriorityClassSet || o.DefaultObjectiveSet || o.AllowedObjectivesSet {
-				if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+				if err := featuregate.Require(restOptions, featuregate.Objectives, "set ratelimit", cmd.ErrOrStderr()); err != nil {
 					return err
 				}
 			}

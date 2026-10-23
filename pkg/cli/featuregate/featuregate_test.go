@@ -2,6 +2,7 @@ package featuregate
 
 import (
 	"bytes"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -31,22 +32,23 @@ func gateway(t *testing.T, status int, body string) (*api.RESTOptions, *int) {
 }
 
 // A peer that is not a loxilb-inference-gateway is refused with
-// FEATURE_UNAVAILABLE and the design's message, before anything is sent.
+// FEATURE_UNAVAILABLE and a message that says so, before anything is sent.
 func TestRequireRefusesNonGateway(t *testing.T) {
-	for name, body := range map[string]string{
-		"plain loxilb":    `{"version":"0.9.8","buildInfo":"x"}`,
-		"another product": `{"version":"1","product":"something-else","features":["bands"]}`,
+	for name, c := range map[string]struct{ body, seen string }{
+		"plain loxilb":    {`{"version":"0.9.8","buildInfo":"x"}`, "no product in /version"},
+		"another product": {`{"version":"1","product":"something-else","features":["bands"]}`, `product "something-else" in /version`},
 	} {
 		t.Run(name, func(t *testing.T) {
-			opts, _ := gateway(t, http.StatusOK, body)
+			opts, _ := gateway(t, http.StatusOK, c.body)
 			var stderr bytes.Buffer
-			err := Require(opts, Bands, &stderr)
+			err := Require(opts, Bands, "create lb", &stderr)
 			ce, ok := err.(*exitcode.CLIError)
 			if !ok || ce.Code != exitcode.FeatureUnavailable {
 				t.Fatalf("error %v, want FEATURE_UNAVAILABLE", err)
 			}
-			if ce.Message != "this gateway does not advertise bands; upgrade the gateway or use a build that does" {
-				t.Fatalf("message %q", ce.Message)
+			want := fmt.Sprintf("the peer at %s:%d is not a loxilb-inference-gateway (%s); create lb needs one", opts.ServerIP, opts.ServerPort, c.seen)
+			if ce.Message != want {
+				t.Fatalf("message %q, want %q", ce.Message, want)
 			}
 			if stderr.Len() != 0 {
 				t.Fatalf("a refusal also warned: %q", stderr.String())
@@ -61,14 +63,14 @@ func TestRequireRefusesNonGateway(t *testing.T) {
 func TestRequireWarnsOnMissingToken(t *testing.T) {
 	opts, reads := gateway(t, http.StatusOK, `{"version":"main","product":"loxilb-inference-gateway","features":["api_key_auth","jwt_auth_profile","objectives"]}`)
 	var stderr bytes.Buffer
-	if err := Require(opts, Bands, &stderr); err != nil {
+	if err := Require(opts, Bands, "get lb --bands", &stderr); err != nil {
 		t.Fatalf("missing token refused: %v", err)
 	}
 	if stderr.String() != "warning: gateway does not advertise bands; sending anyway, the gateway's answer decides\n" {
 		t.Fatalf("warning %q", stderr.String())
 	}
 	stderr.Reset()
-	if err := Require(opts, Objectives, &stderr); err != nil || stderr.Len() != 0 {
+	if err := Require(opts, Objectives, "create objective", &stderr); err != nil || stderr.Len() != 0 {
 		t.Fatalf("advertised token: err %v, stderr %q", err, stderr.String())
 	}
 	if *reads != 1 {
@@ -80,14 +82,14 @@ func TestRequireWarnsOnMissingToken(t *testing.T) {
 // a non-200 /version is classified by its status.
 func TestRequireReadFailures(t *testing.T) {
 	opts, _ := gateway(t, http.StatusUnauthorized, `{"message":"no"}`)
-	err := Require(opts, Bands, &bytes.Buffer{})
+	err := Require(opts, Bands, "create lb", &bytes.Buffer{})
 	if ce, ok := err.(*exitcode.CLIError); !ok || ce.Code != exitcode.Auth {
 		t.Fatalf("401 on /version: %v", err)
 	}
 	opts, _ = gateway(t, http.StatusOK, ``)
 	srvClosed := *opts
 	srvClosed.ServerPort = 1
-	err = Require(&srvClosed, Bands, &bytes.Buffer{})
+	err = Require(&srvClosed, Bands, "create lb", &bytes.Buffer{})
 	if ce, ok := err.(*exitcode.CLIError); !ok || ce.Code != exitcode.Unavailable {
 		t.Fatalf("unreachable: %v", err)
 	}

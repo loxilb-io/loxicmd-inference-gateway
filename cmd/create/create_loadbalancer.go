@@ -1029,17 +1029,17 @@ func lbBandsRequested(o *CreateLoadBalancerOptions) bool {
 // request; nothing is read when none is given.
 func requireLBFeatures(restOptions *api.RESTOptions, o *CreateLoadBalancerOptions, stderr io.Writer) error {
 	if lbBandsRequested(o) {
-		if err := featuregate.Require(restOptions, featuregate.Bands, stderr); err != nil {
+		if err := featuregate.Require(restOptions, featuregate.Bands, "create lb", stderr); err != nil {
 			return err
 		}
 	}
 	if o.AiDefaultReservation != "" || o.AiDefaultMaxTokensSet {
-		if err := featuregate.Require(restOptions, featuregate.Reservation, stderr); err != nil {
+		if err := featuregate.Require(restOptions, featuregate.Reservation, "create lb", stderr); err != nil {
 			return err
 		}
 	}
 	if o.AiObjectiveStrictSet {
-		if err := featuregate.Require(restOptions, featuregate.Objectives, stderr); err != nil {
+		if err := featuregate.Require(restOptions, featuregate.Objectives, "create lb", stderr); err != nil {
 			return err
 		}
 	}

@@ -81,7 +81,7 @@ ex)
 				return exitcode.Invalidf("--priority-class must be one of %s", strings.Join(api.PriorityClasses, "|"))
 			}
 			if o.PriorityClass != "" || o.DefaultObjective != "" || len(o.AllowedObjectives) > 0 {
-				if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+				if err := featuregate.Require(restOptions, featuregate.Objectives, "create apikey", cmd.ErrOrStderr()); err != nil {
 					return err
 				}
 			}

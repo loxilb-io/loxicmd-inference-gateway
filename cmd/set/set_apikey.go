@@ -60,7 +60,7 @@ ex)
 				return exitcode.Invalidf("--priority-class must be one of %s, or empty to clear it", strings.Join(api.PriorityClasses, "|"))
 			}
 			if cmd.Flags().Changed("priority-class") || cmd.Flags().Changed("default-objective") || cmd.Flags().Changed("allowed-objectives") {
-				if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+				if err := featuregate.Require(restOptions, featuregate.Objectives, "set apikey", cmd.ErrOrStderr()); err != nil {
 					return err
 				}
 			}

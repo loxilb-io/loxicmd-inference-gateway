@@ -49,7 +49,7 @@ where each knob came from. -o json carries the whole fc_effective.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			_ = args
 			if bands {
-				if err := featuregate.Require(restOptions, featuregate.Bands, cmd.ErrOrStderr()); err != nil {
+				if err := featuregate.Require(restOptions, featuregate.Bands, "get lb --bands", cmd.ErrOrStderr()); err != nil {
 					return err
 				}
 			}

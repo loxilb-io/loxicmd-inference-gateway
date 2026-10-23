@@ -42,7 +42,7 @@ ex)
 			if len(args) != 1 {
 				return exitcode.Usagef("delete netidentity needs <NAME> arg")
 			}
-			if err := featuregate.Require(restOptions, featuregate.NetIdentity, cmd.ErrOrStderr()); err != nil {
+			if err := featuregate.Require(restOptions, featuregate.NetIdentity, "delete netidentity", cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 			client := api.NewLoxiClient(restOptions)

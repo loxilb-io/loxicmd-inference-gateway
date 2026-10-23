@@ -61,7 +61,7 @@ ex)
 			}
 			entry := api.AIObjectiveEntry{Name: args[0], Priority: o.Priority, Services: o.Services}
 
-			if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+			if err := featuregate.Require(restOptions, featuregate.Objectives, "create objective", cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 			client := api.NewLoxiClient(restOptions)

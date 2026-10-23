@@ -119,8 +119,9 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
     (`VersionGetEntry.features`).
   - Exit `9` `FEATURE_UNAVAILABLE` ([contracts/exit-codes.md](contracts/exit-codes.md)):
     a command that needs a gateway feature reads `/version` first and refuses,
-    sending nothing, when the peer is not a loxilb-inference-gateway, or when
-    the gateway answers 404 for the objective or netidentity path itself. A
+    sending nothing, when the peer is not a loxilb-inference-gateway (the
+    message names the peer and what it answered), or when the gateway
+    answers 404 for the objective or netidentity path itself. A
     gateway that does not advertise the feature's token gets one stderr
     warning and the request is sent, since gateways up to 7a58e59 advertise
     only `api_key_auth` and `jwt_auth_profile`.

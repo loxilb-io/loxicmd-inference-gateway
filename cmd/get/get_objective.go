@@ -46,7 +46,7 @@ ex)
 			if len(args) > 1 {
 				return exitcode.Usagef("get objective takes at most one NAME")
 			}
-			if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+			if err := featuregate.Require(restOptions, featuregate.Objectives, "get objective", cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 			client := api.NewLoxiClient(restOptions)

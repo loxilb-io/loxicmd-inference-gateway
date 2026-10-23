@@ -54,19 +54,19 @@ var (
 )
 
 // Require reads the gateway's /version (once per invocation) and decides
-// whether a command needing feature may send its request. A peer that is
-// not a loxilb-inference-gateway is refused with FEATURE_UNAVAILABLE and
-// nothing is sent. A gateway that advertises features but not this one
-// gets one warning line on stderr and the request goes out: the gateway's
-// answer decides. An unreachable peer is UNAVAILABLE, as the request
-// itself would have been.
-func Require(restOptions *api.RESTOptions, feature string, stderr io.Writer) error {
+// whether command, which needs feature, may send its request. A peer that
+// is not a loxilb-inference-gateway is refused with FEATURE_UNAVAILABLE,
+// the message saying so, and nothing is sent. A gateway that advertises
+// features but not this one gets one warning line on stderr and the
+// request goes out: the gateway's answer decides. An unreachable peer is
+// UNAVAILABLE, as the request itself would have been.
+func Require(restOptions *api.RESTOptions, feature, command string, stderr io.Writer) error {
 	version, err := read(restOptions)
 	if err != nil {
 		return err
 	}
 	if version.Product != api.GatewayProduct {
-		return Unavailable(feature)
+		return NotAGateway(restOptions, version.Product, command)
 	}
 	for _, f := range version.Features {
 		if f == feature {
@@ -77,7 +77,25 @@ func Require(restOptions *api.RESTOptions, feature string, stderr io.Writer) err
 	return nil
 }
 
-// Unavailable is the FEATURE_UNAVAILABLE failure for feature.
+// NotAGateway is the FEATURE_UNAVAILABLE failure for a peer whose /version
+// does not name loxilb-inference-gateway as its product: plain loxilb, a
+// gateway build that predates the field, or another product.
+func NotAGateway(restOptions *api.RESTOptions, product, command string) *exitcode.CLIError {
+	seen := "no product in /version"
+	if product != "" {
+		seen = fmt.Sprintf("product %q in /version", product)
+	}
+	return &exitcode.CLIError{
+		Code:          exitcode.FeatureUnavailable,
+		Message:       fmt.Sprintf("the peer at %s:%d is not a loxilb-inference-gateway (%s); %s needs one", restOptions.ServerIP, restOptions.ServerPort, seen, command),
+		Origin:        "gateway",
+		ComponentCode: "not-a-gateway",
+	}
+}
+
+// Unavailable is the FEATURE_UNAVAILABLE failure for a gateway that does
+// not offer feature: the reserved token-absent refusal, and a gateway
+// whose router does not serve the feature's path.
 func Unavailable(feature string) *exitcode.CLIError {
 	return &exitcode.CLIError{
 		Code:          exitcode.FeatureUnavailable,

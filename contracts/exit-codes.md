@@ -34,10 +34,10 @@ invocation before they send anything. The feature keys are `bands`,
 triggers:
 
 1. **Not a gateway.** `VersionGetEntry.product` is not
-   `loxilb-inference-gateway` (plain loxilb, or a gateway build that
-   predates the field). The message is
-   `this gateway does not advertise <feature>; upgrade the gateway or use a build that does`
-   and the request is not sent.
+   `loxilb-inference-gateway` (plain loxilb, a gateway build that predates
+   the field, or another product). The message says so:
+   `the peer at <host:port> is not a loxilb-inference-gateway (no product in /version); <command> needs one`
+   (or `product "<x>" in /version`), and the request is not sent.
 2. **Path not served.** The gateway answers `404` for the feature's own path
    (`/config/ai/objective`, `/config/ai/netidentity`) rather than for a
    named item on it: the gateway is one that predates the resource.
@@ -45,8 +45,10 @@ triggers:
    `VersionGetEntry.features` but not the one the command needs. Gateways up
    to loxilb-inference-gateway 7a58e59 advertise only `api_key_auth` and
    `jwt_auth_profile`, none of the four keys above, so this trigger is not
-   enforced yet: when `product` is the gateway and the token is absent, the
-   request is sent and one line goes to stderr —
+   enforced yet (when it is, the message is
+   `this gateway does not advertise <feature>; upgrade the gateway or use a build that does`):
+   when `product` is the gateway and the token is absent, the request is
+   sent and one line goes to stderr —
    `warning: gateway does not advertise <feature>; sending anyway, the gateway's answer decides`
    — and the exit code follows the gateway's answer. The refusal is turned on
    once gateways advertise the keys.

@@ -42,7 +42,7 @@ ex)
 			if len(args) != 1 {
 				return exitcode.Usagef("delete objective needs <NAME> arg")
 			}
-			if err := featuregate.Require(restOptions, featuregate.Objectives, cmd.ErrOrStderr()); err != nil {
+			if err := featuregate.Require(restOptions, featuregate.Objectives, "delete objective", cmd.ErrOrStderr()); err != nil {
 				return err
 			}
 			client := api.NewLoxiClient(restOptions)
