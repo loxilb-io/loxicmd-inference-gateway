@@ -20,7 +20,7 @@
 // /version, read once per invocation: a peer that is not a
 // loxilb-inference-gateway is refused; a gateway that does not advertise
 // the feature's token is warned about and the request is sent, since
-// gateways up to 7a58e59 advertise none of the keys below.
+// gateways up to 7a58e59 advertise only jwt_auth_profile of the keys below.
 package featuregate
 
 import (
@@ -38,12 +38,15 @@ import (
 )
 
 // The feature keys, as the companion design names them. They are the
-// tokens the gate looks for in VersionGetEntry.features.
+// tokens the gate looks for in VersionGetEntry.features. JWTAuthProfile
+// is the gateway's own token (common.FeatureJWTAuthProfile), advertised
+// since 7a58e59.
 const (
-	Bands       = "bands"
-	Objectives  = "objectives"
-	NetIdentity = "netidentity"
-	Reservation = "reservation"
+	Bands          = "bands"
+	Objectives     = "objectives"
+	NetIdentity    = "netidentity"
+	Reservation    = "reservation"
+	JWTAuthProfile = "jwt_auth_profile"
 )
 
 // cache holds the /version answer per gateway for the invocation, so a

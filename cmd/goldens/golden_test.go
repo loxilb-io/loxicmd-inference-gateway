@@ -249,6 +249,15 @@ const netIdentityListBody = `{"netIdentityAttr":[` +
 	`{"name":"edge","match":{"vlan":100},"tenant":"tenant-b","enforce":"strict","credential":"network","forward_identity":false,"priority_class":"standard","fail_mode":"closed"},` +
 	`{"name":"lab","match":{"cidr":["10.10.0.0/16"]},"services":["192.0.2.20:8000"],"tenant":"tenant-a","allowed_models":["llama-70b"],"enforce":"advisory","credential":"none","forward_identity":true,"priority_class":"critical","fail_mode":"neutral"}]}`
 
+// jwtAuthProfileListBody mirrors GET /config/ai/jwtauthprofile: a bare
+// profile beside one with every field set.
+const jwtAuthProfileListBody = `{"jwtAuthProfileAttr":[` +
+	`{"name":"keycloak","issuer":"https://sso.example.com/realms/ai","forward_identity":false,"authorization_passthrough":false},` +
+	`{"name":"okta","issuer":"https://example.okta.com","jwks_url":"https://example.okta.com/keys","audiences":["ai-gateway","api"],` +
+	`"algs":["RS256","ES256"],"leeway_sec":60,"refresh_sec":600,"tenant_claim":"org_id","user_claim":"sub","models_claim":"models",` +
+	`"roles_claim":"groups","model_role_prefix":"llm:","username_claim":"email","model_authz":"allow-all","default_tenant":"public",` +
+	`"forward_identity":true,"authorization_passthrough":true,"priority_class":"critical"}]}`
+
 // apiKeyPriorityListBody and ratelimitPriorityBody carry the three
 // priority fields on a key and a tenant for the wide views.
 const apiKeyPriorityListBody = `[{"key_id":"key-abc","tenant_id":"tenant-a","name":"key-1","allowed_models":["llama-70b"],"rate_limit_rps":5,"burst_size":10,` +
@@ -493,6 +502,14 @@ var goldenCases = []goldenCase{
 	{"get-netidentity-help", []string{"get", "netidentity", "--help"}, http.StatusOK, "", ""},
 	{"delete-netidentity", []string{"delete", "netidentity", "lab"}, http.StatusOK, successBody, gatewayVersionBody},
 	{"delete-netidentity-help", []string{"delete", "netidentity", "--help"}, http.StatusOK, "", ""},
+	{"create-jwtauthprofile", []string{"create", "jwtauthprofile", "okta", "--issuer=https://example.okta.com", "--audiences=ai-gateway,api", "--algs=RS256,ES256", "--leeway-sec=60", "--tenant-claim=org_id", "--model-authz=allow-all", "--forward-identity", "--priority-class=critical"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"create-jwtauthprofile-help", []string{"create", "jwtauthprofile", "--help"}, http.StatusOK, "", ""},
+	{"get-jwtauthprofile-human", []string{"get", "jwtauthprofile"}, http.StatusOK, jwtAuthProfileListBody, gatewayVersionBody},
+	{"get-jwtauthprofile-wide", []string{"get", "jwtauthprofile", "-o", "wide"}, http.StatusOK, jwtAuthProfileListBody, gatewayVersionBody},
+	{"get-jwtauthprofile-json", []string{"get", "jwtauthprofile", "okta", "-o", "json"}, http.StatusOK, jwtAuthProfileListBody, gatewayVersionBody},
+	{"get-jwtauthprofile-help", []string{"get", "jwtauthprofile", "--help"}, http.StatusOK, "", ""},
+	{"delete-jwtauthprofile", []string{"delete", "jwtauthprofile", "okta"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"delete-jwtauthprofile-help", []string{"delete", "jwtauthprofile", "--help"}, http.StatusOK, "", ""},
 }
 
 // normalize replaces the only run-dependent value — the Go toolchain of the

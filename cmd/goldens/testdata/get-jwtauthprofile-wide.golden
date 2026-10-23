@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+|   NAME   |              ISSUER               | TENANT CLAIM | PRIORITY |           JWKS URL            |   AUDIENCES    |    ALGS     | LEEWAY(S) | REFRESH(S) | USER CLAIM | MODELS CLAIM | ROLES CLAIM | MODEL ROLE PREFIX | USERNAME CLAIM | MODEL AUTHZ | DEFAULT TENANT | FORWARD IDENTITY | AUTHZ PASSTHROUGH |
+|----------|-----------------------------------|--------------|----------|-------------------------------|----------------|-------------|-----------|------------|------------|--------------|-------------|-------------------|----------------|-------------|----------------|------------------|-------------------|
+| keycloak | https://sso.example.com/realms/ai | -            | -        | -                             | -              | -           | -         | -          | -          | -            | -           | -                 | -              | -           | -              | false            | false             |
+| okta     | https://example.okta.com          | org_id       | critical | https://example.okta.com/keys | ai-gateway,api | RS256,ES256 |        60 |        600 | sub        | models       | groups      | llm:              | email          | allow-all   | public         | true             | true              |
+--- stderr ---

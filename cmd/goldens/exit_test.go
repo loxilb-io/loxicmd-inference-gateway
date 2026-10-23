@@ -105,6 +105,9 @@ func TestExitTaxonomy(t *testing.T) {
 			`{"code":404,"message":"path /netlox/v1/config/ai/netidentity was not found"}`, 9, "does not advertise netidentity", gatewayVersionBody},
 		{"feature-item-404-is-precondition", []string{"delete", "objective", "nope"}, http.StatusNotFound,
 			`{"code":404,"message":"Resource not found"}`, 4, "404", gatewayVersionBody},
+		{"jwtauthprofile-not-a-gateway-is-feature-unavailable", []string{"create", "jwtauthprofile", "okta", "--issuer=https://example.okta.com"}, http.StatusOK, `{"version":"0.9.8"}`, 9, "is not a loxilb-inference-gateway (no product in /version); create jwtauthprofile needs one", ""},
+		{"jwtauthprofile-referenced-409-is-precondition", []string{"delete", "jwtauthprofile", "okta"}, http.StatusConflict,
+			`{"code":409,"message":"profile okta is referenced by 1 LB rule"}`, 4, "409", gatewayVersionBody},
 		{"feature-missing-token-warns-and-sends", []string{"create", "objective", "batch"}, http.StatusBadRequest,
 			`{"code":400,"fields":["name"],"message":"Malformed arguments for API call","result":"name: must not begin with tier:"}`, 6, "warning: gateway does not advertise objectives", gatewayVersionBody},
 	}

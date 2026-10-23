@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+|   NAME   |              ISSUER               | TENANT CLAIM | PRIORITY |
+|----------|-----------------------------------|--------------|----------|
+| keycloak | https://sso.example.com/realms/ai | -            | -        |
+| okta     | https://example.okta.com          | org_id       | critical |
+--- stderr ---

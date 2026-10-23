@@ -115,20 +115,31 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
     `create|get|delete netidentity` (`/config/ai/netidentity`), modelled on
     the swagger definitions field for field. Neither has a `set`: the gateway
     offers POST (create or replace), GET and DELETE only.
+  - `create|get|delete jwtauthprofile` (`/config/ai/jwtauthprofile`): the
+    JWT auth profile that LB rules reference by name, all 18 swagger fields
+    as flags (`--issuer` required; `--jwks-url`, `--audiences`, `--algs`,
+    `--leeway-sec`, `--refresh-sec`, the six claim paths, `--model-authz`,
+    `--default-tenant`, `--forward-identity`, `--authorization-passthrough`,
+    `--priority-class`). The default table shows name, issuer, tenant claim
+    and priority class; `-o wide` the rest; `-o json` the whole entry. A
+    delete the gateway refuses with 409 (a rule still references the
+    profile) is exit `4` with its message. The family gates on the
+    gateway's own `jwt_auth_profile` token, advertised since 7a58e59;
+    `--priority-class` additionally gates on `objectives`.
   - `get lbversion` prints the feature tokens the gateway advertises
     (`VersionGetEntry.features`).
   - Exit `9` `FEATURE_UNAVAILABLE` ([contracts/exit-codes.md](contracts/exit-codes.md)):
     a command that needs a gateway feature reads `/version` first and refuses,
     sending nothing, when the peer is not a loxilb-inference-gateway (the
     message names the peer and what it answered), or when the gateway
-    answers 404 for the objective or netidentity path itself. A
+    answers 404 for the objective, netidentity or jwtauthprofile path itself. A
     gateway that does not advertise the feature's token gets one stderr
     warning and the request is sent, since gateways up to 7a58e59 advertise
     only `api_key_auth` and `jwt_auth_profile`.
 
 ### Changed
 - `create lb`, `create apikey`, `set apikey`, `set ratelimit` and the
-  objective and netidentity commands print a 400 with the gateway's body as
+  objective, netidentity and jwtauthprofile commands print a 400 with the gateway's body as
   received, so the field it names and the reason it gives are shown, not only
   its generic message.
 

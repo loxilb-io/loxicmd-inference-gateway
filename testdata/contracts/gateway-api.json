@@ -152,6 +152,21 @@
       "methods": [
         "delete"
       ]
+    },
+    {
+      "spec": "swagger.yml",
+      "path": "/config/ai/jwtauthprofile",
+      "methods": [
+        "get",
+        "post"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "path": "/config/ai/jwtauthprofile/{name}",
+      "methods": [
+        "delete"
+      ]
     }
   ],
   "fields": [
@@ -1550,6 +1565,161 @@
       "enum": [
         "neutral",
         "closed"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "name"
+      ],
+      "type": "string",
+      "required": true
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "issuer"
+      ],
+      "type": "string",
+      "required": true
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "jwks_url"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "audiences"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "algs"
+      ],
+      "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "leeway_sec"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "refresh_sec"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "tenant_claim"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "user_claim"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "models_claim"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "roles_claim"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "model_role_prefix"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "username_claim"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "model_authz"
+      ],
+      "type": "string",
+      "enum": [
+        "claims-required",
+        "allow-all"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "default_tenant"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "forward_identity"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "authorization_passthrough"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "JWTAuthProfileEntry",
+      "property_path": [
+        "priority_class"
+      ],
+      "type": "string",
+      "enum": [
+        "standard",
+        "critical",
+        "sheddable"
       ]
     },
     {

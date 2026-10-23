@@ -58,6 +58,7 @@ Create - Service type external load-balancer, Vlan, Vxlan, Qos Policies,
 	createCmd.AddCommand(NewCreateAPIKeyCmd(restOptions))
 	createCmd.AddCommand(NewCreateObjectiveCmd(restOptions))
 	createCmd.AddCommand(NewCreateNetIdentityCmd(restOptions))
+	createCmd.AddCommand(NewCreateJWTAuthProfileCmd(restOptions))
 	createCmd.AddCommand(NewCreateUserCmd(restOptions))
 	createCmd.AddCommand(NewCreateCertCmd(restOptions))
 	createCmd.AddCommand(NewCreateSNICmd(restOptions))

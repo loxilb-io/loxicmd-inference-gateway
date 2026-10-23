@@ -1912,6 +1912,118 @@ _loxicmd_create_ip()
     noun_aliases=()
 }
 
+_loxicmd_create_jwtauthprofile()
+{
+    last_command="loxicmd_create_jwtauthprofile"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--algs=")
+    two_word_flags+=("--algs")
+    local_nonpersistent_flags+=("--algs")
+    local_nonpersistent_flags+=("--algs=")
+    flags+=("--audiences=")
+    two_word_flags+=("--audiences")
+    local_nonpersistent_flags+=("--audiences")
+    local_nonpersistent_flags+=("--audiences=")
+    flags+=("--authorization-passthrough")
+    local_nonpersistent_flags+=("--authorization-passthrough")
+    flags+=("--default-tenant=")
+    two_word_flags+=("--default-tenant")
+    local_nonpersistent_flags+=("--default-tenant")
+    local_nonpersistent_flags+=("--default-tenant=")
+    flags+=("--forward-identity")
+    local_nonpersistent_flags+=("--forward-identity")
+    flags+=("--issuer=")
+    two_word_flags+=("--issuer")
+    local_nonpersistent_flags+=("--issuer")
+    local_nonpersistent_flags+=("--issuer=")
+    flags+=("--jwks-url=")
+    two_word_flags+=("--jwks-url")
+    local_nonpersistent_flags+=("--jwks-url")
+    local_nonpersistent_flags+=("--jwks-url=")
+    flags+=("--leeway-sec=")
+    two_word_flags+=("--leeway-sec")
+    local_nonpersistent_flags+=("--leeway-sec")
+    local_nonpersistent_flags+=("--leeway-sec=")
+    flags+=("--model-authz=")
+    two_word_flags+=("--model-authz")
+    local_nonpersistent_flags+=("--model-authz")
+    local_nonpersistent_flags+=("--model-authz=")
+    flags+=("--model-role-prefix=")
+    two_word_flags+=("--model-role-prefix")
+    local_nonpersistent_flags+=("--model-role-prefix")
+    local_nonpersistent_flags+=("--model-role-prefix=")
+    flags+=("--models-claim=")
+    two_word_flags+=("--models-claim")
+    local_nonpersistent_flags+=("--models-claim")
+    local_nonpersistent_flags+=("--models-claim=")
+    flags+=("--priority-class=")
+    two_word_flags+=("--priority-class")
+    local_nonpersistent_flags+=("--priority-class")
+    local_nonpersistent_flags+=("--priority-class=")
+    flags+=("--refresh-sec=")
+    two_word_flags+=("--refresh-sec")
+    local_nonpersistent_flags+=("--refresh-sec")
+    local_nonpersistent_flags+=("--refresh-sec=")
+    flags+=("--roles-claim=")
+    two_word_flags+=("--roles-claim")
+    local_nonpersistent_flags+=("--roles-claim")
+    local_nonpersistent_flags+=("--roles-claim=")
+    flags+=("--tenant-claim=")
+    two_word_flags+=("--tenant-claim")
+    local_nonpersistent_flags+=("--tenant-claim")
+    local_nonpersistent_flags+=("--tenant-claim=")
+    flags+=("--user-claim=")
+    two_word_flags+=("--user-claim")
+    local_nonpersistent_flags+=("--user-claim")
+    local_nonpersistent_flags+=("--user-claim=")
+    flags+=("--username-claim=")
+    two_word_flags+=("--username-claim")
+    local_nonpersistent_flags+=("--username-claim")
+    local_nonpersistent_flags+=("--username-claim=")
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--originator")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+    flags+=("--token-file=")
+    two_word_flags+=("--token-file")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
 _loxicmd_create_lb()
 {
     last_command="loxicmd_create_lb"
@@ -3285,6 +3397,13 @@ _loxicmd_create()
         command_aliases+=("ipv4address")
         aliashash["ipv4address"]="ip"
     fi
+    commands+=("jwtauthprofile")
+    if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
+        command_aliases+=("jwtauthprofiles")
+        aliashash["jwtauthprofiles"]="jwtauthprofile"
+        command_aliases+=("jwtprofile")
+        aliashash["jwtprofile"]="jwtauthprofile"
+    fi
     commands+=("lb")
     commands+=("mirror")
     if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
@@ -3818,6 +3937,54 @@ _loxicmd_delete_firewall()
 _loxicmd_delete_ip()
 {
     last_command="loxicmd_delete_ip"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--originator")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+    flags+=("--token-file=")
+    two_word_flags+=("--token-file")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_delete_jwtauthprofile()
+{
+    last_command="loxicmd_delete_jwtauthprofile"
 
     command_aliases=()
 
@@ -4682,6 +4849,13 @@ _loxicmd_delete()
         aliashash["ipv4"]="ip"
         command_aliases+=("ipv4address")
         aliashash["ipv4address"]="ip"
+    fi
+    commands+=("jwtauthprofile")
+    if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
+        command_aliases+=("jwtauthprofiles")
+        aliashash["jwtauthprofiles"]="jwtauthprofile"
+        command_aliases+=("jwtprofile")
+        aliashash["jwtprofile"]="jwtauthprofile"
     fi
     commands+=("lb")
     commands+=("mirror")
@@ -5606,6 +5780,54 @@ _loxicmd_get_hastate()
 _loxicmd_get_ip()
 {
     last_command="loxicmd_get_ip"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--apiserver=")
+    two_word_flags+=("--apiserver")
+    two_word_flags+=("-s")
+    flags+=("--bearer")
+    flags+=("--cacert=")
+    two_word_flags+=("--cacert")
+    flags+=("--cert=")
+    two_word_flags+=("--cert")
+    flags+=("--insecure")
+    flags+=("-k")
+    flags+=("--key=")
+    two_word_flags+=("--key")
+    flags+=("--originator")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--port=")
+    two_word_flags+=("--port")
+    two_word_flags+=("-p")
+    flags+=("--protocol=")
+    two_word_flags+=("--protocol")
+    flags+=("--timeout=")
+    two_word_flags+=("--timeout")
+    two_word_flags+=("-t")
+    flags+=("--token=")
+    two_word_flags+=("--token")
+    flags+=("--token-file=")
+    two_word_flags+=("--token-file")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_loxicmd_get_jwtauthprofile()
+{
+    last_command="loxicmd_get_jwtauthprofile"
 
     command_aliases=()
 
@@ -7180,6 +7402,13 @@ _loxicmd_get()
         aliashash["ipv4"]="ip"
         command_aliases+=("ipv4address")
         aliashash["ipv4address"]="ip"
+    fi
+    commands+=("jwtauthprofile")
+    if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then
+        command_aliases+=("jwtauthprofiles")
+        aliashash["jwtauthprofiles"]="jwtauthprofile"
+        command_aliases+=("jwtprofile")
+        aliashash["jwtprofile"]="jwtauthprofile"
     fi
     commands+=("kvinventory")
     if [[ -z "${BASH_VERSION:-}" || "${BASH_VERSINFO[0]:-}" -gt 3 ]]; then

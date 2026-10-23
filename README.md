@@ -153,6 +153,11 @@ printf '%s' "$EXISTING_API_KEY" | ./loxicmd create apikey \
 ./loxicmd create netidentity lab --tenant=tenant-a --cidr=10.10.0.0/16
 ./loxicmd get netidentity -o wide
 
+# JWT auth profiles (the issuer configuration LB rules reference by name)
+./loxicmd create jwtauthprofile keycloak --issuer=https://sso.example.com/realms/ai \
+  --audiences=ai-gateway --priority-class=critical
+./loxicmd get jwtauthprofile -o wide
+
 # Priority bands on a service, and the per-band state the gate reports
 ./loxicmd create lb 192.0.2.20 --tcp=2020:8000 --mode=fullproxy --fc-mode=enforce \
   --fc-max-outstanding=8 --fc-wake-policy=weighted --fc-band-weights=8:3:1 \
@@ -246,6 +251,7 @@ Run `./loxicmd help` or `./loxicmd <command> --help` for full details.
 | `set ratelimit`, `get ratelimit -o wide` | `/config/ai/tenant/ratelimit` | the same three flags; a class flag alone leaves the limits |
 | `create objective`, `get objective`, `delete objective` | `POST`/`GET /config/ai/objective`, `DELETE /config/ai/objective/{name}` | no `set`: the gateway has no PUT or PATCH, POST replaces |
 | `create netidentity`, `get netidentity`, `delete netidentity` | `POST`/`GET /config/ai/netidentity`, `DELETE /config/ai/netidentity/{name}` | no `set`, as above |
+| `create jwtauthprofile`, `get jwtauthprofile`, `delete jwtauthprofile` | `POST`/`GET /config/ai/jwtauthprofile`, `DELETE /config/ai/jwtauthprofile/{name}` | no `set`, as above; all 18 swagger fields as flags; delete is 409 → exit `4` while a rule references the profile |
 | `get lbversion` | `GET /version` | prints `features`; exit `9` `FEATURE_UNAVAILABLE` when a command's feature is not offered ([contracts/exit-codes.md](contracts/exit-codes.md)) |
 
 ## Community & Governance

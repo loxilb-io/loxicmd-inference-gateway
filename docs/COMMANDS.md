@@ -292,13 +292,33 @@ loxicmd create netidentity edge --tenant=tenant-b --vlan=100 --credential=networ
 loxicmd get netidentity -o wide
 loxicmd delete netidentity edge
 
+# JWT auth profiles — swagger /config/ai/jwtauthprofile (POST creates or replaces,
+# GET lists, DELETE /{name}; no set). The named issuer configuration LB rules
+# reference for bearer-token admission. --issuer (required, an http(s) URL, also
+# the OIDC discovery base unless --jwks-url is set); --audiences, --algs (comma
+# lists); --leeway-sec, --refresh-sec (zero selects the gateway default); the claim
+# dot-paths --tenant-claim, --user-claim, --models-claim, --roles-claim,
+# --model-role-prefix, --username-claim; --model-authz claims-required|allow-all;
+# --default-tenant; --forward-identity; --authorization-passthrough;
+# --priority-class (the cap on requests the profile's tokens admit). Only the two
+# enums are checked here; the issuer form and the algorithm list are the gateway's
+# 400. The table shows name, issuer, tenant claim and priority class; -o wide the
+# rest. A profile a rule still references is not deletable: 409, exit 4.
+loxicmd create jwtauthprofile keycloak --issuer=https://sso.example.com/realms/ai
+loxicmd create jwtauthprofile okta --issuer=https://example.okta.com --audiences=ai-gateway \
+  --tenant-claim=org_id --model-authz=allow-all --priority-class=critical
+loxicmd get jwtauthprofile -o wide
+loxicmd get jwtauthprofile okta -o json
+loxicmd delete jwtauthprofile okta
+
 # What the gateway advertises. get lbversion prints VersionGetEntry.features as a
 # line. Commands that use a feature (the band, reservation and strict-objective flags
-# of create lb, get lb --bands, the priority flags, objective, netidentity) read
-# /version first: a peer that is not a loxilb-inference-gateway exits 9
-# FEATURE_UNAVAILABLE and sends nothing; a gateway that does not advertise the token
-# (none does at 7a58e59) gets one stderr warning and the request is sent; a 404 for
-# the objective or netidentity path itself is exit 9 too. See contracts/exit-codes.md.
+# of create lb, get lb --bands, the priority flags, objective, netidentity,
+# jwtauthprofile) read /version first: a peer that is not a loxilb-inference-gateway
+# exits 9 FEATURE_UNAVAILABLE and sends nothing; a gateway that does not advertise
+# the token (at 7a58e59 only jwt_auth_profile is) gets one stderr warning and the
+# request is sent; a 404 for the objective, netidentity or jwtauthprofile path itself
+# is exit 9 too. See contracts/exit-codes.md.
 loxicmd get lbversion
 
 # The service must explicitly require X-Api-Key for enforcement
