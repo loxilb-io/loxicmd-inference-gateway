@@ -14,6 +14,7 @@ reused, and new meanings get new numbers.
 | `6` | `CONTRACT_MISMATCH` | Schema, version, or validation mismatch between this CLI and its peer | Use a compatible release or input; do not retry unchanged |
 | `7` | `FAILED` | Operation failed and no state change is confirmed | Correct the cause, then retry |
 | `8` | `PARTIAL` | Partial apply or recovery required | Do NOT retry automatically; recover using the operation ID |
+| `9` | `FEATURE_UNAVAILABLE` | The command needs a gateway feature this peer does not offer; nothing was sent or changed | Upgrade the gateway, or use a build that offers the feature; do not retry unchanged |
 
 Reserved values:
 
@@ -22,6 +23,35 @@ Reserved values:
   detect it is talking to a pre-taxonomy binary.
 - `126`/`127` and signal-death codes (`128+n`) keep their shell semantics and
   are not part of this contract.
+
+## `9` `FEATURE_UNAVAILABLE`
+
+Commands that use a gateway feature (the priority bands and the default
+reservation on a load balancer, the objectives on keys and tenants, the
+`objective` and `netidentity` resources) read `GET /version` once per
+invocation before they send anything. The feature keys are `bands`,
+`objectives`, `netidentity` and `reservation`. The code is emitted on three
+triggers:
+
+1. **Not a gateway.** `VersionGetEntry.product` is not
+   `loxilb-inference-gateway` (plain loxilb, a gateway build that predates
+   the field, or another product). The message says so:
+   `the peer at <host:port> is not a loxilb-inference-gateway (no product in /version); <command> needs one`
+   (or `product "<x>" in /version`), and the request is not sent.
+2. **Path not served.** The gateway answers `404` for the feature's own path
+   (`/config/ai/objective`, `/config/ai/netidentity`) rather than for a
+   named item on it: the gateway is one that predates the resource.
+3. **Reserved: token absent.** A gateway that advertises feature tokens in
+   `VersionGetEntry.features` but not the one the command needs. Gateways up
+   to loxilb-inference-gateway 7a58e59 advertise only `api_key_auth` and
+   `jwt_auth_profile`, none of the four keys above, so this trigger is not
+   enforced yet (when it is, the message is
+   `this gateway does not advertise <feature>; upgrade the gateway or use a build that does`):
+   when `product` is the gateway and the token is absent, the request is
+   sent and one line goes to stderr —
+   `warning: gateway does not advertise <feature>; sending anyway, the gateway's answer decides`
+   — and the exit code follows the gateway's answer. The refusal is turned on
+   once gateways advertise the keys.
 
 ## Rules
 

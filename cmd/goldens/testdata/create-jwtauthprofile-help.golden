@@ -1,0 +1,61 @@
+exit=0
+--- stdout ---
+Create or replace a JWT auth profile: a named issuer configuration for
+bearer-token admission that LB rules reference by name (POST
+/config/ai/jwtauthprofile). Posting an existing name replaces the profile
+and restarts its key lifecycle: the profile answers 503-class on the data
+plane until the first JWKS fetch against the new configuration succeeds.
+Only public key material is ever fetched or held. A successful create is
+not proof the issuer is reachable; activation does not wait for the fetch.
+
+Claim extraction is dot-paths because the identity provider owns the
+claim schema; the defaults are Keycloak-shaped. A numeric flag left at
+zero selects the gateway's documented default. What the gateway refuses
+(an issuer that is not an http(s) URL, an algorithm it never accepts) is
+printed as it answers.
+
+ex)
+	loxicmd create jwtauthprofile keycloak --issuer=https://sso.example.com/realms/ai
+	loxicmd create jwtauthprofile okta --issuer=https://example.okta.com --audiences=ai-gateway --tenant-claim=org_id --priority-class=critical
+
+Usage:
+  loxicmd create jwtauthprofile <NAME> --issuer=<url> [--jwks-url=<url>] [--audiences=<aud>,] [--algs=<alg>,] [--leeway-sec=<n>] [--refresh-sec=<n>] [--tenant-claim=<path>] [--user-claim=<path>] [--models-claim=<path>] [--roles-claim=<path>] [--model-role-prefix=<prefix>] [--username-claim=<path>] [--model-authz=claims-required|allow-all] [--default-tenant=<tenant>] [--forward-identity] [--authorization-passthrough] [--priority-class=<class>] [flags]
+
+Aliases:
+  jwtauthprofile, jwtauthprofiles, jwtprofile
+
+Flags:
+      --algs strings                Signature-algorithm accept-list (RS256/RS384/RS512, ES256/ES384/ES512, PS256/PS384/PS512); default RS256,ES256. alg=none and HMAC are refused by the gateway unconditionally
+      --audiences strings           Accept-list matched against the token aud values and azp; at least one must match. Empty skips the audience check
+      --authorization-passthrough   Leave the client Authorization header on the upstream request instead of stripping it after verification
+      --default-tenant string       Tenant used when the tenant claim is absent. Empty means such tokens are denied (401): an unattributable request cannot be metered
+      --forward-identity            Inject verified X-Auth-Tenant/X-Auth-User headers upstream (client-sent copies are always stripped)
+  -h, --help                        help for jwtauthprofile
+      --issuer string               Exact string the token iss claim must equal; an http(s) URL. When --jwks-url is unset it is also the base for OIDC discovery (issuer + /.well-known/openid-configuration) (required)
+      --jwks-url string             Overrides OIDC discovery of the JWKS endpoint when set
+      --leeway-sec int              Clock-skew allowance in seconds for exp/nbf/iat (gateway default 30)
+      --model-authz string          What happens when no model list can be derived from the token: claims-required (default) denies every model; allow-all admits any model for an otherwise-valid token
+      --model-role-prefix string    Prefix filter turning roles into allowed models (gateway default "model:")
+      --models-claim string         Dot-path to a string array of allowed models. Unset derives models from roles via --model-role-prefix; when set and present in the token it is authoritative, even when empty
+      --priority-class string       The highest priority class a request admitted by this profile's tokens may have: standard, critical or sheddable. It can only lower what the tenant allows; omitted means no cap from the profile
+      --refresh-sec int             Periodic JWKS refresh interval in seconds (gateway default 3600)
+      --roles-claim string          Dot-path to the roles array (gateway default realm_access.roles)
+      --tenant-claim string         Dot-path to the tenant identity claim (gateway default tenant_id)
+      --user-claim string           Dot-path to the stable user identity claim (gateway default sub)
+      --username-claim string       Dot-path to a display-only username (gateway default preferred_username)
+
+Global Flags:
+  -s, --apiserver string    Set API server IP address (default "127.0.0.1")
+      --bearer              Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets) (default true)
+      --cacert string       CA certificate (PEM) to verify the server (https only)
+      --cert string         Client certificate (PEM) for mutual TLS (https only)
+  -k, --insecure            Skip TLS certificate verification (https only)
+      --key string          Client private key (PEM) for mutual TLS (https only)
+      --originator          Name this invocation in the gateway's audit trail as 'cli:<os user>@<host>', sent as the X-Loxilb-Originator header (for a service account driving the CLI)
+  -o, --output string       Set output layer (ex.) wide, json)
+  -p, --port int            Set API server port number (default 11111)
+      --protocol string     Set API server http/https (default "http")
+  -t, --timeout int16       Set timeout (default 10)
+      --token string        Set Token for the API server (deprecated: the value is visible in shell history and process listings; use --token-file)
+      --token-file string   Read the API server token from an owner-only (0600) regular file; replaces the deprecated --token
+--- stderr ---

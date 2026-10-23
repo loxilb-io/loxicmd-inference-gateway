@@ -93,6 +93,7 @@ func TestCodesMatchSchemaEnum(t *testing.T) {
 	goCodes := []string{
 		string(OK), string(InvalidArgument), string(Auth), string(Precondition),
 		string(Unavailable), string(ContractMismatch), string(Failed), string(Partial),
+		string(FeatureUnavailable),
 	}
 	sort.Strings(schemaCodes)
 	sort.Strings(goCodes)
@@ -107,7 +108,7 @@ func TestCodesMatchSchemaEnum(t *testing.T) {
 func TestExitCodeMapping(t *testing.T) {
 	want := map[Code]int{
 		OK: 0, InvalidArgument: 2, Auth: 3, Precondition: 4,
-		Unavailable: 5, ContractMismatch: 6, Failed: 7, Partial: 8,
+		Unavailable: 5, ContractMismatch: 6, Failed: 7, Partial: 8, FeatureUnavailable: 9,
 	}
 	for code, exit := range want {
 		if got := code.ExitCode(); got != exit {

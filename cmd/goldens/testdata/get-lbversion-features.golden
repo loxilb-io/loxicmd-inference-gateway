@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+|         PRODUCT          | LOXILB VERSION | LOXILB BUILD INFO |
+|--------------------------|----------------|-------------------|
+| loxilb-inference-gateway | main-7a58e59b  | 2026_10_23-main   |
+features: api_key_auth, jwt_auth_profile
+--- stderr ---

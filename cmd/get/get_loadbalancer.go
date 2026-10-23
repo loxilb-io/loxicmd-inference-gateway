@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 	"io"
 	"net/http"
 	"os"
@@ -33,14 +34,25 @@ import (
 )
 
 func NewGetLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
+	var bands bool
 	var GetLbCmd = &cobra.Command{
 		Use:     "loadbalancer",
 		Short:   "Get a LoadBalancer",
 		Aliases: []string{"lb", "loadbalancers", "lbs"},
-		Long:    `It shows Load balancer Information`,
+		Long: `It shows Load balancer Information
+
+-o wide adds the capacity gate in force, including the priority bands'
+wake policy as configured and as run. --bands prints, for each rule (one
+with --servName), the per-band table the gateway reports in fc_effective:
+inflight, queued, wait window, queue share, floor and weight in force, with
+where each knob came from. -o json carries the whole fc_effective.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_ = cmd
 			_ = args
+			if bands {
+				if err := featuregate.Require(restOptions, featuregate.Bands, "get lb --bands", cmd.ErrOrStderr()); err != nil {
+					return err
+				}
+			}
 			client := api.NewLoxiClient(restOptions)
 			ctx := context.TODO()
 			var cancel context.CancelFunc
@@ -53,6 +65,9 @@ func NewGetLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 				return exitcode.Unavailablef("get lb: %v", err)
 			}
 			if resp.StatusCode == http.StatusOK {
+				if bands && restOptions.PrintOption != "json" {
+					return PrintGetLbBands(resp, *restOptions)
+				}
 				PrintGetLbResult(resp, *restOptions)
 				return nil
 			}
@@ -60,6 +75,7 @@ func NewGetLoadBalancerCmd(restOptions *api.RESTOptions) *cobra.Command {
 		},
 	}
 	GetLbCmd.Flags().StringVarP(&restOptions.ServiceName, "servName", "", restOptions.ServiceName, "Name for load balancer rule")
+	GetLbCmd.Flags().BoolVar(&bands, "bands", false, "Print the per-band table (band, inflight, queued, wait_ms, queue_pct, min_share_pct, floor_units, weight, weight_pct, source) of each rule, one with --servName")
 	return GetLbCmd
 }
 
@@ -187,6 +203,7 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 		tenantCell := fcTenantCell(lbrule.Service.FcEffective)
 		headersCell := fcHeadersCell(lbrule.Service.FcEffective)
 		backendTLSCell := backendTLSCell(lbrule.Service.BackendTLSEffective)
+		bandsCell := fcBandsCell(lbrule.Service.FcEffective)
 		if o.PrintOption == "wide" {
 			table.SetHeader(LOADBALANCER_WIDE_TITLE)
 			secIPs := ""
@@ -210,13 +227,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", "", "", "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", "", "", "", "", ""})
 					}
 				}
 			} else {
@@ -224,13 +241,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", "", "", "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", "", "", "", "", ""})
 					}
 				}
 			}
@@ -461,4 +478,118 @@ func backendTLSCell(eff *api.BackendTLSEffective) string {
 		policy += ", name"
 	}
 	return eff.Status + ": " + policy
+}
+
+// fcBandsCell renders the priority bands' wake policy for the wide view: as
+// configured, and beside it what the gate runs when that differs, with the
+// gateway's reason ("weighted (effective: strict, reason: zero_weight)"). A
+// fallback that leaves the policy as configured still names its reason. "-"
+// when the gateway reports no band state (a gateway that predates it).
+func fcBandsCell(eff *api.FcEffective) string {
+	if eff == nil || eff.WakePolicy == "" {
+		return "-"
+	}
+	return fcEffectiveCell(eff.WakePolicy, eff.WakePolicyEffective, eff.BandFallbackReason)
+}
+
+// fcEffectiveCell renders a configured value beside the effective one when
+// they differ, with the reason the gateway gives.
+func fcEffectiveCell(configured, effective, reason string) string {
+	if configured == "" {
+		return "-"
+	}
+	hasReason := reason != "" && reason != "none"
+	switch {
+	case effective != "" && effective != configured && hasReason:
+		return fmt.Sprintf("%s (effective: %s, reason: %s)", configured, effective, reason)
+	case effective != "" && effective != configured:
+		return fmt.Sprintf("%s (effective: %s)", configured, effective)
+	case hasReason:
+		return fmt.Sprintf("%s (reason: %s)", configured, reason)
+	}
+	return configured
+}
+
+// PrintGetLbBands prints, per rule, the priority bands the gateway reports
+// in fc_effective: a line with the policies in force and the critical
+// reserve, then one row per band. A rule the gateway reports no bands for
+// prints "-" in every cell, never 0.
+func PrintGetLbBands(resp *http.Response, o api.RESTOptions) error {
+	lbresp := api.LbRuleModGet{}
+	resultByte, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return exitcode.Unavailablef("get lb: read response: %v", err)
+	}
+	if err := json.Unmarshal(resultByte, &lbresp); err != nil {
+		return &exitcode.CLIError{Code: exitcode.ContractMismatch, Message: fmt.Sprintf("get lb: decode response: %v", err), Origin: "gateway", HTTPStatus: resp.StatusCode}
+	}
+	lbresp.Sort()
+	for _, lbrule := range lbresp.LbRules {
+		if o.ServiceName != "" && o.ServiceName != lbrule.Service.Name || lbrule.Service.Snat {
+			continue
+		}
+		svc := lbrule.Service
+		fmt.Println(fcBandsHeading(svc))
+		table := TableInit()
+		table.SetHeader(LOADBALANCER_BANDS_TITLE)
+		TableShow(fcBandRows(svc.FcEffective), table)
+	}
+	return nil
+}
+
+// fcBandsHeading names the rule and the band policies in force on it.
+func fcBandsHeading(svc api.LoadBalancerService) string {
+	name := svc.Name
+	if name == "" {
+		name = "-"
+	}
+	eff := svc.FcEffective
+	if eff == nil || eff.WakePolicy == "" {
+		return fmt.Sprintf("%s %s:%d/%s  bands: -", name, svc.ExternalIP, svc.Port, svc.Protocol)
+	}
+	reserve := "-"
+	if eff.Bands != nil {
+		reserve = fmt.Sprintf("%d%% (%d units)", eff.Bands.CriticalReservePct, eff.Bands.CriticalReserveUnits)
+	}
+	configSource := eff.ConfigSource
+	if configSource == "" {
+		configSource = "-"
+	}
+	return fmt.Sprintf("%s %s:%d/%s  wake policy: %s  shed queue: %s  tenant wake: %s  critical reserve: %s  config source: %s",
+		name, svc.ExternalIP, svc.Port, svc.Protocol,
+		fcEffectiveCell(eff.WakePolicy, eff.WakePolicyEffective, eff.BandFallbackReason),
+		fcEffectiveCell(eff.ShedQueue, eff.ShedQueueEffective, ""),
+		fcEffectiveCell(eff.TenantWake, eff.TenantWakeEffective, ""),
+		reserve, configSource)
+}
+
+// fcBandRows renders the three bands. The source column is where the
+// weight, floor, wait window and queue share came from, in that order.
+func fcBandRows(eff *api.FcEffective) [][]string {
+	names := []string{"critical", "standard", "sheddable"}
+	if eff == nil || eff.Bands == nil {
+		rows := make([][]string, 0, 3)
+		for _, n := range names {
+			rows = append(rows, []string{n, "-", "-", "-", "-", "-", "-", "-", "-", "-"})
+		}
+		return rows
+	}
+	source := "-"
+	if src := eff.Source; src != nil {
+		dash := func(s string) string {
+			if s == "" {
+				return "-"
+			}
+			return s
+		}
+		source = fmt.Sprintf("%s/%s/%s/%s", dash(src.BandWeights), dash(src.BandMinSharePct), dash(src.BandWaitMs), dash(src.BandQueuePct))
+	}
+	rows := make([][]string, 0, 3)
+	for i, b := range []api.FcBandEffective{eff.Bands.Critical, eff.Bands.Standard, eff.Bands.Sheddable} {
+		rows = append(rows, []string{names[i],
+			fmt.Sprintf("%d", b.Inflight), fmt.Sprintf("%d", b.Queued), fmt.Sprintf("%d", b.WaitMs),
+			fmt.Sprintf("%d", b.QueuePct), fmt.Sprintf("%d", b.MinSharePct), fmt.Sprintf("%d", b.FloorUnits),
+			fmt.Sprintf("%d", b.Weight), fmt.Sprintf("%d", b.WeightPct), source})
+	}
+	return rows
 }

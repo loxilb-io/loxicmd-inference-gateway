@@ -99,14 +99,18 @@ func rateLimitRow(entry api.AITenantRateLimitEntry, wide bool) []string {
 	if wide {
 		models = formatTenantModelLimits(entry.ModelLimits)
 	}
-	return []string{
+	row := []string{
 		entry.TenantID,
 		fmt.Sprintf("%d", entry.Rps),
 		fmt.Sprintf("%d", entry.TokensPerMin),
 		fmt.Sprintf("%d", entry.BurstPct),
 		models,
-		entry.UpdatedAt,
 	}
+	if wide {
+		// The priority fields; one the tenant does not set prints "-".
+		row = append(row, dashIfEmpty(entry.PriorityClass), dashIfEmpty(entry.DefaultObjective), dashIfEmpty(strings.Join(entry.AllowedObjectives, ",")))
+	}
+	return append(row, entry.UpdatedAt)
 }
 
 func formatTenantModelLimits(limits []api.AITenantModelRateLimit) string {

@@ -29,6 +29,12 @@ type AITenantRateLimitMod struct {
 	TokensPerMin int64                    `json:"tokens_per_min,omitempty"`
 	BurstPct     int64                    `json:"burst_pct,omitempty"`
 	ModelLimits  []AITenantModelRateLimit `json:"model_limits,omitempty"`
+	// The tenant's priority, written only when named: omitted leaves the
+	// stored value, an empty string or list clears it (pointers so an
+	// empty value goes on the wire while nil stays off it).
+	PriorityClass     *string   `json:"priority_class,omitempty"`
+	DefaultObjective  *string   `json:"default_objective,omitempty"`
+	AllowedObjectives *[]string `json:"allowed_objectives,omitempty"`
 }
 
 // AITenantModelRateLimit is a per-model quota update. TokensPerMin
@@ -45,5 +51,9 @@ type AITenantRateLimitEntry struct {
 	TokensPerMin int64                    `json:"tokens_per_min"`
 	BurstPct     int64                    `json:"burst_pct,omitempty"`
 	ModelLimits  []AITenantModelRateLimit `json:"model_limits,omitempty"`
-	UpdatedAt    string                   `json:"updated_at"`
+	// Absent when the tenant sets none (held at standard).
+	PriorityClass     string   `json:"priority_class,omitempty"`
+	DefaultObjective  string   `json:"default_objective,omitempty"`
+	AllowedObjectives []string `json:"allowed_objectives,omitempty"`
+	UpdatedAt         string   `json:"updated_at"`
 }

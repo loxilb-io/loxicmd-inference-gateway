@@ -23,56 +23,59 @@ import (
 )
 
 const (
-	loxiProvider                = "netlox"
-	loxiApiVersion              = "v1"
-	loxiLoadBalancerResource    = "config/loadbalancer"
-	loxiLoadBalancerResourceAll = "config/loadbalancer/all"
-	loxiConntrackResource       = "config/conntrack/all"
-	loxiPortResource            = "config/port/all"
-	loxiSessionResource         = "config/session"
-	loxiSessionUlClResource     = "config/sessionulcl"
-	loxiPolicyResource          = "config/policy"
-	loxiRouteResource           = "config/route"
-	loxiIPv4AddressResource     = "config/ipv4address"
-	loxiNeighborResource        = "config/neighbor"
-	loxiFDBResource             = "config/fdb"
-	loxiVlanResource            = "config/vlan"
-	loxiVxlanResource           = "config/tunnel/vxlan"
-	loxiMirrorResource          = "config/mirror"
-	loxiFirewallResource        = "config/firewall"
-	loxiEndPointResource        = "config/endpoint"
-	loxiParamResource           = "config/params"
-	loxiBGPNeighResource        = "config/bgp/neigh"
-	loxiStatusResource          = "status"
-	loxiBFDSessionResource      = "config/bfd"
-	loxiVersionResource         = "version"
-	loxiLoginResource           = "auth/login"
-	loxiAIApiKeyResource        = "config/ai/apikey"
-	loxiAITenantRateLimit       = "config/ai/tenant/ratelimit"
-	loxiAIKvInventoryResource   = "config/ai/kv/inventory"
-	loxiUserResource            = "auth/users"
-	loxiCertResource            = "config/cert"
-	loxiSNIResource             = "sni/certificates"
-	loxiMetricsResource         = "config/metrics"
-	loxiGPUResource             = "config/gpu"
-	loxiWorkerMetricsResource   = "config/worker/metrics"
-	loxiPIIResource             = "config/pii"
-	loxiLlamaFirewallResource   = "config/llamafirewall"
-	loxiTraceResource           = "config/trace"
-	loxiL4TraceResource         = "config/l4trace"
-	loxiOPAResource             = "config/opa/watcher"
-	loxiDPUResource             = "config/dpu"
-	loxiSnapshotResource        = "config/snapshot"
-	loxiRestoreResource         = "config/restore"
-	loxiPersistResource         = "config/persist"
-	loxiMaintenanceResource     = "maintenance"
-	loxiDiagnosticsResource     = "diagnostics"
-	loxiStatusReadyResource     = "status/ready"
-	loxiLogsResource            = "logs"
-	loxiLogArchivesResource     = "log-archives"
-	loxiAuditStatusResource     = "audit/status"
-	loxiAuditSinkResource       = "audit/sink"
-	loxiAuditSinksResource      = "audit/sinks"
+	loxiProvider                 = "netlox"
+	loxiApiVersion               = "v1"
+	loxiLoadBalancerResource     = "config/loadbalancer"
+	loxiLoadBalancerResourceAll  = "config/loadbalancer/all"
+	loxiConntrackResource        = "config/conntrack/all"
+	loxiPortResource             = "config/port/all"
+	loxiSessionResource          = "config/session"
+	loxiSessionUlClResource      = "config/sessionulcl"
+	loxiPolicyResource           = "config/policy"
+	loxiRouteResource            = "config/route"
+	loxiIPv4AddressResource      = "config/ipv4address"
+	loxiNeighborResource         = "config/neighbor"
+	loxiFDBResource              = "config/fdb"
+	loxiVlanResource             = "config/vlan"
+	loxiVxlanResource            = "config/tunnel/vxlan"
+	loxiMirrorResource           = "config/mirror"
+	loxiFirewallResource         = "config/firewall"
+	loxiEndPointResource         = "config/endpoint"
+	loxiParamResource            = "config/params"
+	loxiBGPNeighResource         = "config/bgp/neigh"
+	loxiStatusResource           = "status"
+	loxiBFDSessionResource       = "config/bfd"
+	loxiVersionResource          = "version"
+	loxiLoginResource            = "auth/login"
+	loxiAIApiKeyResource         = "config/ai/apikey"
+	loxiAITenantRateLimit        = "config/ai/tenant/ratelimit"
+	loxiAIKvInventoryResource    = "config/ai/kv/inventory"
+	loxiAIObjectiveResource      = "config/ai/objective"
+	loxiAINetIdentityResource    = "config/ai/netidentity"
+	loxiAIJWTAuthProfileResource = "config/ai/jwtauthprofile"
+	loxiUserResource             = "auth/users"
+	loxiCertResource             = "config/cert"
+	loxiSNIResource              = "sni/certificates"
+	loxiMetricsResource          = "config/metrics"
+	loxiGPUResource              = "config/gpu"
+	loxiWorkerMetricsResource    = "config/worker/metrics"
+	loxiPIIResource              = "config/pii"
+	loxiLlamaFirewallResource    = "config/llamafirewall"
+	loxiTraceResource            = "config/trace"
+	loxiL4TraceResource          = "config/l4trace"
+	loxiOPAResource              = "config/opa/watcher"
+	loxiDPUResource              = "config/dpu"
+	loxiSnapshotResource         = "config/snapshot"
+	loxiRestoreResource          = "config/restore"
+	loxiPersistResource          = "config/persist"
+	loxiMaintenanceResource      = "maintenance"
+	loxiDiagnosticsResource      = "diagnostics"
+	loxiStatusReadyResource      = "status/ready"
+	loxiLogsResource             = "logs"
+	loxiLogArchivesResource      = "log-archives"
+	loxiAuditStatusResource      = "audit/status"
+	loxiAuditSinkResource        = "audit/sink"
+	loxiAuditSinksResource       = "audit/sinks"
 )
 
 type LoxiClient struct {
@@ -406,6 +409,45 @@ func (l *LoxiClient) AITenantRatelimit() *AITenantRatelimit {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiAITenantRateLimit,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AIObjective() *AIObjective {
+	return &AIObjective{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAIObjectiveResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AINetIdentity() *AINetIdentity {
+	return &AINetIdentity{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAINetIdentityResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AIJWTAuthProfile() *AIJWTAuthProfile {
+	return &AIJWTAuthProfile{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAIJWTAuthProfileResource,
 			},
 		},
 	}

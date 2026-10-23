@@ -53,9 +53,23 @@ type fakeGateway struct {
 
 func newFakeGateway(t *testing.T, status int, body string) *fakeGateway {
 	t.Helper()
+	return newFakeGatewayVersioned(t, status, body, "")
+}
+
+// newFakeGatewayVersioned answers GET /version with version (200) when
+// one is given, so a command that reads what the gateway advertises before
+// it sends (the feature gate) sees a gateway; every other request gets the
+// canned response.
+func newFakeGatewayVersioned(t *testing.T, status int, body, version string) *fakeGateway {
+	t.Helper()
 	gw := &fakeGateway{}
-	gw.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	gw.server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if version != "" && r.Method == http.MethodGet && r.URL.Path == "/netlox/v1/version" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(version))
+			return
+		}
 		w.WriteHeader(status)
 		_, _ = w.Write([]byte(body))
 	}))
@@ -198,37 +212,93 @@ const auditStatusSinksBody = `{"available":true,"running":true,"boot_id":"boot-a
 	`"cursor":{"segment_uuid":"seg-2","seq":1020},"in_active_segment":true,"lag_records":4},` +
 	`{"name":"siem2","state":"disconnected","cursor":{"segment_uuid":"seg-1","seq":600},"lag_drops":2}]}`
 
+// gatewayVersionBody mirrors GET /version on loxilb-inference-gateway
+// 7a58e59: the product and the two feature tokens it advertises.
+const gatewayVersionBody = `{"version":"main-7a58e59b","buildInfo":"2026_10_23-main","product":"loxilb-inference-gateway",` +
+	`"features":["api_key_auth","jwt_auth_profile"]}`
+
+// bandsLbBody is one AI-gateway rule whose fc_effective carries the
+// priority bands, the weighted wake running strict on a zero weight, so
+// the configured/effective rendering and every band cell are pinned.
+const bandsLbBody = `{"lbAttr":[{` +
+	`"serviceArguments":{"externalIP":"192.0.2.20","port":8000,"protocol":"tcp","sel":0,"mode":4,"BGP":false,"Monitor":false,` +
+	`"inactiveTimeOut":240,"block":0,"name":"chat","fc_wake_policy":"weighted","fc_band_weights":"8:0:1",` +
+	`"fc_effective":{"mode":"enforce","max_outstanding":8,"effective_max_outstanding":8,"queue_depth":64,"queue_wait_ms":30000,` +
+	`"adapt_state":"off","expose_headers":"off","tenant_slots":1024,` +
+	`"wake_policy":"weighted","wake_policy_effective":"strict","weights_in_use":false,` +
+	`"shed_queue":"on","shed_queue_effective":"on","tenant_wake":"fifo","tenant_wake_effective":"fifo",` +
+	`"band_fallback_reason":"zero_weight","llmd_headers":"off","bands_configured":true,` +
+	`"bands":{"critical_reserve_pct":10,"critical_reserve_units":1,` +
+	`"critical":{"inflight":1,"queued":0,"wait_ms":0,"queue_pct":0,"min_share_pct":0,"floor_units":0,"weight":8,"weight_pct":89},` +
+	`"standard":{"inflight":3,"queued":2,"wait_ms":5000,"queue_pct":50,"min_share_pct":20,"floor_units":2,"weight":0,"weight_pct":0},` +
+	`"sheddable":{"inflight":0,"queued":0,"wait_ms":1000,"queue_pct":20,"min_share_pct":0,"floor_units":0,"weight":1,"weight_pct":11}},` +
+	`"default_reservation":"off","default_max_tokens":0,"config_source":"store","store_reachable":true,` +
+	`"source":{"mode":"rule","max_outstanding":"rule","wake_policy":"rule","band_weights":"rule","band_min_share_pct":"default",` +
+	`"critical_reserve_pct":"rule","band_wait_ms":"env","band_queue_pct":"default","shed_queue":"env","tenant_wake":"default","llmd_headers":"default"}}},` +
+	`"secondaryIPs":[],"allowedSources":[],` +
+	`"endpoints":[{"endpointIP":"203.0.113.1","targetPort":8000,"weight":1,"state":"active","counter":"0:0"}]}]}`
+
+// objectiveListBody mirrors GET /config/ai/objective read from the key
+// store; netIdentityListBody mirrors GET /config/ai/netidentity with one
+// binding of each match kind that is set.
+const objectiveListBody = `{"objectiveAttr":[{"name":"batch","services":["192.0.2.20:8000"],"priority":-5,"updated_at":"2026-10-23T05:59:00.960Z"},` +
+	`{"name":"interactive","priority":10,"updated_at":"2026-10-23T05:59:00.946Z"}],` +
+	`"source":"store","source_timestamp":"2026-10-23T05:59:00.971Z","store_reachable":true,"store_last_read":"2026-10-23T05:59:00.971Z"}`
+
+const netIdentityListBody = `{"netIdentityAttr":[` +
+	`{"name":"edge","match":{"vlan":100},"tenant":"tenant-b","enforce":"strict","credential":"network","forward_identity":false,"priority_class":"standard","fail_mode":"closed"},` +
+	`{"name":"lab","match":{"cidr":["10.10.0.0/16"]},"services":["192.0.2.20:8000"],"tenant":"tenant-a","allowed_models":["llama-70b"],"enforce":"advisory","credential":"none","forward_identity":true,"priority_class":"critical","fail_mode":"neutral"}]}`
+
+// jwtAuthProfileListBody mirrors GET /config/ai/jwtauthprofile: a bare
+// profile beside one with every field set.
+const jwtAuthProfileListBody = `{"jwtAuthProfileAttr":[` +
+	`{"name":"keycloak","issuer":"https://sso.example.com/realms/ai","forward_identity":false,"authorization_passthrough":false},` +
+	`{"name":"okta","issuer":"https://example.okta.com","jwks_url":"https://example.okta.com/keys","audiences":["ai-gateway","api"],` +
+	`"algs":["RS256","ES256"],"leeway_sec":60,"refresh_sec":600,"tenant_claim":"org_id","user_claim":"sub","models_claim":"models",` +
+	`"roles_claim":"groups","model_role_prefix":"llm:","username_claim":"email","model_authz":"allow-all","default_tenant":"public",` +
+	`"forward_identity":true,"authorization_passthrough":true,"priority_class":"critical"}]}`
+
+// apiKeyPriorityListBody and ratelimitPriorityBody carry the three
+// priority fields on a key and a tenant for the wide views.
+const apiKeyPriorityListBody = `[{"key_id":"key-abc","tenant_id":"tenant-a","name":"key-1","allowed_models":["llama-70b"],"rate_limit_rps":5,"burst_size":10,` +
+	`"tokens_per_min":1000,"created_at":"2026-10-23T05:00:00Z","expires_at":"","enabled":true,"priority_class":"sheddable","default_objective":"batch","allowed_objectives":["batch"]}]`
+
+const ratelimitPriorityBody = `{"tenant_id":"tenant-a","rps":50,"tokens_per_min":2000,"burst_pct":125,"priority_class":"critical",` +
+	`"default_objective":"interactive","allowed_objectives":["interactive","batch"],"updated_at":"2026-10-23T05:00:00Z"}`
+
 // goldenCase is one pinned invocation. Every case runs against a fake
-// gateway that answers with the given canned response.
+// gateway that answers with the given canned response; version, when
+// given, is what GET /version answers instead.
 type goldenCase struct {
-	name   string
-	args   []string
-	status int
-	body   string
+	name    string
+	args    []string
+	status  int
+	body    string
+	version string
 }
 
 var goldenCases = []goldenCase{
-	{"get-lb-human", []string{"get", "lb"}, http.StatusOK, oneLbBody},
-	{"get-lb-json", []string{"get", "lb", "-o", "json"}, http.StatusOK, oneLbBody},
-	{"create-lb", []string{"create", "lb", "20.20.20.1", "--tcp=2020:8080", "--endpoints=31.31.31.1:1"}, http.StatusOK, successBody},
-	{"delete-lb", []string{"delete", "lb", "20.20.20.1", "--tcp=2020"}, http.StatusOK, successBody},
-	{"save-api", []string{"save", "--api"}, http.StatusOK, durablePersistBody},
-	{"create-persist-json", []string{"create", "persist", "-o", "json"}, http.StatusOK, durablePersistBody},
-	{"version-human", []string{"version"}, http.StatusOK, ""},
-	{"version-json", []string{"version", "-o", "json"}, http.StatusOK, ""},
-	{"completion-bash", []string{"completion", "bash"}, http.StatusOK, ""},
-	{"get-maintenance-human", []string{"get", "maintenance"}, http.StatusOK, maintenanceBody},
-	{"get-maintenance-json", []string{"get", "maintenance", "-o", "json"}, http.StatusOK, maintenanceBody},
-	{"set-maintenance-on", []string{"set", "maintenance", "on", "--drain-timeout", "300"}, http.StatusOK, maintenanceBody},
-	{"get-ready-human", []string{"get", "ready"}, http.StatusOK, readyBody},
-	{"get-ready-json", []string{"get", "ready", "-o", "json"}, http.StatusOK, readyBody},
-	{"get-diagnostics-human", []string{"get", "diagnostics"}, http.StatusOK, diagnosticsBody},
-	{"get-logs-human", []string{"get", "logs"}, http.StatusOK, logsBody},
-	{"get-logs-json", []string{"get", "logs", "-o", "json"}, http.StatusOK, logsBody},
-	{"get-logs-help", []string{"get", "logs", "--help"}, http.StatusOK, ""},
-	{"get-log-archives-human", []string{"get", "log-archives"}, http.StatusOK, logArchivesBody},
-	{"get-log-archives-json", []string{"get", "log-archives", "-o", "json"}, http.StatusOK, logArchivesBody},
-	{"get-log-archives-help", []string{"get", "log-archives", "--help"}, http.StatusOK, ""},
+	{"get-lb-human", []string{"get", "lb"}, http.StatusOK, oneLbBody, ""},
+	{"get-lb-json", []string{"get", "lb", "-o", "json"}, http.StatusOK, oneLbBody, ""},
+	{"create-lb", []string{"create", "lb", "20.20.20.1", "--tcp=2020:8080", "--endpoints=31.31.31.1:1"}, http.StatusOK, successBody, ""},
+	{"delete-lb", []string{"delete", "lb", "20.20.20.1", "--tcp=2020"}, http.StatusOK, successBody, ""},
+	{"save-api", []string{"save", "--api"}, http.StatusOK, durablePersistBody, ""},
+	{"create-persist-json", []string{"create", "persist", "-o", "json"}, http.StatusOK, durablePersistBody, ""},
+	{"version-human", []string{"version"}, http.StatusOK, "", ""},
+	{"version-json", []string{"version", "-o", "json"}, http.StatusOK, "", ""},
+	{"completion-bash", []string{"completion", "bash"}, http.StatusOK, "", ""},
+	{"get-maintenance-human", []string{"get", "maintenance"}, http.StatusOK, maintenanceBody, ""},
+	{"get-maintenance-json", []string{"get", "maintenance", "-o", "json"}, http.StatusOK, maintenanceBody, ""},
+	{"set-maintenance-on", []string{"set", "maintenance", "on", "--drain-timeout", "300"}, http.StatusOK, maintenanceBody, ""},
+	{"get-ready-human", []string{"get", "ready"}, http.StatusOK, readyBody, ""},
+	{"get-ready-json", []string{"get", "ready", "-o", "json"}, http.StatusOK, readyBody, ""},
+	{"get-diagnostics-human", []string{"get", "diagnostics"}, http.StatusOK, diagnosticsBody, ""},
+	{"get-logs-human", []string{"get", "logs"}, http.StatusOK, logsBody, ""},
+	{"get-logs-json", []string{"get", "logs", "-o", "json"}, http.StatusOK, logsBody, ""},
+	{"get-logs-help", []string{"get", "logs", "--help"}, http.StatusOK, "", ""},
+	{"get-log-archives-human", []string{"get", "log-archives"}, http.StatusOK, logArchivesBody, ""},
+	{"get-log-archives-json", []string{"get", "log-archives", "-o", "json"}, http.StatusOK, logArchivesBody, ""},
+	{"get-log-archives-help", []string{"get", "log-archives", "--help"}, http.StatusOK, "", ""},
 
 	// The audit commands. Status and sink are status-and-configuration
 	// only: the trail itself is deliberately not served over the
@@ -236,106 +306,106 @@ var goldenCases = []goldenCase{
 	// The unavailable-writer and unconfigured-sink renderings are pinned
 	// as their own cases because they are the two answers an operator
 	// acts on and the only ones where the remaining fields mean nothing.
-	{"get-audit-status-human", []string{"get", "audit-status"}, http.StatusOK, auditStatusBody},
-	{"get-audit-status-json", []string{"get", "audit-status", "-o", "json"}, http.StatusOK, auditStatusBody},
-	{"get-audit-status-unavailable", []string{"get", "audit-status"}, http.StatusOK, auditStatusUnavailableBody},
-	{"get-audit-status-help", []string{"get", "audit-status", "--help"}, http.StatusOK, ""},
-	{"get-audit-sink-human", []string{"get", "audit-sink"}, http.StatusOK, auditSinkBody},
-	{"get-audit-sink-json", []string{"get", "audit-sink", "-o", "json"}, http.StatusOK, auditSinkBody},
-	{"get-audit-sink-off", []string{"get", "audit-sink"}, http.StatusOK, auditSinkOffBody},
-	{"get-audit-sink-help", []string{"get", "audit-sink", "--help"}, http.StatusOK, ""},
+	{"get-audit-status-human", []string{"get", "audit-status"}, http.StatusOK, auditStatusBody, ""},
+	{"get-audit-status-json", []string{"get", "audit-status", "-o", "json"}, http.StatusOK, auditStatusBody, ""},
+	{"get-audit-status-unavailable", []string{"get", "audit-status"}, http.StatusOK, auditStatusUnavailableBody, ""},
+	{"get-audit-status-help", []string{"get", "audit-status", "--help"}, http.StatusOK, "", ""},
+	{"get-audit-sink-human", []string{"get", "audit-sink"}, http.StatusOK, auditSinkBody, ""},
+	{"get-audit-sink-json", []string{"get", "audit-sink", "-o", "json"}, http.StatusOK, auditSinkBody, ""},
+	{"get-audit-sink-off", []string{"get", "audit-sink"}, http.StatusOK, auditSinkOffBody, ""},
+	{"get-audit-sink-help", []string{"get", "audit-sink", "--help"}, http.StatusOK, "", ""},
 	// The sink endpoint answers 204 with no body, so these pin what the
 	// CLI says on its own rather than a rendering of a response.
 	{"set-audit-sink", []string{"set", "audit-sink", "--address", "siem.example.com:6514",
-		"--ca-bundle", "/etc/loxilb/siem-ca.pem"}, http.StatusNoContent, ""},
-	{"set-audit-sink-disable", []string{"set", "audit-sink", "--disable"}, http.StatusNoContent, ""},
+		"--ca-bundle", "/etc/loxilb/siem-ca.pem"}, http.StatusNoContent, "", ""},
+	{"set-audit-sink-disable", []string{"set", "audit-sink", "--disable"}, http.StatusNoContent, "", ""},
 	// A set that never reaches the gateway: --ca-bundle is refused
 	// locally, because the receiver's certificate is always verified and
 	// there is no default the CLI could supply.
 	{"set-audit-sink-no-ca", []string{"set", "audit-sink", "--address", "siem.example.com:6514"},
-		http.StatusNoContent, ""},
-	{"set-audit-sink-help", []string{"set", "audit-sink", "--help"}, http.StatusOK, ""},
+		http.StatusNoContent, "", ""},
+	{"set-audit-sink-help", []string{"set", "audit-sink", "--help"}, http.StatusOK, "", ""},
 	// The secondary sinks: the same commands with a name, and a delete.
-	{"get-audit-status-sinks", []string{"get", "audit-status"}, http.StatusOK, auditStatusSinksBody},
-	{"get-audit-sink-named-human", []string{"get", "audit-sink", "siem2"}, http.StatusOK, auditNamedSinkBody},
-	{"get-audit-sink-named-json", []string{"get", "audit-sink", "siem2", "-o", "json"}, http.StatusOK, auditNamedSinkBody},
+	{"get-audit-status-sinks", []string{"get", "audit-status"}, http.StatusOK, auditStatusSinksBody, ""},
+	{"get-audit-sink-named-human", []string{"get", "audit-sink", "siem2"}, http.StatusOK, auditNamedSinkBody, ""},
+	{"get-audit-sink-named-json", []string{"get", "audit-sink", "siem2", "-o", "json"}, http.StatusOK, auditNamedSinkBody, ""},
 	{"set-audit-sink-named", []string{"set", "audit-sink", "siem2", "--address", "siem2.example.com:6514",
 		"--ca-bundle", "/etc/loxilb/siem2-ca.pem", "--enterprise-number", "32473",
 		"--stream", "data", "--service", "chat", "--outcome", "failed", "--data-sample", "10"},
-		http.StatusNoContent, ""},
+		http.StatusNoContent, "", ""},
 	// Refused locally: a secondary sink without an enterprise number, a
 	// selection aimed at the compliance sink, and the reserved name.
 	{"set-audit-sink-named-no-pen", []string{"set", "audit-sink", "siem2", "--address", "siem2.example.com:6514",
-		"--ca-bundle", "/etc/loxilb/siem2-ca.pem"}, http.StatusNoContent, ""},
+		"--ca-bundle", "/etc/loxilb/siem2-ca.pem"}, http.StatusNoContent, "", ""},
 	{"set-audit-sink-filter-no-name", []string{"set", "audit-sink", "--address", "siem.example.com:6514",
-		"--ca-bundle", "/etc/loxilb/siem-ca.pem", "--stream", "mgmt"}, http.StatusNoContent, ""},
-	{"delete-audit-sink", []string{"delete", "audit-sink", "siem2"}, http.StatusNoContent, ""},
-	{"delete-audit-sink-reserved", []string{"delete", "audit-sink", "compliance"}, http.StatusNoContent, ""},
-	{"delete-audit-sink-help", []string{"delete", "audit-sink", "--help"}, http.StatusOK, ""},
+		"--ca-bundle", "/etc/loxilb/siem-ca.pem", "--stream", "mgmt"}, http.StatusNoContent, "", ""},
+	{"delete-audit-sink", []string{"delete", "audit-sink", "siem2"}, http.StatusNoContent, "", ""},
+	{"delete-audit-sink-reserved", []string{"delete", "audit-sink", "compliance"}, http.StatusNoContent, "", ""},
+	{"delete-audit-sink-help", []string{"delete", "audit-sink", "--help"}, http.StatusOK, "", ""},
 
 	// The appliance namespace never contacts the gateway, so only its
 	// help surfaces are pinned here (the not-available markers are part
 	// of the public capability contract); runtime behavior is proven by
 	// cmd/appliance's packaged-binary tests against a fake backend.
-	{"appliance-help", []string{"appliance", "--help"}, http.StatusOK, ""},
-	{"appliance-status-help", []string{"appliance", "status", "--help"}, http.StatusOK, ""},
-	{"appliance-network-validate-help", []string{"appliance", "network", "validate", "--help"}, http.StatusOK, ""},
-	{"appliance-public-address-configure-help", []string{"appliance", "public-address", "configure", "--help"}, http.StatusOK, ""},
-	{"appliance-gateway-register-local-help", []string{"appliance", "gateway", "register-local", "--help"}, http.StatusOK, ""},
-	{"appliance-credentials-bootstrap-help", []string{"appliance", "credentials", "bootstrap", "--help"}, http.StatusOK, ""},
-	{"appliance-diagnostics-create-help", []string{"appliance", "diagnostics", "create", "--help"}, http.StatusOK, ""},
-	{"appliance-logs-help", []string{"appliance", "logs", "--help"}, http.StatusOK, ""},
-	{"appliance-backup-help", []string{"appliance", "backup", "--help"}, http.StatusOK, ""},
+	{"appliance-help", []string{"appliance", "--help"}, http.StatusOK, "", ""},
+	{"appliance-status-help", []string{"appliance", "status", "--help"}, http.StatusOK, "", ""},
+	{"appliance-network-validate-help", []string{"appliance", "network", "validate", "--help"}, http.StatusOK, "", ""},
+	{"appliance-public-address-configure-help", []string{"appliance", "public-address", "configure", "--help"}, http.StatusOK, "", ""},
+	{"appliance-gateway-register-local-help", []string{"appliance", "gateway", "register-local", "--help"}, http.StatusOK, "", ""},
+	{"appliance-credentials-bootstrap-help", []string{"appliance", "credentials", "bootstrap", "--help"}, http.StatusOK, "", ""},
+	{"appliance-diagnostics-create-help", []string{"appliance", "diagnostics", "create", "--help"}, http.StatusOK, "", ""},
+	{"appliance-logs-help", []string{"appliance", "logs", "--help"}, http.StatusOK, "", ""},
+	{"appliance-backup-help", []string{"appliance", "backup", "--help"}, http.StatusOK, "", ""},
 
 	// The full delete family, pinned ahead of its error-handling
 	// migration: these are the success surfaces the conversion must not
 	// move. Invocations follow each command's own documented example.
-	{"delete-apikey", []string{"delete", "apikey", "lxb_abc123"}, http.StatusOK, successBody},
-	{"delete-bfd", []string{"delete", "bfd", "32.32.32.2", "--instance=default"}, http.StatusOK, successBody},
-	{"delete-bgpneighbor", []string{"delete", "bgpneighbor", "10.10.10.2", "65001"}, http.StatusOK, successBody},
-	{"delete-cert", []string{"delete", "cert", "web"}, http.StatusOK, successBody},
-	{"delete-endpoint", []string{"delete", "endpoint", "31.31.31.31", "--name=31.31.31.31_http_8080", "--probetype=http", "--probeport=8080"}, http.StatusOK, successBody},
-	{"delete-fdb", []string{"delete", "fdb", "aa:bb:cc:dd:ee:ff", "eno1"}, http.StatusOK, successBody},
-	{"delete-firewall", []string{"delete", "firewall", "--firewallRule=sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200"}, http.StatusOK, successBody},
-	{"delete-ip", []string{"delete", "ip", "10.10.10.1/24", "eno1"}, http.StatusOK, successBody},
-	{"delete-mirror", []string{"delete", "mirror", "mirr-1"}, http.StatusOK, successBody},
-	{"delete-neighbor", []string{"delete", "neighbor", "10.10.10.2", "eno1"}, http.StatusOK, successBody},
-	{"delete-opa", []string{"delete", "opa"}, http.StatusOK, successBody},
-	{"delete-policy", []string{"delete", "policy", "pol-1"}, http.StatusOK, successBody},
-	{"delete-route", []string{"delete", "route", "192.168.10.0/24"}, http.StatusOK, successBody},
-	{"delete-session", []string{"delete", "session", "user-1"}, http.StatusOK, successBody},
-	{"delete-sessionulcl", []string{"delete", "sessionulcl", "user-1", "--ulclArgs=10.10.10.1"}, http.StatusOK, successBody},
-	{"delete-sni", []string{"delete", "sni", "--hostname=api.example.com"}, http.StatusOK, successBody},
-	{"delete-vlan", []string{"delete", "vlan", "100"}, http.StatusOK, successBody},
-	{"delete-vlanmember", []string{"delete", "vlanmember", "100", "eno1", "--tagged=true"}, http.StatusOK, successBody},
-	{"delete-vxlan", []string{"delete", "vxlan", "50"}, http.StatusOK, successBody},
-	{"delete-vxlanpeer", []string{"delete", "vxlanpeer", "50", "30.1.3.1"}, http.StatusOK, successBody},
+	{"delete-apikey", []string{"delete", "apikey", "lxb_abc123"}, http.StatusOK, successBody, ""},
+	{"delete-bfd", []string{"delete", "bfd", "32.32.32.2", "--instance=default"}, http.StatusOK, successBody, ""},
+	{"delete-bgpneighbor", []string{"delete", "bgpneighbor", "10.10.10.2", "65001"}, http.StatusOK, successBody, ""},
+	{"delete-cert", []string{"delete", "cert", "web"}, http.StatusOK, successBody, ""},
+	{"delete-endpoint", []string{"delete", "endpoint", "31.31.31.31", "--name=31.31.31.31_http_8080", "--probetype=http", "--probeport=8080"}, http.StatusOK, successBody, ""},
+	{"delete-fdb", []string{"delete", "fdb", "aa:bb:cc:dd:ee:ff", "eno1"}, http.StatusOK, successBody, ""},
+	{"delete-firewall", []string{"delete", "firewall", "--firewallRule=sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200"}, http.StatusOK, successBody, ""},
+	{"delete-ip", []string{"delete", "ip", "10.10.10.1/24", "eno1"}, http.StatusOK, successBody, ""},
+	{"delete-mirror", []string{"delete", "mirror", "mirr-1"}, http.StatusOK, successBody, ""},
+	{"delete-neighbor", []string{"delete", "neighbor", "10.10.10.2", "eno1"}, http.StatusOK, successBody, ""},
+	{"delete-opa", []string{"delete", "opa"}, http.StatusOK, successBody, ""},
+	{"delete-policy", []string{"delete", "policy", "pol-1"}, http.StatusOK, successBody, ""},
+	{"delete-route", []string{"delete", "route", "192.168.10.0/24"}, http.StatusOK, successBody, ""},
+	{"delete-session", []string{"delete", "session", "user-1"}, http.StatusOK, successBody, ""},
+	{"delete-sessionulcl", []string{"delete", "sessionulcl", "user-1", "--ulclArgs=10.10.10.1"}, http.StatusOK, successBody, ""},
+	{"delete-sni", []string{"delete", "sni", "--hostname=api.example.com"}, http.StatusOK, successBody, ""},
+	{"delete-vlan", []string{"delete", "vlan", "100"}, http.StatusOK, successBody, ""},
+	{"delete-vlanmember", []string{"delete", "vlanmember", "100", "eno1", "--tagged=true"}, http.StatusOK, successBody, ""},
+	{"delete-vxlan", []string{"delete", "vxlan", "50"}, http.StatusOK, successBody, ""},
+	{"delete-vxlanpeer", []string{"delete", "vxlanpeer", "50", "30.1.3.1"}, http.StatusOK, successBody, ""},
 
 	// The full create family, pinned ahead of its error-handling
 	// migration, same contract as the delete block above: these are the
 	// success surfaces the conversion must not move. Invocations follow
 	// each command's own documented example. create-lb and create-persist
 	// are already pinned with the founding cases.
-	{"create-apikey", []string{"create", "apikey", "--tenant-id=tenant-a", "--name=key-1", "--allowed-models=llama-70b,mistral-7b", "--rps=5", "--burst=10", "--tokens-per-min=1000"}, http.StatusCreated, apiKeyCreatedBody},
-	{"create-bfd", []string{"create", "bfd", "32.32.32.2", "--instance=default", "--sourceIP=32.32.32.1", "--interval=200000", "--retryCount=3"}, http.StatusOK, successBody},
-	{"create-bgpneighbor", []string{"create", "bgpneighbor", "10.10.10.1", "64512"}, http.StatusOK, successBody},
-	{"create-cert", []string{"create", "cert", "--cert-file=testdata/fixtures/placeholder-cert.txt", "--key-file=testdata/fixtures/placeholder-key.txt", "--cert-id=web"}, http.StatusCreated, successBody},
-	{"create-endpoint", []string{"create", "endpoint", "32.32.32.1", "--name=32.32.32.1_http_8080", "--probetype=http", "--probeport=8080", "--period=60", "--retries=2"}, http.StatusOK, successBody},
-	{"create-fdb", []string{"create", "fdb", "aa:aa:aa:aa:bb:bb", "eno7"}, http.StatusOK, successBody},
-	{"create-firewall", []string{"create", "firewall", "--firewallRule=sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200", "--allow"}, http.StatusOK, successBody},
-	{"create-ip", []string{"create", "ip", "192.168.0.1/24", "eno7"}, http.StatusOK, successBody},
-	{"create-mirror", []string{"create", "mirror", "mirr-1", "--mirrorInfo=type:0,port:hs0", "--targetObject=attachement:1,mirrObjName:hs1"}, http.StatusOK, successBody},
-	{"create-neighbor", []string{"create", "neighbor", "192.168.0.1", "eno7", "--macAddress=aa:aa:aa:aa:aa:aa"}, http.StatusOK, successBody},
-	{"create-policy", []string{"create", "policy", "pol-rule", "--rate=100:100", "--target=192.0.2.10:443:tcp:rule"}, http.StatusOK, successBody},
-	{"create-route", []string{"create", "route", "192.168.212.0/24", "172.17.0.254", "--proto=static"}, http.StatusOK, successBody},
-	{"create-session", []string{"create", "session", "user1", "192.168.20.1", "--accessNetworkTunnel=1:1.232.16.1", "--coreNetworkTunnel=1:1.233.16.1"}, http.StatusOK, successBody},
-	{"create-sessionulcl", []string{"create", "sessionulcl", "user1", "--ulclArgs=16:192.33.125.1"}, http.StatusOK, successBody},
-	{"create-sni", []string{"create", "sni", "--hostname=api.example.com"}, http.StatusOK, successBody},
-	{"create-user", []string{"create", "user", "--username=admin", "--password=placeholder-pass", "--role=admin"}, http.StatusCreated, successBody},
-	{"create-vlan", []string{"create", "vlan", "100"}, http.StatusOK, successBody},
-	{"create-vlanmember", []string{"create", "vlanmember", "100", "eno7", "--tagged=true"}, http.StatusOK, successBody},
-	{"create-vxlan", []string{"create", "vxlan", "100", "eno7"}, http.StatusOK, successBody},
-	{"create-vxlanpeer", []string{"create", "vxlanpeer", "100", "30.1.3.1"}, http.StatusOK, successBody},
+	{"create-apikey", []string{"create", "apikey", "--tenant-id=tenant-a", "--name=key-1", "--allowed-models=llama-70b,mistral-7b", "--rps=5", "--burst=10", "--tokens-per-min=1000"}, http.StatusCreated, apiKeyCreatedBody, ""},
+	{"create-bfd", []string{"create", "bfd", "32.32.32.2", "--instance=default", "--sourceIP=32.32.32.1", "--interval=200000", "--retryCount=3"}, http.StatusOK, successBody, ""},
+	{"create-bgpneighbor", []string{"create", "bgpneighbor", "10.10.10.1", "64512"}, http.StatusOK, successBody, ""},
+	{"create-cert", []string{"create", "cert", "--cert-file=testdata/fixtures/placeholder-cert.txt", "--key-file=testdata/fixtures/placeholder-key.txt", "--cert-id=web"}, http.StatusCreated, successBody, ""},
+	{"create-endpoint", []string{"create", "endpoint", "32.32.32.1", "--name=32.32.32.1_http_8080", "--probetype=http", "--probeport=8080", "--period=60", "--retries=2"}, http.StatusOK, successBody, ""},
+	{"create-fdb", []string{"create", "fdb", "aa:aa:aa:aa:bb:bb", "eno7"}, http.StatusOK, successBody, ""},
+	{"create-firewall", []string{"create", "firewall", "--firewallRule=sourceIP:1.2.3.2/32,destinationIP:2.3.1.2/32,preference:200", "--allow"}, http.StatusOK, successBody, ""},
+	{"create-ip", []string{"create", "ip", "192.168.0.1/24", "eno7"}, http.StatusOK, successBody, ""},
+	{"create-mirror", []string{"create", "mirror", "mirr-1", "--mirrorInfo=type:0,port:hs0", "--targetObject=attachement:1,mirrObjName:hs1"}, http.StatusOK, successBody, ""},
+	{"create-neighbor", []string{"create", "neighbor", "192.168.0.1", "eno7", "--macAddress=aa:aa:aa:aa:aa:aa"}, http.StatusOK, successBody, ""},
+	{"create-policy", []string{"create", "policy", "pol-rule", "--rate=100:100", "--target=192.0.2.10:443:tcp:rule"}, http.StatusOK, successBody, ""},
+	{"create-route", []string{"create", "route", "192.168.212.0/24", "172.17.0.254", "--proto=static"}, http.StatusOK, successBody, ""},
+	{"create-session", []string{"create", "session", "user1", "192.168.20.1", "--accessNetworkTunnel=1:1.232.16.1", "--coreNetworkTunnel=1:1.233.16.1"}, http.StatusOK, successBody, ""},
+	{"create-sessionulcl", []string{"create", "sessionulcl", "user1", "--ulclArgs=16:192.33.125.1"}, http.StatusOK, successBody, ""},
+	{"create-sni", []string{"create", "sni", "--hostname=api.example.com"}, http.StatusOK, successBody, ""},
+	{"create-user", []string{"create", "user", "--username=admin", "--password=placeholder-pass", "--role=admin"}, http.StatusCreated, successBody, ""},
+	{"create-vlan", []string{"create", "vlan", "100"}, http.StatusOK, successBody, ""},
+	{"create-vlanmember", []string{"create", "vlanmember", "100", "eno7", "--tagged=true"}, http.StatusOK, successBody, ""},
+	{"create-vxlan", []string{"create", "vxlan", "100", "eno7"}, http.StatusOK, successBody, ""},
+	{"create-vxlanpeer", []string{"create", "vxlanpeer", "100", "30.1.3.1"}, http.StatusOK, successBody, ""},
 
 	// The get, set, and apply families, pinned ahead of their
 	// error-handling migration, same contract as the blocks above.
@@ -343,54 +413,104 @@ var goldenCases = []goldenCase{
 	// no-items rendering; mutation verbs get the standard success body.
 	// The login family is deliberately not pinned: it writes fixed-path
 	// token files under /tmp, which a test must not touch.
-	{"get-apikey", []string{"get", "apikey", "--tenant-id=tenant-a"}, http.StatusOK, `[]`},
-	{"get-bfd", []string{"get", "bfd"}, http.StatusOK, `{}`},
-	{"get-bgpneighbor", []string{"get", "bgpneighbor"}, http.StatusOK, `{}`},
-	{"get-cert", []string{"get", "cert", "web"}, http.StatusOK, `{}`},
-	{"get-conntrack", []string{"get", "conntrack"}, http.StatusOK, `{}`},
-	{"get-dpu", []string{"get", "dpu"}, http.StatusOK, `{}`},
-	{"get-endpoint", []string{"get", "endpoint"}, http.StatusOK, `{}`},
-	{"get-fdb", []string{"get", "fdb"}, http.StatusOK, `{}`},
-	{"get-firewall", []string{"get", "firewall"}, http.StatusOK, `{}`},
-	{"get-gpu", []string{"get", "gpu"}, http.StatusOK, `{}`},
-	{"get-hastate", []string{"get", "hastate"}, http.StatusOK, `{}`},
-	{"get-ip", []string{"get", "ip"}, http.StatusOK, `{}`},
-	{"get-kvinventory", []string{"get", "kvinventory", "--service-id=3", "--ep-idx=0"}, http.StatusOK, `{}`},
-	{"get-l4trace", []string{"get", "l4trace"}, http.StatusOK, `{}`},
-	{"get-lbversion", []string{"get", "lbversion"}, http.StatusOK, `{}`},
-	{"get-llamafirewall", []string{"get", "llamafirewall"}, http.StatusOK, `{}`},
-	{"get-log-level", []string{"get", "log-level"}, http.StatusOK, `{}`},
-	{"get-metrics", []string{"get", "metrics"}, http.StatusOK, `{}`},
-	{"get-mirror", []string{"get", "mirror"}, http.StatusOK, `{}`},
-	{"get-neighbor", []string{"get", "neighbor"}, http.StatusOK, `{}`},
-	{"get-opa", []string{"get", "opa"}, http.StatusOK, `{}`},
-	{"get-pii", []string{"get", "pii"}, http.StatusOK, `{}`},
-	{"get-policy", []string{"get", "policy"}, http.StatusOK, `{}`},
-	{"get-port", []string{"get", "port"}, http.StatusOK, `{}`},
-	{"get-process", []string{"get", "process"}, http.StatusOK, `{}`},
-	{"get-device", []string{"get", "device"}, http.StatusOK, `{}`},
-	{"get-filesystem", []string{"get", "filesystem"}, http.StatusOK, `{}`},
-	{"get-ratelimit", []string{"get", "ratelimit", "tenant-a"}, http.StatusOK, `{}`},
-	{"get-route", []string{"get", "route"}, http.StatusOK, `{}`},
-	{"get-session", []string{"get", "session"}, http.StatusOK, `{}`},
-	{"get-sessionulcl", []string{"get", "sessionulcl"}, http.StatusOK, `{}`},
-	{"get-sni", []string{"get", "sni"}, http.StatusOK, `{}`},
-	{"get-trace", []string{"get", "trace"}, http.StatusOK, `{}`},
-	{"get-vlan", []string{"get", "vlan"}, http.StatusOK, `{}`},
-	{"get-vxlan", []string{"get", "vxlan"}, http.StatusOK, `{}`},
-	{"set-apikey", []string{"set", "apikey", "lxb_abc123", "--enabled=false"}, http.StatusOK, successBody},
-	{"set-bfd", []string{"set", "bfd", "32.32.32.2", "--interval=200000"}, http.StatusOK, successBody},
-	{"set-dpu", []string{"set", "dpu", "--action", "unregister", "--plugin", "doca"}, http.StatusOK, successBody},
-	{"set-gpu", []string{"set", "gpu", "--enable"}, http.StatusOK, successBody},
-	{"set-l4trace", []string{"set", "l4trace", "--enable", "--sampling-rate", "100"}, http.StatusOK, successBody},
-	{"set-llamafirewall", []string{"set", "llamafirewall", "--enable"}, http.StatusOK, successBody},
-	{"set-log-level", []string{"set", "log-level", "debug"}, http.StatusOK, successBody},
-	{"set-metrics", []string{"set", "metrics", "--enable"}, http.StatusOK, successBody},
-	{"set-opa", []string{"set", "opa", "--opa-url", "http://opa.example.com:8181"}, http.StatusOK, successBody},
-	{"set-pii", []string{"set", "pii", "--enable"}, http.StatusOK, successBody},
-	{"set-ratelimit", []string{"set", "ratelimit", "--tenant-id=tenant-a", "--rps=50", "--tokens-per-min=2000"}, http.StatusOK, successBody},
-	{"set-trace", []string{"set", "trace", "--enable"}, http.StatusOK, successBody},
-	{"apply-file", []string{"apply", "-f", "testdata/fixtures/apply-vlan.yaml"}, http.StatusOK, successBody},
+	{"get-apikey", []string{"get", "apikey", "--tenant-id=tenant-a"}, http.StatusOK, `[]`, ""},
+	{"get-bfd", []string{"get", "bfd"}, http.StatusOK, `{}`, ""},
+	{"get-bgpneighbor", []string{"get", "bgpneighbor"}, http.StatusOK, `{}`, ""},
+	{"get-cert", []string{"get", "cert", "web"}, http.StatusOK, `{}`, ""},
+	{"get-conntrack", []string{"get", "conntrack"}, http.StatusOK, `{}`, ""},
+	{"get-dpu", []string{"get", "dpu"}, http.StatusOK, `{}`, ""},
+	{"get-endpoint", []string{"get", "endpoint"}, http.StatusOK, `{}`, ""},
+	{"get-fdb", []string{"get", "fdb"}, http.StatusOK, `{}`, ""},
+	{"get-firewall", []string{"get", "firewall"}, http.StatusOK, `{}`, ""},
+	{"get-gpu", []string{"get", "gpu"}, http.StatusOK, `{}`, ""},
+	{"get-hastate", []string{"get", "hastate"}, http.StatusOK, `{}`, ""},
+	{"get-ip", []string{"get", "ip"}, http.StatusOK, `{}`, ""},
+	{"get-kvinventory", []string{"get", "kvinventory", "--service-id=3", "--ep-idx=0"}, http.StatusOK, `{}`, ""},
+	{"get-l4trace", []string{"get", "l4trace"}, http.StatusOK, `{}`, ""},
+	{"get-lbversion", []string{"get", "lbversion"}, http.StatusOK, `{}`, ""},
+	{"get-llamafirewall", []string{"get", "llamafirewall"}, http.StatusOK, `{}`, ""},
+	{"get-log-level", []string{"get", "log-level"}, http.StatusOK, `{}`, ""},
+	{"get-metrics", []string{"get", "metrics"}, http.StatusOK, `{}`, ""},
+	{"get-mirror", []string{"get", "mirror"}, http.StatusOK, `{}`, ""},
+	{"get-neighbor", []string{"get", "neighbor"}, http.StatusOK, `{}`, ""},
+	{"get-opa", []string{"get", "opa"}, http.StatusOK, `{}`, ""},
+	{"get-pii", []string{"get", "pii"}, http.StatusOK, `{}`, ""},
+	{"get-policy", []string{"get", "policy"}, http.StatusOK, `{}`, ""},
+	{"get-port", []string{"get", "port"}, http.StatusOK, `{}`, ""},
+	{"get-process", []string{"get", "process"}, http.StatusOK, `{}`, ""},
+	{"get-device", []string{"get", "device"}, http.StatusOK, `{}`, ""},
+	{"get-filesystem", []string{"get", "filesystem"}, http.StatusOK, `{}`, ""},
+	{"get-ratelimit", []string{"get", "ratelimit", "tenant-a"}, http.StatusOK, `{}`, ""},
+	{"get-route", []string{"get", "route"}, http.StatusOK, `{}`, ""},
+	{"get-session", []string{"get", "session"}, http.StatusOK, `{}`, ""},
+	{"get-sessionulcl", []string{"get", "sessionulcl"}, http.StatusOK, `{}`, ""},
+	{"get-sni", []string{"get", "sni"}, http.StatusOK, `{}`, ""},
+	{"get-trace", []string{"get", "trace"}, http.StatusOK, `{}`, ""},
+	{"get-vlan", []string{"get", "vlan"}, http.StatusOK, `{}`, ""},
+	{"get-vxlan", []string{"get", "vxlan"}, http.StatusOK, `{}`, ""},
+	{"set-apikey", []string{"set", "apikey", "lxb_abc123", "--enabled=false"}, http.StatusOK, successBody, ""},
+	{"set-apikey-rate", []string{"set", "apikey", "lxb_abc123", "--rate-limit-rps=20", "--burst-size=0", "--tokens-per-min=5000"}, http.StatusNoContent, "", ""},
+	{"set-bfd", []string{"set", "bfd", "32.32.32.2", "--interval=200000"}, http.StatusOK, successBody, ""},
+	{"set-dpu", []string{"set", "dpu", "--action", "unregister", "--plugin", "doca"}, http.StatusOK, successBody, ""},
+	{"set-gpu", []string{"set", "gpu", "--enable"}, http.StatusOK, successBody, ""},
+	{"set-l4trace", []string{"set", "l4trace", "--enable", "--sampling-rate", "100"}, http.StatusOK, successBody, ""},
+	{"set-llamafirewall", []string{"set", "llamafirewall", "--enable"}, http.StatusOK, successBody, ""},
+	{"set-log-level", []string{"set", "log-level", "debug"}, http.StatusOK, successBody, ""},
+	{"set-metrics", []string{"set", "metrics", "--enable"}, http.StatusOK, successBody, ""},
+	{"set-opa", []string{"set", "opa", "--opa-url", "http://opa.example.com:8181"}, http.StatusOK, successBody, ""},
+	{"set-pii", []string{"set", "pii", "--enable"}, http.StatusOK, successBody, ""},
+	{"set-ratelimit", []string{"set", "ratelimit", "--tenant-id=tenant-a", "--rps=50", "--tokens-per-min=2000"}, http.StatusOK, successBody, ""},
+	{"set-trace", []string{"set", "trace", "--enable"}, http.StatusOK, successBody, ""},
+	{"apply-file", []string{"apply", "-f", "testdata/fixtures/apply-vlan.yaml"}, http.StatusOK, successBody, ""},
+
+	// The gateway-sync surfaces (loxilb-inference-gateway 7a58e59): the
+	// feature tokens a gateway advertises, the priority bands on a rule
+	// (configured beside effective, the per-band table), the priority
+	// fields on keys and tenants, and the objective and netidentity
+	// resources. The commands that gate on a feature read /version first,
+	// so they run against a gateway that answers it; the warning that the
+	// token is not advertised (none is, at 7a58e59) is part of the pinned
+	// stderr.
+	{"get-lbversion-features", []string{"get", "lbversion"}, http.StatusOK, gatewayVersionBody, ""},
+	{"get-lb-wide-bands", []string{"get", "lb", "-o", "wide"}, http.StatusOK, bandsLbBody, ""},
+	{"get-lb-bands", []string{"get", "lb", "--bands"}, http.StatusOK, bandsLbBody, gatewayVersionBody},
+	{"get-lb-bands-none", []string{"get", "lb", "--bands"}, http.StatusOK, oneLbBody, gatewayVersionBody},
+	{"get-lb-json-bands", []string{"get", "lb", "-o", "json"}, http.StatusOK, bandsLbBody, ""},
+	{"create-lb-bands", []string{"create", "lb", "192.0.2.20", "--tcp=8000:8000", "--mode=fullproxy", "--endpoints=203.0.113.1:1",
+		"--fc-mode=enforce", "--fc-wake-policy=weighted", "--fc-band-weights=8:3:1", "--fc-band-min-share-pct=10:5:0",
+		"--fc-critical-reserve-pct=10", "--fc-shed-queue=on", "--ai-default-reservation=on", "--ai-default-max-tokens=512",
+		"--ai-objective-strict"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"create-apikey-priority", []string{"create", "apikey", "--tenant-id=tenant-a", "--name=key-1", "--priority-class=sheddable", "--default-objective=batch", "--allowed-objectives=batch"}, http.StatusCreated, apiKeyCreatedBody, gatewayVersionBody},
+	{"get-apikey-wide", []string{"get", "apikey", "--tenant-id=tenant-a", "-o", "wide"}, http.StatusOK, apiKeyPriorityListBody, ""},
+	{"set-apikey-priority", []string{"set", "apikey", "lxb_abc123", "--priority-class=critical", "--allowed-objectives="}, http.StatusNoContent, "", gatewayVersionBody},
+	{"set-ratelimit-priority", []string{"set", "ratelimit", "--tenant-id=tenant-a", "--priority-class=critical", "--default-objective=interactive", "--allowed-objectives=interactive,batch"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"get-ratelimit-wide", []string{"get", "ratelimit", "tenant-a", "-o", "wide"}, http.StatusOK, ratelimitPriorityBody, ""},
+	{"create-objective", []string{"create", "objective", "batch", "--priority=-5", "--services=192.0.2.20:8000"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"create-objective-help", []string{"create", "objective", "--help"}, http.StatusOK, "", ""},
+	{"get-objective-human", []string{"get", "objective"}, http.StatusOK, objectiveListBody, gatewayVersionBody},
+	{"get-objective-named", []string{"get", "objective", "batch"}, http.StatusOK, objectiveListBody, gatewayVersionBody},
+	{"get-objective-json", []string{"get", "objective", "-o", "json"}, http.StatusOK, objectiveListBody, gatewayVersionBody},
+	{"get-objective-help", []string{"get", "objective", "--help"}, http.StatusOK, "", ""},
+	{"delete-objective", []string{"delete", "objective", "batch"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"delete-objective-help", []string{"delete", "objective", "--help"}, http.StatusOK, "", ""},
+	{"create-netidentity", []string{"create", "netidentity", "lab", "--tenant=tenant-a", "--cidr=10.10.0.0/16", "--services=192.0.2.20:8000", "--priority-class=critical", "--forward-identity"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"create-netidentity-warning", []string{"create", "netidentity", "edge", "--tenant=tenant-b", "--vlan=100", "--credential=network", "--enforce=strict", "--fail-mode=closed"},
+		http.StatusOK, `{"result":"Success; warning: match.vlan: no interface vlan100 on this node; the binding matches nothing until it exists"}`, gatewayVersionBody},
+	{"create-netidentity-help", []string{"create", "netidentity", "--help"}, http.StatusOK, "", ""},
+	{"get-netidentity-human", []string{"get", "netidentity"}, http.StatusOK, netIdentityListBody, gatewayVersionBody},
+	{"get-netidentity-wide", []string{"get", "netidentity", "-o", "wide"}, http.StatusOK, netIdentityListBody, gatewayVersionBody},
+	{"get-netidentity-json", []string{"get", "netidentity", "lab", "-o", "json"}, http.StatusOK, netIdentityListBody, gatewayVersionBody},
+	{"get-netidentity-help", []string{"get", "netidentity", "--help"}, http.StatusOK, "", ""},
+	{"delete-netidentity", []string{"delete", "netidentity", "lab"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"delete-netidentity-help", []string{"delete", "netidentity", "--help"}, http.StatusOK, "", ""},
+	{"create-jwtauthprofile", []string{"create", "jwtauthprofile", "okta", "--issuer=https://example.okta.com", "--audiences=ai-gateway,api", "--algs=RS256,ES256", "--leeway-sec=60", "--tenant-claim=org_id", "--model-authz=allow-all", "--forward-identity", "--priority-class=critical"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"create-jwtauthprofile-help", []string{"create", "jwtauthprofile", "--help"}, http.StatusOK, "", ""},
+	{"get-jwtauthprofile-human", []string{"get", "jwtauthprofile"}, http.StatusOK, jwtAuthProfileListBody, gatewayVersionBody},
+	{"get-jwtauthprofile-wide", []string{"get", "jwtauthprofile", "-o", "wide"}, http.StatusOK, jwtAuthProfileListBody, gatewayVersionBody},
+	{"get-jwtauthprofile-json", []string{"get", "jwtauthprofile", "okta", "-o", "json"}, http.StatusOK, jwtAuthProfileListBody, gatewayVersionBody},
+	{"get-jwtauthprofile-help", []string{"get", "jwtauthprofile", "--help"}, http.StatusOK, "", ""},
+	{"delete-jwtauthprofile", []string{"delete", "jwtauthprofile", "okta"}, http.StatusOK, successBody, gatewayVersionBody},
+	{"delete-jwtauthprofile-help", []string{"delete", "jwtauthprofile", "--help"}, http.StatusOK, "", ""},
 }
 
 // normalize replaces the only run-dependent value — the Go toolchain of the
@@ -404,7 +524,7 @@ func TestGolden(t *testing.T) {
 
 	for _, tc := range goldenCases {
 		t.Run(tc.name, func(t *testing.T) {
-			gw := newFakeGateway(t, tc.status, tc.body)
+			gw := newFakeGatewayVersioned(t, tc.status, tc.body, tc.version)
 			host, port := gw.hostPort(t)
 			args := append([]string{"-s", host, "-p", port}, tc.args...)
 			cmd := exec.Command(binary, args...)

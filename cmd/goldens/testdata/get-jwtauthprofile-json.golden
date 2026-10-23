@@ -1,0 +1,33 @@
+exit=0
+--- stdout ---
+{
+    "jwtAuthProfileAttr": [
+        {
+            "name": "okta",
+            "issuer": "https://example.okta.com",
+            "jwks_url": "https://example.okta.com/keys",
+            "audiences": [
+                "ai-gateway",
+                "api"
+            ],
+            "algs": [
+                "RS256",
+                "ES256"
+            ],
+            "leeway_sec": 60,
+            "refresh_sec": 600,
+            "tenant_claim": "org_id",
+            "user_claim": "sub",
+            "models_claim": "models",
+            "roles_claim": "groups",
+            "model_role_prefix": "llm:",
+            "username_claim": "email",
+            "model_authz": "allow-all",
+            "default_tenant": "public",
+            "forward_identity": true,
+            "authorization_passthrough": true,
+            "priority_class": "critical"
+        }
+    ]
+}
+--- stderr ---

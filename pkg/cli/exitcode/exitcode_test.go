@@ -126,6 +126,7 @@ func TestLabelsMatchTheContractTable(t *testing.T) {
 		OK: "OK", InvalidArgument: "INVALID_ARGUMENT", Auth: "AUTH",
 		Precondition: "PRECONDITION", Unavailable: "UNAVAILABLE",
 		ContractMismatch: "CONTRACT_MISMATCH", Failed: "FAILED", Partial: "PARTIAL",
+		FeatureUnavailable: "FEATURE_UNAVAILABLE",
 	} {
 		if code.Label() != want {
 			t.Errorf("Code %d label %q, want %q", code, code.Label(), want)
@@ -139,7 +140,7 @@ func TestLabelsMatchTheContractTable(t *testing.T) {
 // enum without the other fails here.
 func TestEnvelopeCodeAgreement(t *testing.T) {
 	for _, code := range []Code{OK, InvalidArgument, Auth, Precondition,
-		Unavailable, ContractMismatch, Failed, Partial} {
+		Unavailable, ContractMismatch, Failed, Partial, FeatureUnavailable} {
 		if got := envelope.Code(code.Label()).ExitCode(); got != int(code) {
 			t.Errorf("envelope code %q exits %d, exit taxonomy says %d", code.Label(), got, int(code))
 		}

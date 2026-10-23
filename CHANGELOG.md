@@ -90,6 +90,65 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
   `timeoutMemberData`, `timeoutTcpInspect`) and TLS hardening values
   (`alpn_protocols`, `tls_ciphers`, `tls_versions`), which the gateway now
   reports.
+- Gateway sync with loxilb-inference-gateway 7a58e59 (the consumed contract
+  is pinned to it):
+  - `create lb` takes the priority bands and the default reservation:
+    `--fc-wake-policy`, `--fc-band-weights`, `--fc-band-min-share-pct`,
+    `--fc-band-queue-pct`, `--fc-band-wait-ms` (band triples in the gateway's
+    `critical:standard:sheddable` form, `0:0:0` resets),
+    `--fc-critical-reserve-pct`, `--fc-shed-queue`, `--fc-tenant-wake`,
+    `--fc-llmd-headers`, `--ai-default-reservation`, `--ai-default-max-tokens`
+    and `--ai-objective-strict`. Validation is format only (enum membership,
+    each value's own range); the rules between values are the gateway's 400,
+    printed with the body as received. `get lb -o wide` adds a Bands column
+    (the wake policy as configured beside the one the gate runs, with the
+    gateway's reason), `get lb --bands` prints the per-band table (inflight,
+    queued, wait window, queue share, floor, weight, sources), and `-o json`
+    carries the whole extended `fc_effective` (bands, reservation counters and
+    held claims, class config source, key-store state). A value the gateway
+    did not report prints `-`, never `0`.
+  - `create apikey`, `set apikey` and `set ratelimit` take `--priority-class`
+    (the cap), `--default-objective` and `--allowed-objectives`; `get apikey
+    -o wide` and `get ratelimit -o wide` show them. On the update paths an
+    empty value clears the stored one and an omitted flag keeps it.
+  - `set apikey` takes `--rate-limit-rps`, `--burst-size` and
+    `--tokens-per-min`, the three rate fields the swagger-extras
+    `PATCH /config/ai/apikey/{key_id}` body carries. A flag given goes on
+    the wire with its value, `0` included (the swagger gives zero a meaning:
+    no per-key request limit, a burst of one second's allowance, no token
+    quota); a flag not given keeps the stored value. Changing a key's limit
+    no longer means deleting and recreating the key.
+  - `create|get|delete objective` (`/config/ai/objective`) and
+    `create|get|delete netidentity` (`/config/ai/netidentity`), modelled on
+    the swagger definitions field for field. Neither has a `set`: the gateway
+    offers POST (create or replace), GET and DELETE only.
+  - `create|get|delete jwtauthprofile` (`/config/ai/jwtauthprofile`): the
+    JWT auth profile that LB rules reference by name, all 18 swagger fields
+    as flags (`--issuer` required; `--jwks-url`, `--audiences`, `--algs`,
+    `--leeway-sec`, `--refresh-sec`, the six claim paths, `--model-authz`,
+    `--default-tenant`, `--forward-identity`, `--authorization-passthrough`,
+    `--priority-class`). The default table shows name, issuer, tenant claim
+    and priority class; `-o wide` the rest; `-o json` the whole entry. A
+    delete the gateway refuses with 409 (a rule still references the
+    profile) is exit `4` with its message. The family gates on the
+    gateway's own `jwt_auth_profile` token, advertised since 7a58e59;
+    `--priority-class` additionally gates on `objectives`.
+  - `get lbversion` prints the feature tokens the gateway advertises
+    (`VersionGetEntry.features`).
+  - Exit `9` `FEATURE_UNAVAILABLE` ([contracts/exit-codes.md](contracts/exit-codes.md)):
+    a command that needs a gateway feature reads `/version` first and refuses,
+    sending nothing, when the peer is not a loxilb-inference-gateway (the
+    message names the peer and what it answered), or when the gateway
+    answers 404 for the objective, netidentity or jwtauthprofile path itself. A
+    gateway that does not advertise the feature's token gets one stderr
+    warning and the request is sent, since gateways up to 7a58e59 advertise
+    only `api_key_auth` and `jwt_auth_profile`.
+
+### Changed
+- `create lb`, `create apikey`, `set apikey`, `set ratelimit` and the
+  objective, netidentity and jwtauthprofile commands print a 400 with the gateway's body as
+  received, so the field it names and the reason it gives are shown, not only
+  its generic message.
 
 ### Deprecated
 - `--token`: the literal token is visible in shell history and process

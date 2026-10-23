@@ -1,0 +1,55 @@
+exit=0
+--- stdout ---
+Create or replace a network-identity binding: the tenant of the requests
+that reach AI services from a network (POST /config/ai/netidentity).
+Posting an existing name replaces the binding.
+
+The match is exactly one of --cidr (where a request came from; it does not
+prove who sent it), --ingress-if, --vlan, --vni and --ipsec-tunnel (the
+interface the connection arrived on). A cidr match is for limits, fairness
+and records, never in place of a credential. What the gateway refuses
+(a match that is not exactly one, a credential with a cidr match, a
+forward identity without services, a conflicting binding) is printed as
+it answers.
+
+ex)
+	loxicmd create netidentity lab --tenant=tenant-a --cidr=10.10.0.0/16
+	loxicmd create netidentity edge --tenant=tenant-b --vlan=100 --credential=network --enforce=strict
+
+Usage:
+  loxicmd create netidentity <NAME> --tenant=<tenant> (--cidr=<a.b.c.d/len>,|--ingress-if=<if>|--vlan=<id>|--vni=<vni>|--ipsec-tunnel=<name>) [--services=<VIP:port>,] [--allowed-models=<m>,] [--enforce=advisory|strict] [--credential=none|network] [--forward-identity] [--priority-class=<class>] [--fail-mode=neutral|closed] [flags]
+
+Aliases:
+  netidentity, netidentities, netid
+
+Flags:
+      --allowed-models strings   The models a request admitted or held by this binding may name, compared exactly; empty allows any; at most 256
+      --cidr strings             IPv4 networks in a.b.c.d/len form, without host bits, that the socket peer of the request is in; at most 256
+      --credential string        none (default): the binding never stands in for a credential; network: on a service that requires a credential, a request that presents none is admitted as the binding's tenant (interface matches only)
+      --enforce string           advisory (default): a request that presents a credential is decided by it; strict: a credential whose tenant is not the binding's is refused with 403 network_tenant_mismatch
+      --fail-mode string         What the binding's services do with a request while the binding lookup itself cannot answer: neutral (default) decides it as if the service had no binding, closed refuses it with 503 netid_unavailable
+      --forward-identity         Forward the request's tenant upstream as X-Auth-Tenant, and its user as X-Auth-User, on a request whose source matched this binding; needs --services
+  -h, --help                     help for netidentity
+      --ingress-if string        Name of the interface the connection arrived on, at most 15 characters
+      --ipsec-tunnel string      Name of an IPsec tunnel configured on this node: the tunnel's VTI interface
+      --priority-class string    The highest priority class a request the binding names the tenant of may have: standard, critical or sheddable
+      --services strings         The AI services the binding applies to, each as VIP:port; empty applies it to every AI service; at most 256
+      --tenant string            The tenant a matching request is attributed to, 1 to 127 bytes; the same namespace as API-key and JWT tenants (required)
+      --vlan uint32              A VLAN ID (1 to 4094): the VLAN's bridge interface on this node, vlan<id>
+      --vni uint32               A VXLAN network identifier (1 to 16777215): the interface vxlan<vni> on this node
+
+Global Flags:
+  -s, --apiserver string    Set API server IP address (default "127.0.0.1")
+      --bearer              Send the token as 'Authorization: Bearer <token>' (required by the inference gateway; disable for classic loxilb raw-token targets) (default true)
+      --cacert string       CA certificate (PEM) to verify the server (https only)
+      --cert string         Client certificate (PEM) for mutual TLS (https only)
+  -k, --insecure            Skip TLS certificate verification (https only)
+      --key string          Client private key (PEM) for mutual TLS (https only)
+      --originator          Name this invocation in the gateway's audit trail as 'cli:<os user>@<host>', sent as the X-Loxilb-Originator header (for a service account driving the CLI)
+  -o, --output string       Set output layer (ex.) wide, json)
+  -p, --port int            Set API server port number (default 11111)
+      --protocol string     Set API server http/https (default "http")
+  -t, --timeout int16       Set timeout (default 10)
+      --token string        Set Token for the API server (deprecated: the value is visible in shell history and process listings; use --token-file)
+      --token-file string   Read the API server token from an owner-only (0600) regular file; replaces the deprecated --token
+--- stderr ---

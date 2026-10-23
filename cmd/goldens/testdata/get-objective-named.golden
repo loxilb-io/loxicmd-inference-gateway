@@ -1,0 +1,8 @@
+exit=0
+--- stdout ---
+source: store  source time: 2026-10-23T05:59:00.971Z  store reachable: true  store last read: 2026-10-23T05:59:00.971Z
+| NAME  | PRIORITY |    SERVICES     |         UPDATED          |
+|-------|----------|-----------------|--------------------------|
+| batch |       -5 | 192.0.2.20:8000 | 2026-10-23T05:59:00.960Z |
+--- stderr ---
+warning: gateway does not advertise objectives; sending anyway, the gateway's answer decides

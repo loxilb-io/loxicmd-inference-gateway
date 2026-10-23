@@ -1,0 +1,5 @@
+exit=0
+--- stdout ---
+Network-identity binding 'lab' deleted.
+--- stderr ---
+warning: gateway does not advertise netidentity; sending anyway, the gateway's answer decides

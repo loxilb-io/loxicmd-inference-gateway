@@ -70,8 +70,76 @@ type FcEffective struct {
 	TenantsActive     uint32 `json:"tenants_active,omitempty"       yaml:"tenants_active,omitempty"`
 	// Whether admitted responses carry the admission headers: on or off.
 	ExposeHeaders string `json:"expose_headers,omitempty" yaml:"expose_headers,omitempty"`
+	// Tenants the pool tracks by name at once for the tenant share.
+	TenantSlots uint32 `json:"tenant_slots,omitempty" yaml:"tenant_slots,omitempty"`
+	// The priority bands: the wake policy, shed queue and tenant wake as
+	// configured and as the gate runs them (they differ only when
+	// BandFallbackReason is not none), the llm-d headers switch, whether
+	// any band knob in force differs from its default, and the per-band
+	// counts and knobs in force. Bands is nil when the gateway predates
+	// them.
+	WakePolicy          string            `json:"wake_policy,omitempty"           yaml:"wake_policy,omitempty"`
+	WakePolicyEffective string            `json:"wake_policy_effective,omitempty" yaml:"wake_policy_effective,omitempty"`
+	WeightsInUse        bool              `json:"weights_in_use,omitempty"        yaml:"weights_in_use,omitempty"`
+	ShedQueue           string            `json:"shed_queue,omitempty"            yaml:"shed_queue,omitempty"`
+	ShedQueueEffective  string            `json:"shed_queue_effective,omitempty"  yaml:"shed_queue_effective,omitempty"`
+	TenantWake          string            `json:"tenant_wake,omitempty"           yaml:"tenant_wake,omitempty"`
+	TenantWakeEffective string            `json:"tenant_wake_effective,omitempty" yaml:"tenant_wake_effective,omitempty"`
+	BandFallbackReason  string            `json:"band_fallback_reason,omitempty"  yaml:"band_fallback_reason,omitempty"`
+	LlmdHeaders         string            `json:"llmd_headers,omitempty"          yaml:"llmd_headers,omitempty"`
+	BandsConfigured     bool              `json:"bands_configured,omitempty"      yaml:"bands_configured,omitempty"`
+	Bands               *FcEffectiveBands `json:"bands,omitempty"                 yaml:"bands,omitempty"`
+	// The default completion-token reservation in force and its counters:
+	// the switch and the tokens, the requests clamped below the default
+	// since the process started (by reason), and the claims held right now
+	// on the quota buckets this service reserves on.
+	DefaultReservation       string              `json:"default_reservation,omitempty"        yaml:"default_reservation,omitempty"`
+	DefaultMaxTokens         uint32              `json:"default_max_tokens,omitempty"         yaml:"default_max_tokens,omitempty"`
+	ReservationClampedBurst  uint64              `json:"reservation_clamped_burst,omitempty"  yaml:"reservation_clamped_burst,omitempty"`
+	ReservationClampedBudget uint64              `json:"reservation_clamped_budget,omitempty" yaml:"reservation_clamped_budget,omitempty"`
+	ReservationEpoch         int64               `json:"reservation_epoch,omitempty"          yaml:"reservation_epoch,omitempty"`
+	ReservationHeldClaims    int64               `json:"reservation_held_claims,omitempty"    yaml:"reservation_held_claims,omitempty"`
+	ReservationHeldTruncated bool                `json:"reservation_held_truncated,omitempty" yaml:"reservation_held_truncated,omitempty"`
+	ReservationHeld          []FcReservationHeld `json:"reservation_held,omitempty"           yaml:"reservation_held,omitempty"`
+	// Where the objectives and classes the gateway applies came from
+	// (store, lkg or none), whether the AI key store answered the latest
+	// read (absent when no store is configured) and when a read last
+	// answered. The gateway's, the same on every rule.
+	ConfigSource   string `json:"config_source,omitempty"   yaml:"config_source,omitempty"`
+	StoreReachable *bool  `json:"store_reachable,omitempty" yaml:"store_reachable,omitempty"`
+	StoreLastRead  string `json:"store_last_read,omitempty" yaml:"store_last_read,omitempty"`
 	// Source names where each value came from: rule, env or default.
 	Source *FcEffectiveSource `json:"source,omitempty" yaml:"source,omitempty"`
+}
+
+// FcEffectiveBands is each priority band's live counts and the knobs in
+// force (after any fallback), with the critical reserve beside them. Every
+// value is explicit, zero included, as the gateway reports it.
+type FcEffectiveBands struct {
+	CriticalReservePct   uint32          `json:"critical_reserve_pct"   yaml:"critical_reserve_pct"`
+	CriticalReserveUnits uint32          `json:"critical_reserve_units" yaml:"critical_reserve_units"`
+	Critical             FcBandEffective `json:"critical"               yaml:"critical"`
+	Standard             FcBandEffective `json:"standard"               yaml:"standard"`
+	Sheddable            FcBandEffective `json:"sheddable"              yaml:"sheddable"`
+}
+
+// FcBandEffective is one priority band as the capacity gate holds it.
+type FcBandEffective struct {
+	Inflight    uint32 `json:"inflight"      yaml:"inflight"`
+	Queued      uint32 `json:"queued"        yaml:"queued"`
+	WaitMs      uint32 `json:"wait_ms"       yaml:"wait_ms"`
+	QueuePct    uint32 `json:"queue_pct"     yaml:"queue_pct"`
+	MinSharePct uint32 `json:"min_share_pct" yaml:"min_share_pct"`
+	FloorUnits  uint32 `json:"floor_units"   yaml:"floor_units"`
+	Weight      uint32 `json:"weight"        yaml:"weight"`
+	WeightPct   uint32 `json:"weight_pct"    yaml:"weight_pct"`
+}
+
+// FcReservationHeld is one quota bucket holding reserved tokens right now.
+type FcReservationHeld struct {
+	Kind   string `json:"kind"   yaml:"kind"`
+	Bucket string `json:"bucket" yaml:"bucket"`
+	Tokens int64  `json:"tokens" yaml:"tokens"`
 }
 
 // FcEffectiveSource is where each value of FcEffective came from.
@@ -89,6 +157,17 @@ type FcEffectiveSource struct {
 	TtftTargetMs       string `json:"ttft_target_ms,omitempty"       yaml:"ttft_target_ms,omitempty"`
 	TenantMaxSharePct  string `json:"tenant_max_share_pct,omitempty" yaml:"tenant_max_share_pct,omitempty"`
 	ExposeHeaders      string `json:"expose_headers,omitempty"       yaml:"expose_headers,omitempty"`
+	DefaultReservation string `json:"default_reservation,omitempty"  yaml:"default_reservation,omitempty"`
+	DefaultMaxTokens   string `json:"default_max_tokens,omitempty"   yaml:"default_max_tokens,omitempty"`
+	WakePolicy         string `json:"wake_policy,omitempty"          yaml:"wake_policy,omitempty"`
+	BandWeights        string `json:"band_weights,omitempty"         yaml:"band_weights,omitempty"`
+	BandMinSharePct    string `json:"band_min_share_pct,omitempty"   yaml:"band_min_share_pct,omitempty"`
+	CriticalReservePct string `json:"critical_reserve_pct,omitempty" yaml:"critical_reserve_pct,omitempty"`
+	BandWaitMs         string `json:"band_wait_ms,omitempty"         yaml:"band_wait_ms,omitempty"`
+	BandQueuePct       string `json:"band_queue_pct,omitempty"       yaml:"band_queue_pct,omitempty"`
+	ShedQueue          string `json:"shed_queue,omitempty"           yaml:"shed_queue,omitempty"`
+	TenantWake         string `json:"tenant_wake,omitempty"          yaml:"tenant_wake,omitempty"`
+	LlmdHeaders        string `json:"llmd_headers,omitempty"         yaml:"llmd_headers,omitempty"`
 }
 
 type LoadBalancerService struct {
@@ -139,6 +218,27 @@ type LoadBalancerService struct {
 	FcTenantMaxSharePct *uint32 `json:"fc_tenant_max_share_pct,omitempty" yaml:"fc_tenant_max_share_pct,omitempty"`
 	// The admission headers switch (on, off, inherit), sent when given.
 	FcExposeHeaders string `json:"fc_expose_headers,omitempty" yaml:"fc_expose_headers,omitempty"`
+	// The priority bands, under the same presence rules: the enumerated
+	// switches (strict|weighted|inherit, on|off|inherit, fifo|rr|inherit)
+	// are sent when given; the band triples (critical:standard:sheddable,
+	// 0:0:0 resets) and the critical reserve are sent when given, nil
+	// stays off the wire so a replace keeps the rule's current value.
+	FcWakePolicy         string      `json:"fc_wake_policy,omitempty"          yaml:"fc_wake_policy,omitempty"`
+	FcBandWeights        *BandTriple `json:"fc_band_weights,omitempty"         yaml:"fc_band_weights,omitempty"`
+	FcBandMinSharePct    *BandTriple `json:"fc_band_min_share_pct,omitempty"   yaml:"fc_band_min_share_pct,omitempty"`
+	FcCriticalReservePct *uint32     `json:"fc_critical_reserve_pct,omitempty" yaml:"fc_critical_reserve_pct,omitempty"`
+	FcBandWaitMs         *BandTriple `json:"fc_band_wait_ms,omitempty"         yaml:"fc_band_wait_ms,omitempty"`
+	FcBandQueuePct       *BandTriple `json:"fc_band_queue_pct,omitempty"       yaml:"fc_band_queue_pct,omitempty"`
+	FcShedQueue          string      `json:"fc_shed_queue,omitempty"           yaml:"fc_shed_queue,omitempty"`
+	FcTenantWake         string      `json:"fc_tenant_wake,omitempty"          yaml:"fc_tenant_wake,omitempty"`
+	FcLlmdHeaders        string      `json:"fc_llmd_headers,omitempty"         yaml:"fc_llmd_headers,omitempty"`
+	// The default completion-token reservation (on|off|inherit, sent when
+	// given; the tokens sent when given, 0 restores the process default)
+	// and the strict objective switch, a pointer so an explicit false goes
+	// on the wire while an omitted one keeps the rule's current value.
+	AiDefaultReservation string  `json:"ai_default_reservation,omitempty" yaml:"ai_default_reservation,omitempty"`
+	AiDefaultMaxTokens   *uint32 `json:"ai_default_max_tokens,omitempty"  yaml:"ai_default_max_tokens,omitempty"`
+	AiObjectiveStrict    *bool   `json:"ai_objective_strict,omitempty"    yaml:"ai_objective_strict,omitempty"`
 	// Flow-control state the gateway reports on GET; never sent on create.
 	FcEffective *FcEffective `json:"fc_effective,omitempty" yaml:"fc_effective,omitempty"`
 

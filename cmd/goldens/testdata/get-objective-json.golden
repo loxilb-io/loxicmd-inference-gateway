@@ -1,0 +1,25 @@
+exit=0
+--- stdout ---
+{
+    "objectiveAttr": [
+        {
+            "name": "batch",
+            "services": [
+                "192.0.2.20:8000"
+            ],
+            "priority": -5,
+            "updated_at": "2026-10-23T05:59:00.960Z"
+        },
+        {
+            "name": "interactive",
+            "priority": 10,
+            "updated_at": "2026-10-23T05:59:00.946Z"
+        }
+    ],
+    "source": "store",
+    "source_timestamp": "2026-10-23T05:59:00.971Z",
+    "store_reachable": true,
+    "store_last_read": "2026-10-23T05:59:00.971Z"
+}
+--- stderr ---
+warning: gateway does not advertise objectives; sending anyway, the gateway's answer decides

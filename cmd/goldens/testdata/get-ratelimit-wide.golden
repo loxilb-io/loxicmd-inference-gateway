@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+|  TENANT  | RPS | TOKENS/MIN | BURST % | MODEL LIMITS | PRIORITY | DEFAULT OBJECTIVE | ALLOWED OBJECTIVES |       UPDATED        |
+|----------|-----|------------|---------|--------------|----------|-------------------|--------------------|----------------------|
+| tenant-a |  50 |       2000 |     125 |              | critical | interactive       | interactive,batch  | 2026-10-23T05:00:00Z |
+--- stderr ---

@@ -168,6 +168,33 @@ loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-mode=enforce --fc-max-outstanding=8 --fc-expose-headers=on \
   --endpoints=203.0.113.1:1
 
+# The priority bands (gateway 7a58e59; swagger fc_wake_policy, fc_band_*,
+# fc_critical_reserve_pct, fc_shed_queue, fc_tenant_wake, fc_llmd_headers).
+# A band triple is the gateway's own critical:standard:sheddable string (8:3:1);
+# 0:0:0 resets. --fc-wake-policy strict|weighted|inherit; --fc-band-weights (each
+# 0..62, the sum and a zero beside non-zero are the gateway's 400, relayed with its
+# body); --fc-band-min-share-pct and --fc-band-queue-pct (each 0..100);
+# --fc-band-wait-ms (each 0..3600000); --fc-critical-reserve-pct (0..100);
+# --fc-shed-queue on|off|inherit; --fc-tenant-wake fifo|rr|inherit;
+# --fc-llmd-headers on|off|inherit. On a replace an omitted flag keeps the stored
+# value. get lb -o wide shows the wake policy as configured beside the one the gate
+# runs ("weighted (effective: strict, reason: zero_weight)"); get lb --bands prints
+# the per-band table; -o json carries the whole fc_effective.
+loxicmd create lb 192.0.2.32 --tcp=2020:8000 --mode=fullproxy \
+  --fc-mode=enforce --fc-max-outstanding=8 --fc-max-queue-depth=64 --fc-max-queue-wait-ms=30000 \
+  --fc-wake-policy=weighted --fc-band-weights=8:3:1 --fc-band-min-share-pct=10:5:0 \
+  --fc-critical-reserve-pct=10 --fc-shed-queue=on --endpoints=203.0.113.1:1
+loxicmd get lb -o wide
+loxicmd get lb --bands --servName=chat
+
+# The default completion-token reservation and the strict objective switch
+# (swagger ai_default_reservation on|off|inherit, ai_default_max_tokens 0..100000000,
+# ai_objective_strict). fc_effective reads back the value in force, the clamp
+# counters and the claims held.
+loxicmd create lb 192.0.2.32 --tcp=2020:8000 --mode=fullproxy \
+  --ai-default-reservation=on --ai-default-max-tokens=512 --ai-objective-strict \
+  --endpoints=203.0.113.1:1
+
 # get / delete
 loxicmd get lb -o json
 loxicmd delete lb --name=<rule-name>     # L7/fullproxy rules delete by --name
@@ -216,6 +243,10 @@ loxicmd get apikey --tenant-id=tenant-a          # list; raw_key/hash never show
 loxicmd get apikey <key-id>                       # one
 loxicmd set apikey <key-id> --allowed-models=mistral-7b   # PATCH
 loxicmd set apikey <key-id> --enabled=false
+# The three rate fields of the PATCH body (swagger-extras): a flag given is sent with
+# its value, 0 included (no per-key request limit / burst of one second's allowance /
+# no token quota); a flag not given keeps the stored value.
+loxicmd set apikey <key-id> --rate-limit-rps=20 --burst-size=40 --tokens-per-min=5000
 loxicmd delete apikey <key-id>
 
 # Tenant rate limit — swagger /config/ai/tenant/ratelimit   (cicd: ai-apikey)
@@ -224,6 +255,75 @@ loxicmd set ratelimit --tenant-id=tenant-a --rps=50 --tokens-per-min=2000 \
 # A zero model quota is a deletion tombstone for that model-specific limit
 loxicmd set ratelimit --tenant-id=tenant-a --model-limit=mistral-7b=0
 loxicmd get ratelimit tenant-a
+
+# Priority (gateway 7a58e59): the cap (--priority-class standard|critical|sheddable:
+# the highest class a request may have; it never raises one), the objective a request
+# runs at with no hint (--default-objective) and the hints a client may raise with
+# (--allowed-objectives, comma list), on keys and tenants. On set apikey and set
+# ratelimit a flag given goes on the wire, an empty value clears the stored one, a
+# flag not given keeps it; set ratelimit with a class flag alone leaves the limits as
+# they are. get apikey -o wide and get ratelimit -o wide show the three; "-" when unset.
+loxicmd create apikey --tenant-id=tenant-a --name=key-2 --priority-class=sheddable \
+  --default-objective=batch --allowed-objectives=batch
+loxicmd set apikey <key-id> --priority-class=critical
+loxicmd set apikey <key-id> --allowed-objectives=            # clears the list
+loxicmd set ratelimit --tenant-id=tenant-a --priority-class=critical \
+  --default-objective=interactive --allowed-objectives=interactive,batch
+loxicmd get ratelimit tenant-a -o wide
+
+# Objectives — swagger /config/ai/objective (POST creates or replaces, GET lists,
+# DELETE /{name}; there is no PUT or PATCH, so no set). A named request priority:
+# positive --priority is the critical class, negative sheddable, zero standard;
+# --services limits it to "VIP:port" services. get objective prints a line saying
+# whether the list came from the AI key store or the last-known-good file.
+loxicmd create objective interactive --priority=10
+loxicmd create objective batch --priority=-5 --services=192.0.2.20:8000
+loxicmd get objective
+loxicmd get objective batch -o json
+loxicmd delete objective batch
+
+# Network identity — swagger /config/ai/netidentity (POST creates or replaces, GET
+# lists, DELETE /{name}; no set). Binds the requests that reach AI services from a
+# network to a tenant. The match is exactly one of --cidr (a.b.c.d/len, comma list),
+# --ingress-if, --vlan (1..4094), --vni (1..16777215) and --ipsec-tunnel; which may
+# go together, and with --credential=network (interface matches only), is the
+# gateway's 400. --enforce advisory|strict, --credential none|network,
+# --forward-identity (needs --services), --priority-class, --fail-mode
+# neutral|closed, --allowed-models, --services. The gateway's result line is printed
+# as answered, a warning after the status included.
+loxicmd create netidentity lab --tenant=tenant-a --cidr=10.10.0.0/16 --priority-class=critical
+loxicmd create netidentity edge --tenant=tenant-b --vlan=100 --credential=network --enforce=strict
+loxicmd get netidentity -o wide
+loxicmd delete netidentity edge
+
+# JWT auth profiles — swagger /config/ai/jwtauthprofile (POST creates or replaces,
+# GET lists, DELETE /{name}; no set). The named issuer configuration LB rules
+# reference for bearer-token admission. --issuer (required, an http(s) URL, also
+# the OIDC discovery base unless --jwks-url is set); --audiences, --algs (comma
+# lists); --leeway-sec, --refresh-sec (zero selects the gateway default); the claim
+# dot-paths --tenant-claim, --user-claim, --models-claim, --roles-claim,
+# --model-role-prefix, --username-claim; --model-authz claims-required|allow-all;
+# --default-tenant; --forward-identity; --authorization-passthrough;
+# --priority-class (the cap on requests the profile's tokens admit). Only the two
+# enums are checked here; the issuer form and the algorithm list are the gateway's
+# 400. The table shows name, issuer, tenant claim and priority class; -o wide the
+# rest. A profile a rule still references is not deletable: 409, exit 4.
+loxicmd create jwtauthprofile keycloak --issuer=https://sso.example.com/realms/ai
+loxicmd create jwtauthprofile okta --issuer=https://example.okta.com --audiences=ai-gateway \
+  --tenant-claim=org_id --model-authz=allow-all --priority-class=critical
+loxicmd get jwtauthprofile -o wide
+loxicmd get jwtauthprofile okta -o json
+loxicmd delete jwtauthprofile okta
+
+# What the gateway advertises. get lbversion prints VersionGetEntry.features as a
+# line. Commands that use a feature (the band, reservation and strict-objective flags
+# of create lb, get lb --bands, the priority flags, objective, netidentity,
+# jwtauthprofile) read /version first: a peer that is not a loxilb-inference-gateway
+# exits 9 FEATURE_UNAVAILABLE and sends nothing; a gateway that does not advertise
+# the token (at 7a58e59 only jwt_auth_profile is) gets one stderr warning and the
+# request is sent; a 404 for the objective, netidentity or jwtauthprofile path itself
+# is exit 9 too. See contracts/exit-codes.md.
+loxicmd get lbversion
 
 # The service must explicitly require X-Api-Key for enforcement
 loxicmd create lb 192.0.2.20 --tcp=2020:8000 --mode=fullproxy \

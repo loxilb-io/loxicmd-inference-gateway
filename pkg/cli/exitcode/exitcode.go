@@ -58,6 +58,10 @@ const (
 	// Partial — partial apply or recovery required; must never be
 	// retried blindly.
 	Partial Code = 8
+	// FeatureUnavailable — the command needs a gateway feature this peer
+	// does not offer: it is not a loxilb-inference-gateway, or it does not
+	// serve the path the feature lives on. Nothing was sent or changed.
+	FeatureUnavailable Code = 9
 )
 
 // Label returns the envelope `code` string for the taxonomy row.
@@ -79,6 +83,8 @@ func (c Code) Label() string {
 		return "FAILED"
 	case Partial:
 		return "PARTIAL"
+	case FeatureUnavailable:
+		return "FEATURE_UNAVAILABLE"
 	}
 	return "FAILED"
 }

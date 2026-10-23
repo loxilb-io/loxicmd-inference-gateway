@@ -47,6 +47,10 @@ const (
 	ContractMismatch Code = "CONTRACT_MISMATCH" // exit 6
 	Failed           Code = "FAILED"            // exit 7
 	Partial          Code = "PARTIAL"           // exit 8
+	// FeatureUnavailable: the command needs a gateway feature this peer
+	// does not offer (not a loxilb-inference-gateway, or the feature's
+	// path is not served); nothing was sent or changed.
+	FeatureUnavailable Code = "FEATURE_UNAVAILABLE" // exit 9
 )
 
 // ExitCode returns the process exit status frozen for this verdict. An
@@ -71,6 +75,8 @@ func (c Code) ExitCode() int {
 		return 7
 	case Partial:
 		return 8
+	case FeatureUnavailable:
+		return 9
 	}
 	return 1
 }

@@ -1,0 +1,8 @@
+exit=0
+--- stdout ---
+| NAME |  TENANT  |       MATCH       | ENFORCE  | CREDENTIAL | FAIL MODE |
+|------|----------|-------------------|----------|------------|-----------|
+| edge | tenant-b | vlan=100          | strict   | network    | closed    |
+| lab  | tenant-a | cidr=10.10.0.0/16 | advisory | none       | neutral   |
+--- stderr ---
+warning: gateway does not advertise netidentity; sending anyway, the gateway's answer decides

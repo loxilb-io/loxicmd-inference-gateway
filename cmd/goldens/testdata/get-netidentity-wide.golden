@@ -1,0 +1,8 @@
+exit=0
+--- stdout ---
+| NAME |  TENANT  |       MATCH       | ENFORCE  | CREDENTIAL | FAIL MODE | FORWARD IDENTITY | PRIORITY | ALLOWED MODELS |    SERVICES     |
+|------|----------|-------------------|----------|------------|-----------|------------------|----------|----------------|-----------------|
+| edge | tenant-b | vlan=100          | strict   | network    | closed    | false            | standard | -              | -               |
+| lab  | tenant-a | cidr=10.10.0.0/16 | advisory | none       | neutral   | true             | critical | llama-70b      | 192.0.2.20:8000 |
+--- stderr ---
+warning: gateway does not advertise netidentity; sending anyway, the gateway's answer decides

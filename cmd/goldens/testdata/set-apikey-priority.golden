@@ -1,0 +1,5 @@
+exit=0
+--- stdout ---
+API key 'lxb_abc123' updated.
+--- stderr ---
+warning: gateway does not advertise objectives; sending anyway, the gateway's answer decides

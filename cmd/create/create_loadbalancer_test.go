@@ -17,6 +17,7 @@ package create
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -200,7 +201,7 @@ func TestFcEffectiveReadback(t *testing.T) {
 	}
 	want := api.FcEffective{Mode: "enforce", MaxOutstanding: 128, EpMaxInflight: 32, PrefillMaxInflight: 8,
 		DecodeMaxInflight: 24, QueueDepth: 64, QueueWaitMs: 30000, Inflight: 5, Queued: 2, QueueMemoryBoundMib: 64}
-	if *fe != want {
+	if !reflect.DeepEqual(*fe, want) {
 		t.Fatalf("fc_effective = %+v, want %+v", *fe, want)
 	}
 	// Absent on the wire stays nil, so a create body never echoes it back.

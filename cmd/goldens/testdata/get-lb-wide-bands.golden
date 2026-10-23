@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+|   EXT IP   | SEC IPS | SOURCES | HOST | PORT | PROTO | NAME | MARK | SEL |   MODE    |  ENDPOINT   | EPORT | WEIGHT | STATE | COUNTERS |      GATE      | MAX OUT  | ADAPTIVE | TENANTS | HEADERS | BACKEND TLS |             BANDS              |
+|------------|---------|---------|------|------|-------|------|------|-----|-----------|-------------|-------|--------|-------|----------|----------------|----------|----------|---------|---------|-------------|--------------------------------|
+| 192.0.2.20 |         |         |      | 8000 | tcp   | chat |    0 | rr  | fullproxy | 203.0.113.1 |  8000 |      1 | -     | 0:0      | enforce (rule) | 8 (rule) | off      | -       | off     | -           | weighted (effective: strict,   |
+|            |         |         |      |      |       |      |      |     |           |             |       |        |       |          |                |          |          |         |         |             | reason: zero_weight)           |
+--- stderr ---

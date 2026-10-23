@@ -114,15 +114,29 @@ func PrintGetAPIKeyResult(body []byte, o api.RESTOptions, single bool) {
 	}
 	var data [][]string
 	for _, k := range keys {
-		row := []string{
-			k.KeyID, k.TenantID, k.Name, strings.Join(k.AllowedModels, ","),
-			fmt.Sprintf("%d", k.RateLimitRps), fmt.Sprintf("%d", k.BurstSize),
-			fmt.Sprintf("%d", k.TokensPerMin), fmt.Sprintf("%v", k.Enabled),
-		}
-		if wide {
-			row = append(row, k.CreatedAt, k.ExpiresAt)
-		}
-		data = append(data, row)
+		data = append(data, apiKeyRow(k, wide))
 	}
 	TableShow(data, table)
+}
+
+// apiKeyRow renders one key. The wide view adds the timestamps and the
+// priority fields; a priority field the key does not set prints "-".
+func apiKeyRow(k api.AIApiKeySummary, wide bool) []string {
+	row := []string{
+		k.KeyID, k.TenantID, k.Name, strings.Join(k.AllowedModels, ","),
+		fmt.Sprintf("%d", k.RateLimitRps), fmt.Sprintf("%d", k.BurstSize),
+		fmt.Sprintf("%d", k.TokensPerMin), fmt.Sprintf("%v", k.Enabled),
+	}
+	if wide {
+		row = append(row, k.CreatedAt, k.ExpiresAt, dashIfEmpty(k.PriorityClass), dashIfEmpty(k.DefaultObjective), dashIfEmpty(strings.Join(k.AllowedObjectives, ",")))
+	}
+	return row
+}
+
+// dashIfEmpty prints "-" for a value the gateway did not report.
+func dashIfEmpty(s string) string {
+	if s == "" {
+		return "-"
+	}
+	return s
 }

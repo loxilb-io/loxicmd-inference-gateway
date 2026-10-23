@@ -29,6 +29,7 @@ import (
 
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/api"
 	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/exitcode"
+	"github.com/loxilb-io/loxicmd-inference-gateway/pkg/cli/featuregate"
 
 	"github.com/spf13/cobra"
 )
@@ -95,6 +96,32 @@ type CreateLoadBalancerOptions struct {
 
 	// The admission headers on admitted responses: sent when given.
 	FcExposeHeaders string
+
+	// The priority bands: the enumerated switches are sent when given; the
+	// band triples and the critical reserve carry whether their flag was
+	// given, like the queue, so a replace keeps a value it omits.
+	FcWakePolicy            string
+	FcBandWeights           api.BandTriple
+	FcBandMinSharePct       api.BandTriple
+	FcCriticalReservePct    uint32
+	FcBandWaitMs            api.BandTriple
+	FcBandQueuePct          api.BandTriple
+	FcShedQueue             string
+	FcTenantWake            string
+	FcLlmdHeaders           string
+	FcBandWeightsSet        bool
+	FcBandMinSharePctSet    bool
+	FcCriticalReservePctSet bool
+	FcBandWaitMsSet         bool
+	FcBandQueuePctSet       bool
+
+	// The default completion-token reservation and the strict objective
+	// switch, under the same presence rules.
+	AiDefaultReservation  string
+	AiDefaultMaxTokens    uint32
+	AiObjectiveStrict     bool
+	AiDefaultMaxTokensSet bool
+	AiObjectiveStrictSet  bool
 
 	// Active health monitor probe.
 	ProbeType    string
@@ -328,8 +355,18 @@ ex)
 			o.FcWarmupMsSet = cmd.Flags().Changed("fc-warmup-ms")
 			o.FcTtftTargetMsSet = cmd.Flags().Changed("fc-ttft-target-ms")
 			o.FcTenantMaxSharePctSet = cmd.Flags().Changed("fc-tenant-max-share-pct")
+			o.FcBandWeightsSet = cmd.Flags().Changed("fc-band-weights")
+			o.FcBandMinSharePctSet = cmd.Flags().Changed("fc-band-min-share-pct")
+			o.FcCriticalReservePctSet = cmd.Flags().Changed("fc-critical-reserve-pct")
+			o.FcBandWaitMsSet = cmd.Flags().Changed("fc-band-wait-ms")
+			o.FcBandQueuePctSet = cmd.Flags().Changed("fc-band-queue-pct")
+			o.AiDefaultMaxTokensSet = cmd.Flags().Changed("ai-default-max-tokens")
+			o.AiObjectiveStrictSet = cmd.Flags().Changed("ai-objective-strict")
 			if err := validateLBAIOptions(&o); err != nil {
 				return exitcode.Invalidf("%s", err.Error())
+			}
+			if err := requireLBFeatures(restOptions, &o, cmd.ErrOrStderr()); err != nil {
+				return err
 			}
 
 			ProtoPortpair := make(map[string][]string)
@@ -468,7 +505,13 @@ ex)
 					// --kv-hash-algo enum), classified by its status.
 					body, _ := io.ReadAll(resp.Body)
 					ce := exitcode.FromHTTPStatus("create lb", resp.StatusCode)
-					ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+					if resp.StatusCode == http.StatusBadRequest {
+						// The gateway's 400 names the field and the reason
+						// beside its message: printed as received.
+						ce.Message = api.NewAPIError(resp.StatusCode, body).Verbatim()
+					} else {
+						ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
+					}
 					return ce
 				}
 				PrintCreateResult(resp, *restOptions)
@@ -502,6 +545,20 @@ ex)
 	createLbCmd.Flags().StringVar(&o.FcExposeHeaders, "fc-expose-headers", "", "Admission headers on admitted responses: on puts X-Loxilb-Admission-Inflight, -Queued and -Limit (the pool's counts as the response head goes out, and its ceiling in force) on every admitted inference response, streamed ones included; off leaves responses as the backend sent them; inherit returns a replaced rule to the process default (LLB_FC_EXPOSE_HEADERS); omitted keeps the rule's current value on a replace; on is refused with a sockmap mode that accelerates responses")
 	createLbCmd.Flags().Uint32Var(&o.FcTenantMaxSharePct, "fc-tenant-max-share-pct", 0, "The most of the pool ceiling in force, and of the queue depth, one tenant may hold, in percent (rounded up, at least one); a tenant at its share waits for one of its own units or is refused with 429 admission_tenant_share while other tenants still admit; 100 is no share; 0 restores the process default (LLB_FC_TENANT_MAX_SHARE_PCT, else no share); omitted keeps the rule's current value on a replace")
 	createLbCmd.Flags().Uint32Var(&o.FcMaxQueueWaitMs, "fc-max-queue-wait-ms", 0, "Longest wait in the capacity admission queue in milliseconds before 504 admission_queue_timeout; non-zero whenever the rule has a queue depth; omitted keeps the rule's current value on a replace; ceiling 3600000")
+	// The priority bands and the default reservation. Help text is the
+	// first sentence of each field's swagger description.
+	createLbCmd.Flags().StringVar(&o.FcWakePolicy, "fc-wake-policy", "", "Which priority band a freed service unit wakes when requests of several bands wait: strict, weighted or inherit (the process default)")
+	createLbCmd.Flags().Var(bandTripleValue{&o.FcBandWeights}, "fc-band-weights", "The weighted wake's weights, written critical:standard:sheddable (for example 8:3:1): three whole numbers, each 1 to 62, at most 64 together, or 0:0:0 for none")
+	createLbCmd.Flags().Var(bandTripleValue{&o.FcBandMinSharePct}, "fc-band-min-share-pct", "Each band's floor, critical:standard:sheddable, in percent of the service ceiling in force; 0:0:0 is no floor")
+	createLbCmd.Flags().Uint32Var(&o.FcCriticalReservePct, "fc-critical-reserve-pct", 0, "The only true reservation: the percent of the ceiling in force that no other band may take, even when critical is idle (0 to 100)")
+	createLbCmd.Flags().Var(bandTripleValue{&o.FcBandWaitMs}, "fc-band-wait-ms", "Each band's wait window, critical:standard:sheddable, in milliseconds, each 0 to 3600000; 0 is the rule's window")
+	createLbCmd.Flags().Var(bandTripleValue{&o.FcBandQueuePct}, "fc-band-queue-pct", "The most of the queue depth each band may hold, critical:standard:sheddable, in percent; 0 is the shared depth")
+	createLbCmd.Flags().StringVar(&o.FcShedQueue, "fc-shed-queue", "", "off refuses a sheddable request at the ceiling at once with 429 admission_shed; on lets it wait in its band, evicted by a higher band when the queue is full; inherit is the process default")
+	createLbCmd.Flags().StringVar(&o.FcTenantWake, "fc-tenant-wake", "", "The order inside one band: fifo wakes the oldest runnable waiter, rr rotates across the tenants with a runnable waiter; inherit is the process default")
+	createLbCmd.Flags().StringVar(&o.FcLlmdHeaders, "fc-llmd-headers", "", "on adds x-llm-d-request-dropped-reason to admission refusals, honours x-llm-d-inference-ttl and forwards x-llm-d-inference-objective and -fairness-id; off leaves all of it out; inherit is the process default")
+	createLbCmd.Flags().StringVar(&o.AiDefaultReservation, "ai-default-reservation", "", "Whether a request that declares no completion ceiling reserves a default number of completion tokens against the token quotas at admission: on, off or inherit (the process default)")
+	createLbCmd.Flags().Uint32Var(&o.AiDefaultMaxTokens, "ai-default-max-tokens", 0, "The default reservation in tokens, used while ai_default_reservation is in force as on; 0 or omitted leaves the process default in force; at most 100000000")
+	createLbCmd.Flags().BoolVar(&o.AiObjectiveStrict, "ai-objective-strict", false, "What happens to a request that names an objective it may not use: false falls to its default objective and is admitted, true refuses it with 403 objective_not_allowed")
 	createLbCmd.Flags().StringSliceVar(&o.Endpoints, "endpoints", o.Endpoints, "Endpoints is pairs that can be specified as '<endpointIP>:<Weight>'")
 	createLbCmd.Flags().StringVarP(&o.Name, "name", "", o.Name, "Name for load balancer rule")
 	createLbCmd.Flags().BoolVarP(&o.Attach, "attachEP", "", false, "Attach endpoints to the load balancer rule")
@@ -893,7 +950,126 @@ func validateFcQueueOptions(o *CreateLoadBalancerOptions) error {
 	if o.FcTenantMaxSharePct > fcTenantSharePctCeiling {
 		return fmt.Errorf("--fc-tenant-max-share-pct must be within 0..%d", fcTenantSharePctCeiling)
 	}
+	return validateFcBandOptions(o)
+}
+
+// Gateway-side per-value bounds of the band knobs. The rules between values
+// (weights at most 64 together, a zero weight beside non-zero ones, floors
+// and the reserve at most 100 together, a shed queue without a depth) are
+// the gateway's 400, relayed as received.
+const (
+	fcBandWeightCeiling   = 62
+	fcBandPctCeiling      = 100
+	fcBandWaitMsCeiling   = 3600000
+	aiDefaultTokenCeiling = 100000000
+)
+
+// validateFcBandOptions checks the band and reservation flags for format
+// only: enum membership and each value's own range.
+func validateFcBandOptions(o *CreateLoadBalancerOptions) error {
+	for _, c := range []struct {
+		flag, value string
+		allowed     []string
+	}{
+		{"--fc-wake-policy", o.FcWakePolicy, []string{"strict", "weighted", "inherit"}},
+		{"--fc-shed-queue", o.FcShedQueue, []string{"on", "off", "inherit"}},
+		{"--fc-tenant-wake", o.FcTenantWake, []string{"fifo", "rr", "inherit"}},
+		{"--fc-llmd-headers", o.FcLlmdHeaders, []string{"on", "off", "inherit"}},
+		{"--ai-default-reservation", o.AiDefaultReservation, []string{"on", "off", "inherit"}},
+	} {
+		if c.value == "" {
+			continue
+		}
+		ok := false
+		for _, a := range c.allowed {
+			ok = ok || a == c.value
+		}
+		if !ok {
+			return fmt.Errorf("%s must be one of %s", c.flag, strings.Join(c.allowed, "|"))
+		}
+	}
+	for _, c := range []struct {
+		flag    string
+		given   bool
+		triple  api.BandTriple
+		ceiling uint32
+	}{
+		{"--fc-band-weights", o.FcBandWeightsSet, o.FcBandWeights, fcBandWeightCeiling},
+		{"--fc-band-min-share-pct", o.FcBandMinSharePctSet, o.FcBandMinSharePct, fcBandPctCeiling},
+		{"--fc-band-wait-ms", o.FcBandWaitMsSet, o.FcBandWaitMs, fcBandWaitMsCeiling},
+		{"--fc-band-queue-pct", o.FcBandQueuePctSet, o.FcBandQueuePct, fcBandPctCeiling},
+	} {
+		if !c.given {
+			continue
+		}
+		for _, v := range []uint32{c.triple.Critical, c.triple.Standard, c.triple.Sheddable} {
+			if v > c.ceiling {
+				return fmt.Errorf("%s: each value must be within 0..%d", c.flag, c.ceiling)
+			}
+		}
+	}
+	if o.FcCriticalReservePct > fcBandPctCeiling {
+		return fmt.Errorf("--fc-critical-reserve-pct must be within 0..%d", fcBandPctCeiling)
+	}
+	if o.AiDefaultMaxTokens > aiDefaultTokenCeiling {
+		return fmt.Errorf("--ai-default-max-tokens must be within 0..%d", aiDefaultTokenCeiling)
+	}
 	return nil
+}
+
+// lbBandsRequested reports whether any priority band flag was given.
+func lbBandsRequested(o *CreateLoadBalancerOptions) bool {
+	return o.FcWakePolicy != "" || o.FcBandWeightsSet || o.FcBandMinSharePctSet || o.FcCriticalReservePctSet ||
+		o.FcBandWaitMsSet || o.FcBandQueuePctSet || o.FcShedQueue != "" || o.FcTenantWake != "" || o.FcLlmdHeaders != ""
+}
+
+// requireLBFeatures gates the band, reservation and objective flags on
+// what the gateway advertises (contracts/exit-codes.md, FEATURE_UNAVAILABLE):
+// a flag given for a feature the peer does not offer is refused before the
+// request; nothing is read when none is given.
+func requireLBFeatures(restOptions *api.RESTOptions, o *CreateLoadBalancerOptions, stderr io.Writer) error {
+	if lbBandsRequested(o) {
+		if err := featuregate.Require(restOptions, featuregate.Bands, "create lb", stderr); err != nil {
+			return err
+		}
+	}
+	if o.AiDefaultReservation != "" || o.AiDefaultMaxTokensSet {
+		if err := featuregate.Require(restOptions, featuregate.Reservation, "create lb", stderr); err != nil {
+			return err
+		}
+	}
+	if o.AiObjectiveStrictSet {
+		if err := featuregate.Require(restOptions, featuregate.Objectives, "create lb", stderr); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// bandTripleValue is the flag form of a band triple: the command line
+// carries the gateway's own critical:standard:sheddable string, parsed by
+// the one ParseBandTriple, so a malformed value is refused as an invalid
+// argument before any request is built.
+type bandTripleValue struct{ dst *api.BandTriple }
+
+func (v bandTripleValue) String() string { return v.dst.String() }
+func (v bandTripleValue) Type() string   { return "critical:standard:sheddable" }
+func (v bandTripleValue) Set(s string) error {
+	parsed, err := api.ParseBandTriple(s)
+	if err != nil {
+		return err
+	}
+	*v.dst = parsed
+	return nil
+}
+
+// tripleIfGiven returns the triple to send, nil when its flag was not
+// given so it stays off the wire.
+func tripleIfGiven(v api.BandTriple, given bool) *api.BandTriple {
+	if !given {
+		return nil
+	}
+	return &v
 }
 
 // u32IfGiven returns the value to send for an optional numeric flag: nil
@@ -1046,6 +1222,22 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.FcTtftTargetMs = u32IfGiven(o.FcTtftTargetMs, o.FcTtftTargetMsSet)
 	s.FcTenantMaxSharePct = u32IfGiven(o.FcTenantMaxSharePct, o.FcTenantMaxSharePctSet)
 	s.FcExposeHeaders = o.FcExposeHeaders
+	// Priority bands and the default reservation.
+	s.FcWakePolicy = o.FcWakePolicy
+	s.FcBandWeights = tripleIfGiven(o.FcBandWeights, o.FcBandWeightsSet)
+	s.FcBandMinSharePct = tripleIfGiven(o.FcBandMinSharePct, o.FcBandMinSharePctSet)
+	s.FcCriticalReservePct = u32IfGiven(o.FcCriticalReservePct, o.FcCriticalReservePctSet)
+	s.FcBandWaitMs = tripleIfGiven(o.FcBandWaitMs, o.FcBandWaitMsSet)
+	s.FcBandQueuePct = tripleIfGiven(o.FcBandQueuePct, o.FcBandQueuePctSet)
+	s.FcShedQueue = o.FcShedQueue
+	s.FcTenantWake = o.FcTenantWake
+	s.FcLlmdHeaders = o.FcLlmdHeaders
+	s.AiDefaultReservation = o.AiDefaultReservation
+	s.AiDefaultMaxTokens = u32IfGiven(o.AiDefaultMaxTokens, o.AiDefaultMaxTokensSet)
+	if o.AiObjectiveStrictSet || o.AiObjectiveStrict {
+		strict := o.AiObjectiveStrict
+		s.AiObjectiveStrict = &strict
+	}
 	// Model routing / L7.
 	s.ModelName = o.ModelName
 	s.PathPrefix = o.PathPrefix

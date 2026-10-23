@@ -1,0 +1,6 @@
+exit=0
+--- stdout ---
+| KEY ID  |  TENANT  | NAME  |  MODELS   | RPS | BURST | TOKENS/MIN | ENABLED |       CREATED        | EXPIRES | PRIORITY  | DEFAULT OBJECTIVE | ALLOWED OBJECTIVES |
+|---------|----------|-------|-----------|-----|-------|------------|---------|----------------------|---------|-----------|-------------------|--------------------|
+| key-abc | tenant-a | key-1 | llama-70b |   5 |    10 |       1000 | true    | 2026-10-23T05:00:00Z |         | sheddable | batch             | batch              |
+--- stderr ---

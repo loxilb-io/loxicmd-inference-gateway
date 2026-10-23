@@ -1,0 +1,11 @@
+exit=0
+--- stdout ---
+test-lb 20.20.20.1:2020/tcp  bands: -
+|   BAND    | INFLIGHT | QUEUED | WAIT(MS) | QUEUE % | MIN SHARE % | FLOOR UNITS | WEIGHT | WEIGHT % |             SOURCE             |
+|           |          |        |          |         |             |             |        |          |   (WEIGHT/FLOOR/WAIT/QUEUE)    |
+|-----------|----------|--------|----------|---------|-------------|-------------|--------|----------|--------------------------------|
+| critical  | -        | -      | -        | -       | -           | -           | -      | -        | -                              |
+| standard  | -        | -      | -        | -       | -           | -           | -      | -        | -                              |
+| sheddable | -        | -      | -        | -       | -           | -           | -      | -        | -                              |
+--- stderr ---
+warning: gateway does not advertise bands; sending anyway, the gateway's answer decides

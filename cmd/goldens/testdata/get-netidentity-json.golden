@@ -1,0 +1,28 @@
+exit=0
+--- stdout ---
+{
+    "netIdentityAttr": [
+        {
+            "name": "lab",
+            "match": {
+                "cidr": [
+                    "10.10.0.0/16"
+                ]
+            },
+            "services": [
+                "192.0.2.20:8000"
+            ],
+            "tenant": "tenant-a",
+            "allowed_models": [
+                "llama-70b"
+            ],
+            "enforce": "advisory",
+            "credential": "none",
+            "forward_identity": true,
+            "priority_class": "critical",
+            "fail_mode": "neutral"
+        }
+    ]
+}
+--- stderr ---
+warning: gateway does not advertise netidentity; sending anyway, the gateway's answer decides

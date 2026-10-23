@@ -1,0 +1,105 @@
+exit=0
+--- stdout ---
+{
+    "lbAttr": [
+        {
+            "serviceArguments": {
+                "externalIP": "192.0.2.20",
+                "port": 8000,
+                "protocol": "tcp",
+                "sel": 0,
+                "mode": 4,
+                "BGP": false,
+                "Monitor": false,
+                "inactiveTimeOut": 240,
+                "block": 0,
+                "name": "chat",
+                "proxyprotocolv2": false,
+                "egress": false,
+                "fc_wake_policy": "weighted",
+                "fc_band_weights": "8:0:1",
+                "fc_effective": {
+                    "mode": "enforce",
+                    "max_outstanding": 8,
+                    "queue_depth": 64,
+                    "queue_wait_ms": 30000,
+                    "effective_max_outstanding": 8,
+                    "adapt_state": "off",
+                    "expose_headers": "off",
+                    "tenant_slots": 1024,
+                    "wake_policy": "weighted",
+                    "wake_policy_effective": "strict",
+                    "shed_queue": "on",
+                    "shed_queue_effective": "on",
+                    "tenant_wake": "fifo",
+                    "tenant_wake_effective": "fifo",
+                    "band_fallback_reason": "zero_weight",
+                    "llmd_headers": "off",
+                    "bands_configured": true,
+                    "bands": {
+                        "critical_reserve_pct": 10,
+                        "critical_reserve_units": 1,
+                        "critical": {
+                            "inflight": 1,
+                            "queued": 0,
+                            "wait_ms": 0,
+                            "queue_pct": 0,
+                            "min_share_pct": 0,
+                            "floor_units": 0,
+                            "weight": 8,
+                            "weight_pct": 89
+                        },
+                        "standard": {
+                            "inflight": 3,
+                            "queued": 2,
+                            "wait_ms": 5000,
+                            "queue_pct": 50,
+                            "min_share_pct": 20,
+                            "floor_units": 2,
+                            "weight": 0,
+                            "weight_pct": 0
+                        },
+                        "sheddable": {
+                            "inflight": 0,
+                            "queued": 0,
+                            "wait_ms": 1000,
+                            "queue_pct": 20,
+                            "min_share_pct": 0,
+                            "floor_units": 0,
+                            "weight": 1,
+                            "weight_pct": 11
+                        }
+                    },
+                    "default_reservation": "off",
+                    "config_source": "store",
+                    "store_reachable": true,
+                    "source": {
+                        "mode": "rule",
+                        "max_outstanding": "rule",
+                        "wake_policy": "rule",
+                        "band_weights": "rule",
+                        "band_min_share_pct": "default",
+                        "critical_reserve_pct": "rule",
+                        "band_wait_ms": "env",
+                        "band_queue_pct": "default",
+                        "shed_queue": "env",
+                        "tenant_wake": "default",
+                        "llmd_headers": "default"
+                    }
+                }
+            },
+            "secondaryIPs": [],
+            "allowedSources": [],
+            "endpoints": [
+                {
+                    "endpointIP": "203.0.113.1",
+                    "targetPort": 8000,
+                    "weight": 1,
+                    "state": "active",
+                    "counter": "0:0"
+                }
+            ]
+        }
+    ]
+}
+--- stderr ---

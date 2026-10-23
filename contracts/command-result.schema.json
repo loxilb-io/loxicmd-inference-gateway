@@ -43,9 +43,10 @@
         "UNAVAILABLE",
         "CONTRACT_MISMATCH",
         "FAILED",
-        "PARTIAL"
+        "PARTIAL",
+        "FEATURE_UNAVAILABLE"
       ],
-      "description": "Machine verdict, in one-to-one correspondence with the exit-code taxonomy (see exit-codes.md): OK=0, INVALID_ARGUMENT=2, AUTH=3, PRECONDITION=4, UNAVAILABLE=5, CONTRACT_MISMATCH=6, FAILED=7, PARTIAL=8."
+      "description": "Machine verdict, in one-to-one correspondence with the exit-code taxonomy (see exit-codes.md): OK=0, INVALID_ARGUMENT=2, AUTH=3, PRECONDITION=4, UNAVAILABLE=5, CONTRACT_MISMATCH=6, FAILED=7, PARTIAL=8, FEATURE_UNAVAILABLE=9."
     },
     "message": {
       "type": "string",
