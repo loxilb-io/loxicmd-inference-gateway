@@ -50,6 +50,8 @@ const (
 	loxiAIApiKeyResource        = "config/ai/apikey"
 	loxiAITenantRateLimit       = "config/ai/tenant/ratelimit"
 	loxiAIKvInventoryResource   = "config/ai/kv/inventory"
+	loxiAIObjectiveResource     = "config/ai/objective"
+	loxiAINetIdentityResource   = "config/ai/netidentity"
 	loxiUserResource            = "auth/users"
 	loxiCertResource            = "config/cert"
 	loxiSNIResource             = "sni/certificates"
@@ -406,6 +408,32 @@ func (l *LoxiClient) AITenantRatelimit() *AITenantRatelimit {
 				provider:   loxiProvider,
 				apiVersion: loxiApiVersion,
 				resource:   loxiAITenantRateLimit,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AIObjective() *AIObjective {
+	return &AIObjective{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAIObjectiveResource,
+			},
+		},
+	}
+}
+
+func (l *LoxiClient) AINetIdentity() *AINetIdentity {
+	return &AINetIdentity{
+		CommonAPI: CommonAPI{
+			restClient: &l.restClient,
+			requestInfo: RequestInfo{
+				provider:   loxiProvider,
+				apiVersion: loxiApiVersion,
+				resource:   loxiAINetIdentityResource,
 			},
 		},
 	}

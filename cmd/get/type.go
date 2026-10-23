@@ -26,6 +26,9 @@ var (
 	CERT_TITLE               = []string{"Cert ID", "Usage", "Hostnames"}
 	SNI_TITLE                = []string{"Hostname", "Cert Path", "RefCount"}
 	LOADBALANCER_WIDE_TITLE  = []string{"Ext IP", "Sec IPs", "Sources", "Host", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "Endpoint", "EPort", "Weight", "State", "Counters", "Gate", "Max Out", "Adaptive", "Tenants", "Headers", "Backend TLS", "Bands"}
+	OBJECTIVE_TITLE          = []string{"Name", "Priority", "Services", "Updated"}
+	NETIDENTITY_TITLE        = []string{"Name", "Tenant", "Match", "Enforce", "Credential", "Fail Mode"}
+	NETIDENTITY_WIDE_TITLE   = []string{"Name", "Tenant", "Match", "Enforce", "Credential", "Fail Mode", "Forward Identity", "Priority", "Allowed Models", "Services"}
 	LOADBALANCER_BANDS_TITLE = []string{"Band", "Inflight", "Queued", "Wait(ms)", "Queue %", "Min Share %", "Floor Units", "Weight", "Weight %", "Source (weight/floor/wait/queue)"}
 	SESSION_TITLE            = []string{"ident", "session IP"}
 	SESSION_WIDE_TITLE       = []string{"ident", "session IP", "access Network Tunnel", "core Network Tunnel"}
