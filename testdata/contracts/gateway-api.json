@@ -1,9 +1,9 @@
 {
   "source": {
     "repository": "https://github.com/loxilb-io/loxilb-inference-gateway",
-    "revision": "7a58e59b1c18b0eaab8b12a8bc57076618d9d5d3",
-    "swagger_sha256": "9b4e9266d3fef238c105976b37ac6998e6628f4561b5f1f7d179233aa24aa756",
-    "swagger_extras_sha256": "7d7d336f949d574ff8d71502def05c4b1cd4a8d53e8716dbcc6f878d3a19c132"
+    "revision": "55523449a3cb894f5535034855bceef31d6adf59",
+    "swagger_sha256": "a877290ac906cce5847d9647fe848b3e547f6745ef09fc57725fb42c2ede4945",
+    "swagger_extras_sha256": "ce71c78472c97eafcacacc097f1cd99f62ece70f78ec09a514a029dd53abac1c"
   },
   "operations": [
     {
@@ -1892,6 +1892,70 @@
         "features"
       ],
       "type": "array"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "eppEndpoint"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "eppFailureMode"
+      ],
+      "type": "string",
+      "enum": [
+        "FailOpen",
+        "FailClose"
+      ]
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "eppTimeoutMs"
+      ],
+      "type": "integer"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "LoadbalanceEntry",
+      "property_path": [
+        "serviceArguments",
+        "eppPlaintext"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeyCreateRequest",
+      "property_path": [
+        "client_op_id"
+      ],
+      "type": "string"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeyCreateResponse",
+      "property_path": [
+        "reused"
+      ],
+      "type": "boolean"
+    },
+    {
+      "spec": "swagger.yml",
+      "definition": "ApiKeySummary",
+      "property_path": [
+        "client_op_id"
+      ],
+      "type": "string"
     }
   ],
   "model": "general"

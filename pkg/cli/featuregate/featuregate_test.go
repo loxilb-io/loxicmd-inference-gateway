@@ -116,3 +116,32 @@ func TestClassify(t *testing.T) {
 		t.Fatalf("503: %+v", ce)
 	}
 }
+
+// A gateway without the token would ignore the field and install the rule
+// without it, so RequireAdvertised refuses before anything is sent.
+func TestRequireAdvertised(t *testing.T) {
+	for name, c := range map[string]struct {
+		body string
+		want exitcode.Code
+	}{
+		"advertised":    {`{"product":"loxilb-inference-gateway","features":["epp","api_key_auth"]}`, exitcode.OK},
+		"token absent":  {`{"product":"loxilb-inference-gateway","features":["api_key_auth"]}`, exitcode.FeatureUnavailable},
+		"no features":   {`{"product":"loxilb-inference-gateway"}`, exitcode.FeatureUnavailable},
+		"not a gateway": {`{"version":"0.9.8","features":["epp"]}`, exitcode.FeatureUnavailable},
+	} {
+		t.Run(name, func(t *testing.T) {
+			opts, _ := gateway(t, http.StatusOK, c.body)
+			err := RequireAdvertised(opts, EPP, "create lb")
+			if c.want == exitcode.OK {
+				if err != nil {
+					t.Fatalf("refused an advertised feature: %v", err)
+				}
+				return
+			}
+			ce, ok := err.(*exitcode.CLIError)
+			if !ok || ce.Code != c.want {
+				t.Fatalf("error %v, want code %d", err, c.want)
+			}
+		})
+	}
+}

@@ -128,7 +128,7 @@ func apiKeyRow(k api.AIApiKeySummary, wide bool) []string {
 		fmt.Sprintf("%d", k.TokensPerMin), fmt.Sprintf("%v", k.Enabled),
 	}
 	if wide {
-		row = append(row, k.CreatedAt, k.ExpiresAt, dashIfEmpty(k.PriorityClass), dashIfEmpty(k.DefaultObjective), dashIfEmpty(strings.Join(k.AllowedObjectives, ",")))
+		row = append(row, k.CreatedAt, k.ExpiresAt, dashIfEmpty(k.PriorityClass), dashIfEmpty(k.DefaultObjective), dashIfEmpty(strings.Join(k.AllowedObjectives, ",")), dashIfEmpty(k.ClientOpID))
 	}
 	return row
 }

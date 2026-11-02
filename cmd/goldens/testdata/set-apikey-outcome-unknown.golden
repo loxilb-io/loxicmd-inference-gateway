@@ -1,0 +1,4 @@
+exit=8
+--- stdout ---
+--- stderr ---
+Error: server returned 504: ai_key_store_outcome_unknown

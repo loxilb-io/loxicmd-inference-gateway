@@ -28,6 +28,8 @@ func TestParseErrorMessage(t *testing.T) {
 	}{
 		{"SimpleError envelope (swagger-extras)", `{"error":"invalid service_id"}`, "invalid service_id"},
 		{"Error envelope (generated spec)", `{"message":"not found"}`, "not found"},
+		{"504 raw arm (SimpleError)", `{"error":"ai_key_store_outcome_unknown"}`, "ai_key_store_outcome_unknown"},
+		{"504 generated arm (Error)", `{"code":504,"message":"ai_key_store_outcome_unknown"}`, "ai_key_store_outcome_unknown"},
 		{"loxilb result envelope", `{"result":"Success"}`, "Success"},
 		{"msg key", `{"msg":"boom"}`, "boom"},
 		{"unknown json falls back to raw body", `{"foo":"bar"}`, `{"foo":"bar"}`},

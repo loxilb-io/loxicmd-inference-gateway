@@ -114,6 +114,7 @@ func TestFromHTTPStatusTable(t *testing.T) {
 		http.StatusServiceUnavailable:  Unavailable,
 		http.StatusBadRequest:          ContractMismatch,
 		http.StatusInternalServerError: Failed,
+		http.StatusGatewayTimeout:      Partial,
 	} {
 		if got := FromHTTPStatus("op", status).Code; got != want {
 			t.Errorf("HTTP %d -> %d, want %d", status, got, want)

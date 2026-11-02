@@ -47,6 +47,7 @@ type CreateAPIKeyOptions struct {
 	PriorityClass     string
 	DefaultObjective  string
 	AllowedObjectives []string
+	ClientOpID        string
 }
 
 const (
@@ -58,7 +59,7 @@ func NewCreateAPIKeyCmd(restOptions *api.RESTOptions) *cobra.Command {
 	o := CreateAPIKeyOptions{}
 
 	var createAPIKeyCmd = &cobra.Command{
-		Use:   "apikey --tenant-id=<tenant> [--name=<name>] [--api-key-file=<path>|--api-key-stdin] [--allowed-models=<m>,] [--rps=<n>] [--burst=<n>] [--tokens-per-min=<n>] [--expires-at=<RFC3339>] [--enabled] [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,]",
+		Use:   "apikey --tenant-id=<tenant> [--name=<name>] [--api-key-file=<path>|--api-key-stdin] [--allowed-models=<m>,] [--rps=<n>] [--burst=<n>] [--tokens-per-min=<n>] [--expires-at=<RFC3339>] [--enabled] [--priority-class=<class>] [--default-objective=<name>] [--allowed-objectives=<name>,] [--client-op-id=<id>]",
 		Short: "Create an inference-gateway API key",
 		Long: `Create a per-tenant inference-gateway API key.
 
@@ -66,6 +67,13 @@ Without an import option, the plaintext key (raw_key) is returned ONLY once at
 creation time. Store it immediately. To register an existing credential without
 exposing it in process arguments or shell history, use --api-key-file or pipe it
 to --api-key-stdin.
+
+A create is not idempotent by itself: an answer lost to a store stall (504) may
+have left a key whose secret nobody holds, and a blind retry creates a second one.
+With --client-op-id a retry converges on one key per tenant and id: while the key
+has never authenticated, its secret is minted again and delivered with the same
+key_id (the earlier secret stops working); once it has, the gateway answers 409
+api_key_already_delivered. The key's other fields stay those of the first request.
 
 Data-plane enforcement is enabled per load-balancer service with
 --api-key-auth=required. Management Bearer authentication and data-plane
@@ -104,6 +112,7 @@ ex)
 				PriorityClass:     o.PriorityClass,
 				DefaultObjective:  o.DefaultObjective,
 				AllowedObjectives: o.AllowedObjectives,
+				ClientOpID:        o.ClientOpID,
 			}
 
 			client := api.NewLoxiClient(restOptions)
@@ -121,8 +130,13 @@ ex)
 			if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 				ce := exitcode.FromHTTPStatus("create apikey", resp.StatusCode)
 				ce.Message = api.NewAPIError(resp.StatusCode, body).Error()
-				if resp.StatusCode == http.StatusBadRequest {
+				switch resp.StatusCode {
+				case http.StatusBadRequest, http.StatusConflict:
+					// The 400's field and the 409's key_id live in the
+					// body beside its message.
 					ce.Message = api.NewAPIError(resp.StatusCode, body).Verbatim()
+				case http.StatusGatewayTimeout:
+					ce.Message += fmt.Sprintf("; the key may exist: read it back (get apikey --tenant-id=%s) before retrying", o.TenantID)
 				}
 				return ce
 			}
@@ -153,6 +167,7 @@ ex)
 	createAPIKeyCmd.Flags().StringVar(&o.PriorityClass, "priority-class", "", "The highest priority class a request with this key may have: standard, critical or sheddable; it can only lower what the key's tenant allows (omitted: no cap from the key)")
 	createAPIKeyCmd.Flags().StringVar(&o.DefaultObjective, "default-objective", "", "The objective a request with this key gets when it names none, or one it may not use")
 	createAPIKeyCmd.Flags().StringSliceVar(&o.AllowedObjectives, "allowed-objectives", nil, "The objectives a request with this key may ask for by header, out of the ones its tenant allows; at most 64 (empty: the key narrows nothing)")
+	createAPIKeyCmd.Flags().StringVar(&o.ClientOpID, "client-op-id", "", "Idempotency handle for this create, unique per tenant (at most 128 printable non-space ASCII characters): a retry with the same value converges on one key")
 
 	return createAPIKeyCmd
 }
@@ -211,6 +226,13 @@ func printCreateAPIKeyResult(w io.Writer, result api.AIApiKeyCreateResponse, imp
 	}
 	if imported {
 		_, err := fmt.Fprintf(w, "API key imported.\n  key_id : %s\n", result.KeyID)
+		if err == nil && result.Reused {
+			_, err = fmt.Fprintln(w, "  reused : true")
+		}
+		return err
+	}
+	if result.Reused {
+		_, err := fmt.Fprintf(w, "API key reused: an earlier create with this client op ID made it.\n  key_id : %s\n  raw_key: %s\nThe earlier secret no longer authenticates. Store the raw_key now - it will not be shown again.\n", result.KeyID, result.RawKey)
 		return err
 	}
 	_, err := fmt.Fprintf(w, "API key created.\n  key_id : %s\n  raw_key: %s\nStore the raw_key now - it will not be shown again.\n", result.KeyID, result.RawKey)

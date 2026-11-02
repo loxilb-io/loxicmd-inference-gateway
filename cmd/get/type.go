@@ -19,13 +19,13 @@ var (
 	CONNTRACK_TITLE           = []string{"destIP", "srcIP", "dPort", "sPort", "proto", "state", "act", "packets", "bytes"}
 	LOADBALANCER_TITLE        = []string{"Ext IP", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "# of Endpoints", "Timeout", "Monitor", "Conn Limit", "Queue Depth", "Queue Wait(ms)"}
 	APIKEY_TITLE              = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled"}
-	APIKEY_WIDE_TITLE         = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled", "Created", "Expires", "Priority", "Default Objective", "Allowed Objectives"}
+	APIKEY_WIDE_TITLE         = []string{"Key ID", "Tenant", "Name", "Models", "RPS", "Burst", "Tokens/Min", "Enabled", "Created", "Expires", "Priority", "Default Objective", "Allowed Objectives", "Client Op ID"}
 	RATELIMIT_TITLE           = []string{"Tenant", "RPS", "Tokens/Min", "Burst %", "Models", "Updated"}
 	RATELIMIT_WIDE_TITLE      = []string{"Tenant", "RPS", "Tokens/Min", "Burst %", "Model Limits", "Priority", "Default Objective", "Allowed Objectives", "Updated"}
 	KVINVENTORY_TITLE         = []string{"Block Idx", "Hash (uint64)"}
 	CERT_TITLE                = []string{"Cert ID", "Usage", "Hostnames"}
 	SNI_TITLE                 = []string{"Hostname", "Cert Path", "RefCount"}
-	LOADBALANCER_WIDE_TITLE   = []string{"Ext IP", "Sec IPs", "Sources", "Host", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "Endpoint", "EPort", "Weight", "State", "Counters", "Gate", "Max Out", "Adaptive", "Tenants", "Headers", "Backend TLS", "Bands"}
+	LOADBALANCER_WIDE_TITLE   = []string{"Ext IP", "Sec IPs", "Sources", "Host", "Port", "Proto", "Name", "Mark", "Sel", "Mode", "Endpoint", "EPort", "Weight", "State", "Counters", "Gate", "Max Out", "Adaptive", "Tenants", "Headers", "Backend TLS", "Bands", "EPP"}
 	OBJECTIVE_TITLE           = []string{"Name", "Priority", "Services", "Updated"}
 	NETIDENTITY_TITLE         = []string{"Name", "Tenant", "Match", "Enforce", "Credential", "Fail Mode"}
 	NETIDENTITY_WIDE_TITLE    = []string{"Name", "Tenant", "Match", "Enforce", "Credential", "Fail Mode", "Forward Identity", "Priority", "Allowed Models", "Services"}

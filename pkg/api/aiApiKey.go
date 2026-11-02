@@ -39,6 +39,9 @@ type AIApiKeyCreateRequest struct {
 	PriorityClass     string   `json:"priority_class,omitempty"`
 	DefaultObjective  string   `json:"default_objective,omitempty"`
 	AllowedObjectives []string `json:"allowed_objectives,omitempty"`
+	// ClientOpID is the create's idempotency handle: a retry carrying the
+	// same value converges on one row per tenant.
+	ClientOpID string `json:"client_op_id,omitempty"`
 }
 
 // PriorityClasses are the priority classes a key, tenant, JWT profile or
@@ -60,6 +63,10 @@ func IsPriorityClass(s string) bool {
 type AIApiKeyCreateResponse struct {
 	RawKey string `json:"raw_key,omitempty"`
 	KeyID  string `json:"key_id"`
+	// Reused says this answer is a retry's, converged on the row an earlier
+	// request with the same client_op_id created: same key_id, a new secret,
+	// and the earlier secret no longer authenticates.
+	Reused bool `json:"reused"`
 }
 
 // AIApiKeySummary is the GET response item (ApiKeySummary); it never carries the
@@ -79,6 +86,9 @@ type AIApiKeySummary struct {
 	PriorityClass     string   `json:"priority_class,omitempty"`
 	DefaultObjective  string   `json:"default_objective,omitempty"`
 	AllowedObjectives []string `json:"allowed_objectives,omitempty"`
+	// ClientOpID is the handle the create carried, when it carried one: how a
+	// key left by a create whose answer was lost (504) is found in the listing.
+	ClientOpID string `json:"client_op_id,omitempty"`
 }
 
 // AIApiKeyPatchRequest is the PATCH /config/ai/apikey/{key_id} body

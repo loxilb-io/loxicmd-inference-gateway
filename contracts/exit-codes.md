@@ -43,15 +43,27 @@ triggers:
    named item on it: the gateway is one that predates the resource.
 3. **Reserved: token absent.** A gateway that advertises feature tokens in
    `VersionGetEntry.features` but not the one the command needs. Gateways up
-   to loxilb-inference-gateway 7a58e59 advertise only `api_key_auth` and
-   `jwt_auth_profile`, none of the four keys above, so this trigger is not
-   enforced yet (when it is, the message is
+   to loxilb-inference-gateway 55523449 advertise only `epp`, `api_key_auth`
+   and `jwt_auth_profile`, none of the four keys above, so this trigger is not
+   enforced for them yet (when it is, the message is
    `this gateway does not advertise <feature>; upgrade the gateway or use a build that does`):
    when `product` is the gateway and the token is absent, the request is
    sent and one line goes to stderr —
    `warning: gateway does not advertise <feature>; sending anyway, the gateway's answer decides`
    — and the exit code follows the gateway's answer. The refusal is turned on
-   once gateways advertise the keys.
+   once gateways advertise the keys. It is already on for `epp`, which gateways
+   do advertise: `create lb --epp-endpoint` on a gateway without the token exits
+   `9` with that message and sends nothing, since such a gateway would ignore
+   the field and install the rule without its picker.
+
+## `8` `PARTIAL` on HTTP `504`
+
+A gateway `504` on a management write means the outcome is unknown
+(`ai_key_store_outcome_unknown` on the API-key store, `store_outcome_unknown` on
+the management credential store, in either error envelope): the statement was
+handed to the store, which did not answer in time and may still apply it. Read
+the resource back before deciding whether to retry. A `create apikey` retried
+with the same `--client-op-id` converges on one key.
 
 ## Rules
 
