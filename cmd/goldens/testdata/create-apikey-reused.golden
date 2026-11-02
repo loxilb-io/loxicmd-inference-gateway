@@ -1,0 +1,7 @@
+exit=0
+--- stdout ---
+API key reused: an earlier create with this client op ID made it.
+  key_id : key-abc
+  raw_key: raw-key-material-placeholder
+The earlier secret no longer authenticates. Store the raw_key now - it will not be shown again.
+--- stderr ---

@@ -271,6 +271,14 @@ type LoadBalancerService struct {
 	BackendKeepaliveSec  int32  `json:"backend_keepalive_interval_sec,omitempty" yaml:"backend_keepalive_interval_sec,omitempty"`
 	CbEnable             bool   `json:"cb_enable,omitempty"                     yaml:"cb_enable,omitempty"`
 
+	// Endpoint Picker (EPP): the external picker that chooses this fullproxy
+	// rule's backend per request. Empty or zero stays off the wire and the
+	// gateway resolves the default.
+	EppEndpoint    string `json:"eppEndpoint,omitempty"    yaml:"eppEndpoint,omitempty"`
+	EppFailureMode string `json:"eppFailureMode,omitempty" yaml:"eppFailureMode,omitempty"`
+	EppTimeoutMs   int64  `json:"eppTimeoutMs,omitempty"   yaml:"eppTimeoutMs,omitempty"`
+	EppPlaintext   bool   `json:"eppPlaintext,omitempty"   yaml:"eppPlaintext,omitempty"`
+
 	// CHWBL / WRR-hash prefix hashing (sel=8 or sel=10).
 	ChwblPrefixHashLevel int  `json:"chwbl_prefix_hash_level,omitempty" yaml:"chwbl_prefix_hash_level,omitempty"`
 	ChwblPrefixHashFlags int  `json:"chwbl_prefix_hash_flags,omitempty" yaml:"chwbl_prefix_hash_flags,omitempty"`

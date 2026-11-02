@@ -148,7 +148,11 @@ const diagnosticsBody = `{"version":"v1.2.3","build_info":"rev abc","product":"l
 // apiKeyCreatedBody mirrors the gateway's 201 answer to POST /config/ai/apikey.
 // The raw-key value is a deliberately digit-free lowercase placeholder so the
 // repository's history-wide secret scan never mistakes it for a credential.
-const apiKeyCreatedBody = `{"key_id":"key-abc","raw_key":"raw-key-material-placeholder"}`
+const apiKeyCreatedBody = `{"key_id":"key-abc","raw_key":"raw-key-material-placeholder","reused":false}`
+
+// apiKeyReusedBody is the same answer to a retry that converged on the row
+// an earlier request with the same client_op_id created.
+const apiKeyReusedBody = `{"key_id":"key-abc","raw_key":"raw-key-material-placeholder","reused":true}`
 
 // logsBody mirrors GET /logs: one page, newest first, with an older page
 // still to fetch. logArchivesBody mirrors GET /log-archives with the
@@ -213,9 +217,9 @@ const auditStatusSinksBody = `{"available":true,"running":true,"boot_id":"boot-a
 	`{"name":"siem2","state":"disconnected","cursor":{"segment_uuid":"seg-1","seq":600},"lag_drops":2}]}`
 
 // gatewayVersionBody mirrors GET /version on loxilb-inference-gateway
-// 7a58e59: the product and the two feature tokens it advertises.
-const gatewayVersionBody = `{"version":"main-7a58e59b","buildInfo":"2026_10_23-main","product":"loxilb-inference-gateway",` +
-	`"features":["api_key_auth","jwt_auth_profile"]}`
+// 55523449: the product and the three feature tokens it advertises.
+const gatewayVersionBody = `{"version":"main-55523449","buildInfo":"2026_11_02-main","product":"loxilb-inference-gateway",` +
+	`"features":["epp","api_key_auth","jwt_auth_profile"]}`
 
 // bandsLbBody is one AI-gateway rule whose fc_effective carries the
 // priority bands, the weighted wake running strict on a zero weight, so
@@ -469,8 +473,8 @@ var goldenCases = []goldenCase{
 	// fields on keys and tenants, and the objective and netidentity
 	// resources. The commands that gate on a feature read /version first,
 	// so they run against a gateway that answers it; the warning that the
-	// token is not advertised (none is, at 7a58e59) is part of the pinned
-	// stderr.
+	// token is not advertised (none of the four is, at 55523449) is part of
+	// the pinned stderr.
 	{"get-lbversion-features", []string{"get", "lbversion"}, http.StatusOK, gatewayVersionBody, ""},
 	{"get-lb-wide-bands", []string{"get", "lb", "-o", "wide"}, http.StatusOK, bandsLbBody, ""},
 	{"get-lb-bands", []string{"get", "lb", "--bands"}, http.StatusOK, bandsLbBody, gatewayVersionBody},
@@ -481,6 +485,15 @@ var goldenCases = []goldenCase{
 		"--fc-critical-reserve-pct=10", "--fc-shed-queue=on", "--ai-default-reservation=on", "--ai-default-max-tokens=512",
 		"--ai-objective-strict"}, http.StatusOK, successBody, gatewayVersionBody},
 	{"create-apikey-priority", []string{"create", "apikey", "--tenant-id=tenant-a", "--name=key-1", "--priority-class=sheddable", "--default-objective=batch", "--allowed-objectives=batch"}, http.StatusCreated, apiKeyCreatedBody, gatewayVersionBody},
+	{"create-apikey-reused", []string{"create", "apikey", "--tenant-id=tenant-a", "--client-op-id=op-1"}, http.StatusCreated, apiKeyReusedBody, ""},
+	{"create-apikey-delivered", []string{"create", "apikey", "--tenant-id=tenant-a", "--client-op-id=op-1"}, http.StatusConflict,
+		`{"code":409,"message":"api_key_already_delivered","result":"key key-abc has already authenticated; its secret cannot be delivered again. Read the key back; delete and recreate it to issue a new secret"}`, ""},
+	{"create-apikey-outcome-unknown", []string{"create", "apikey", "--tenant-id=tenant-a", "--client-op-id=op-1"}, http.StatusGatewayTimeout,
+		`{"code":504,"message":"ai_key_store_outcome_unknown"}`, ""},
+	{"set-apikey-outcome-unknown", []string{"set", "apikey", "lxb_abc123", "--enabled=false"}, http.StatusGatewayTimeout,
+		`{"error":"ai_key_store_outcome_unknown"}`, ""},
+	{"create-lb-epp", []string{"create", "lb", "192.0.2.20", "--tcp=8000:8000", "--mode=fullproxy", "--endpoints=203.0.113.1:1",
+		"--epp-endpoint=epp.example.svc:9002", "--epp-failure-mode=FailOpen", "--epp-timeout-ms=500", "--epp-plaintext"}, http.StatusOK, successBody, gatewayVersionBody},
 	{"get-apikey-wide", []string{"get", "apikey", "--tenant-id=tenant-a", "-o", "wide"}, http.StatusOK, apiKeyPriorityListBody, ""},
 	{"set-apikey-priority", []string{"set", "apikey", "lxb_abc123", "--priority-class=critical", "--allowed-objectives="}, http.StatusNoContent, "", gatewayVersionBody},
 	{"set-ratelimit-priority", []string{"set", "ratelimit", "--tenant-id=tenant-a", "--priority-class=critical", "--default-objective=interactive", "--allowed-objectives=interactive,batch"}, http.StatusOK, successBody, gatewayVersionBody},

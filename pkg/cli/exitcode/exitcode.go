@@ -140,8 +140,10 @@ func Unavailablef(format string, args ...any) *CLIError {
 // (the target is absent, or the current state refuses the transition);
 // 429 and 503 are the peer refusing service right now; 400 means the
 // peer's validation rejected a request this CLI built — a contract
-// mismatch between the two, not a transport fault; everything else is a
-// classified failure with no better category.
+// mismatch between the two, not a transport fault; 504 is the gateway's
+// "write outcome unknown": the store may still apply the write, so it is
+// never to be retried blindly; everything else is a classified failure with
+// no better category.
 func FromHTTPStatus(op string, status int) *CLIError {
 	e := &CLIError{Message: fmt.Sprintf("%s: gateway answered HTTP %d", op, status), Origin: "gateway", HTTPStatus: status}
 	switch status {
@@ -153,6 +155,8 @@ func FromHTTPStatus(op string, status int) *CLIError {
 		e.Code = Unavailable
 	case http.StatusBadRequest:
 		e.Code = ContractMismatch
+	case http.StatusGatewayTimeout:
+		e.Code = Partial
 	default:
 		e.Code = Failed
 	}

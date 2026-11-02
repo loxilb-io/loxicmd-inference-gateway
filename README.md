@@ -242,18 +242,19 @@ The full, swagger-traceable reference lives in **[docs/COMMANDS.md](docs/COMMAND
 
 Run `./loxicmd help` or `./loxicmd <command> --help` for full details.
 
-### Command table (inference gateway at 7a58e59)
+### Command table (inference gateway at 55523449)
 
 | Command | Gateway path | Notes |
 |---|---|---|
-| `create lb` | `POST /config/loadbalancer` | twelve priority band / reservation flags (`--fc-wake-policy`, `--fc-band-weights`, `--fc-band-min-share-pct`, `--fc-band-queue-pct`, `--fc-band-wait-ms`, `--fc-critical-reserve-pct`, `--fc-shed-queue`, `--fc-tenant-wake`, `--fc-llmd-headers`, `--ai-default-reservation`, `--ai-default-max-tokens`, `--ai-objective-strict`); create or replace, no `set lb` |
-| `get lb` | `GET /config/loadbalancer/all` | `-o wide` adds the Bands column, `--bands` the per-band table, `-o json` the whole `fc_effective` |
-| `create apikey`, `set apikey`, `get apikey -o wide` | `/config/ai/apikey` (+ PATCH) | `--priority-class`, `--default-objective`, `--allowed-objectives`; `set apikey` also `--rate-limit-rps`, `--burst-size`, `--tokens-per-min` (a flag given is sent, `0` included; omitted keeps) |
+| `create lb` | `POST /config/loadbalancer` | twelve priority band / reservation flags (`--fc-wake-policy`, `--fc-band-weights`, `--fc-band-min-share-pct`, `--fc-band-queue-pct`, `--fc-band-wait-ms`, `--fc-critical-reserve-pct`, `--fc-shed-queue`, `--fc-tenant-wake`, `--fc-llmd-headers`, `--ai-default-reservation`, `--ai-default-max-tokens`, `--ai-objective-strict`); Endpoint Picker flags `--epp-endpoint`, `--epp-failure-mode`, `--epp-timeout-ms`, `--epp-plaintext` (exit `9` when the gateway does not advertise `epp`); create or replace, no `set lb` |
+| `get lb` | `GET /config/loadbalancer/all` | `-o wide` adds the Bands and EPP columns, `--bands` the per-band table, `-o json` the whole `fc_effective` |
+| `create apikey`, `set apikey`, `get apikey -o wide` | `/config/ai/apikey` (+ PATCH) | `--priority-class`, `--default-objective`, `--allowed-objectives`; `set apikey` also `--rate-limit-rps`, `--burst-size`, `--tokens-per-min` (a flag given is sent, `0` included; omitted keeps); `create apikey --client-op-id` makes a retry converge on one key (the answer carries `reused`), and `get apikey -o wide` shows the id. The gateway's `Idempotency-Key` header means the same as the body field and has no flag |
 | `set ratelimit`, `get ratelimit -o wide` | `/config/ai/tenant/ratelimit` | the same three flags; a class flag alone leaves the limits |
 | `create objective`, `get objective`, `delete objective` | `POST`/`GET /config/ai/objective`, `DELETE /config/ai/objective/{name}` | no `set`: the gateway has no PUT or PATCH, POST replaces |
 | `create netidentity`, `get netidentity`, `delete netidentity` | `POST`/`GET /config/ai/netidentity`, `DELETE /config/ai/netidentity/{name}` | no `set`, as above |
 | `create jwtauthprofile`, `get jwtauthprofile`, `delete jwtauthprofile` | `POST`/`GET /config/ai/jwtauthprofile`, `DELETE /config/ai/jwtauthprofile/{name}` | no `set`, as above; all 18 swagger fields as flags; delete is 409 → exit `4` while a rule references the profile |
 | `get lbversion` | `GET /version` | prints `features`; exit `9` `FEATURE_UNAVAILABLE` when a command's feature is not offered ([contracts/exit-codes.md](contracts/exit-codes.md)) |
+| any management write | | HTTP `504` is exit `8`: the write's outcome is unknown, read the resource back before retrying ([contracts/exit-codes.md](contracts/exit-codes.md)) |
 
 ## Community & Governance
 

@@ -20,7 +20,9 @@
 // /version, read once per invocation: a peer that is not a
 // loxilb-inference-gateway is refused; a gateway that does not advertise
 // the feature's token is warned about and the request is sent, since
-// gateways up to 7a58e59 advertise only jwt_auth_profile of the keys below.
+// gateways up to 55523449 advertise only jwt_auth_profile and epp of the keys
+// below. The epp token is the exception: a gateway without it is refused,
+// because it would drop the fields and install the rule without its picker.
 package featuregate
 
 import (
@@ -40,13 +42,14 @@ import (
 // The feature keys, as the companion design names them. They are the
 // tokens the gate looks for in VersionGetEntry.features. JWTAuthProfile
 // is the gateway's own token (common.FeatureJWTAuthProfile), advertised
-// since 7a58e59.
+// since 7a58e59, and EPP its common.FeatureEpp.
 const (
 	Bands          = "bands"
 	Objectives     = "objectives"
 	NetIdentity    = "netidentity"
 	Reservation    = "reservation"
 	JWTAuthProfile = "jwt_auth_profile"
+	EPP            = "epp"
 )
 
 // cache holds the /version answer per gateway for the invocation, so a
@@ -78,6 +81,27 @@ func Require(restOptions *api.RESTOptions, feature, command string, stderr io.Wr
 	}
 	fmt.Fprintf(stderr, "warning: gateway does not advertise %s; sending anyway, the gateway's answer decides\n", feature)
 	return nil
+}
+
+// RequireAdvertised is Require for a feature whose token the gateway really
+// advertises and whose fields it would otherwise ignore, installing the rule
+// without them and reporting success. The swagger says a controller that does
+// not find such a token must not send the rule, so an absent token is refused
+// with FEATURE_UNAVAILABLE and nothing is sent.
+func RequireAdvertised(restOptions *api.RESTOptions, feature, command string) error {
+	version, err := read(restOptions)
+	if err != nil {
+		return err
+	}
+	if version.Product != api.GatewayProduct {
+		return NotAGateway(restOptions, version.Product, command)
+	}
+	for _, f := range version.Features {
+		if f == feature {
+			return nil
+		}
+	}
+	return Unavailable(feature)
 }
 
 // NotAGateway is the FEATURE_UNAVAILABLE failure for a peer whose /version

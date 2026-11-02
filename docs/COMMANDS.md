@@ -168,6 +168,17 @@ loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-mode=enforce --fc-max-outstanding=8 --fc-expose-headers=on \
   --endpoints=203.0.113.1:1
 
+# The Endpoint Picker (gateway 55523449; swagger eppEndpoint, eppFailureMode,
+# eppTimeoutMs, eppPlaintext). --epp-endpoint host:port hands the backend choice of
+# every request of a fullproxy rule to a Gateway API Inference Extension EPP; not with
+# --pd-disagg. --epp-failure-mode FailClose (default: 503) or FailOpen (the rule's own
+# selection); --epp-timeout-ms 0..600000 (0 resolves to 3000); --epp-plaintext drops
+# TLS (the default is TLS without certificate verification). get lb -o wide shows it
+# in the EPP column; -o json carries all four.
+loxicmd create lb 192.0.2.32 --tcp=2020:8000 --mode=fullproxy \
+  --epp-endpoint=epp.example.svc:9002 --epp-failure-mode=FailOpen \
+  --endpoints=203.0.113.1:1
+
 # The priority bands (gateway 7a58e59; swagger fc_wake_policy, fc_band_*,
 # fc_critical_reserve_pct, fc_shed_queue, fc_tenant_wake, fc_llmd_headers).
 # A band triple is the gateway's own critical:standard:sheddable string (8:3:1);
@@ -239,6 +250,11 @@ printf '%s' "$EXISTING_API_KEY" | loxicmd create apikey \
   --tenant-id=tenant-a --name=imported --api-key-stdin
 loxicmd create apikey --tenant-id=tenant-a --name=imported \
   --api-key-file=/secure/path/to/key
+# A create whose answer was lost (504, exit 8) may have left a key. --client-op-id makes
+# the retry converge on it: while the key has never authenticated a new secret comes
+# back with the same key_id and "reused" (the earlier secret stops working); once it
+# has, 409 api_key_already_delivered (exit 4). get apikey -o wide shows the id.
+loxicmd create apikey --tenant-id=tenant-a --name=key-3 --client-op-id="$OP_ID"
 loxicmd get apikey --tenant-id=tenant-a          # list; raw_key/hash never shown
 loxicmd get apikey <key-id>                       # one
 loxicmd set apikey <key-id> --allowed-models=mistral-7b   # PATCH
@@ -320,9 +336,10 @@ loxicmd delete jwtauthprofile okta
 # of create lb, get lb --bands, the priority flags, objective, netidentity,
 # jwtauthprofile) read /version first: a peer that is not a loxilb-inference-gateway
 # exits 9 FEATURE_UNAVAILABLE and sends nothing; a gateway that does not advertise
-# the token (at 7a58e59 only jwt_auth_profile is) gets one stderr warning and the
+# the token (at 55523449 only jwt_auth_profile is) gets one stderr warning and the
 # request is sent; a 404 for the objective, netidentity or jwtauthprofile path itself
-# is exit 9 too. See contracts/exit-codes.md.
+# is exit 9 too. create lb --epp-endpoint is refused with exit 9 when the epp token is
+# absent, since that gateway would drop the field. See contracts/exit-codes.md.
 loxicmd get lbversion
 
 # The service must explicitly require X-Api-Key for enforcement

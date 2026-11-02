@@ -1,0 +1,4 @@
+exit=4
+--- stdout ---
+--- stderr ---
+Error: server returned 409: {"code":409,"message":"api_key_already_delivered","result":"key key-abc has already authenticated; its secret cannot be delivered again. Read the key back; delete and recreate it to issue a new secret"}

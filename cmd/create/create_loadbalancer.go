@@ -146,6 +146,11 @@ type CreateLoadBalancerOptions struct {
 	MaxStreamDurationSec int32
 	BackendKeepaliveSec  int32
 	CbEnable             bool
+	// Endpoint Picker.
+	EppEndpoint    string
+	EppFailureMode string
+	EppTimeoutMs   int64
+	EppPlaintext   bool
 	// CHWBL / WRR-hash.
 	ChwblPrefixHashLevel int
 	ChwblPrefixHashFlags int
@@ -598,6 +603,11 @@ ex)
 	createLbCmd.Flags().IntVar(&o.ChwblMeanLoadFactor, "chwbl-load-factor", 0, "CHWBL bounded-load factor 100-300 (default 125)")
 	createLbCmd.Flags().IntVar(&o.ChwblReplication, "chwbl-replication", 0, "CHWBL virtual nodes per endpoint 1-1024 (default 100)")
 	createLbCmd.Flags().BoolVar(&o.ChwblEnableCacheSalt, "chwbl-cache-salt", false, "Require cache_salt in requests for tenant isolation")
+	// Endpoint Picker.
+	createLbCmd.Flags().StringVar(&o.EppEndpoint, "epp-endpoint", "", "gRPC address (host:port) of a Gateway API Inference Extension Endpoint Picker (EPP) that chooses the backend for every request of this fullproxy rule; at most 255 bytes; not with --pd-disagg")
+	createLbCmd.Flags().StringVar(&o.EppFailureMode, "epp-failure-mode", "", "What a request does when the EPP cannot answer: FailClose answers 503 (default), FailOpen falls back to the rule's own selection; only meaningful with --epp-endpoint")
+	createLbCmd.Flags().Int64Var(&o.EppTimeoutMs, "epp-timeout-ms", 0, "Longest wait in milliseconds for the EPP's decision, 0..600000 (0 resolves to 3000); only meaningful with --epp-endpoint")
+	createLbCmd.Flags().BoolVar(&o.EppPlaintext, "epp-plaintext", false, "Connect to the EPP without TLS (default: TLS without certificate verification); only meaningful with --epp-endpoint")
 	// Prefill/decode disaggregation.
 	createLbCmd.Flags().BoolVar(&o.PdDisaggMode, "pd-disagg", false, "Enable prefill/decode disaggregation")
 	createLbCmd.Flags().BoolVar(&o.PdCacheAwareMode, "pd-cache-aware", false, "Enable cache-aware P/D endpoint selection (requires --pd-disagg)")
@@ -834,6 +844,7 @@ func lbAIRequested(o *CreateLoadBalancerOptions) bool {
 	return o.ModelName != "" || o.PathPrefix != "" || o.PathMatchMode != "" ||
 		o.SessionHeaderName != "" || o.TraceType != "" || o.SockMapMode != "" ||
 		o.SseMode || o.APIKeyAuth != "" || o.JWTAuthProfile != "" || o.MaxStreamDurationSec != 0 || o.BackendKeepaliveSec != 0 || o.CbEnable ||
+		o.EppEndpoint != "" ||
 		o.ChwblPrefixHashLevel != 0 || o.ChwblPrefixHashFlags != 0 || o.ChwblMeanLoadFactor != 0 ||
 		o.ChwblReplication != 0 || o.ChwblEnableCacheSalt ||
 		o.PdDisaggMode || o.PdCacheAwareMode || o.PdSessionTtlSec != 0 ||
@@ -872,6 +883,9 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 	} else if o.JWTAuthProfile != "" {
 		return fmt.Errorf("--jwt-auth-profile requires --api-key-auth jwt|apikey-or-jwt")
 	}
+	if err := validateEppOptions(o); err != nil {
+		return err
+	}
 	switch o.SockMapMode {
 	case "", "off", "request", "response", "both":
 	default:
@@ -893,6 +907,35 @@ func validateLBAIOptions(o *CreateLoadBalancerOptions) error {
 		return fmt.Errorf("--pd-cache-aware requires --pd-disagg")
 	}
 	return validateKVEngineOptions(o)
+}
+
+// Gateway-side bounds of the Endpoint Picker fields.
+const (
+	eppEndpointMaxBytes = 255
+	eppTimeoutMsMax     = 600000
+)
+
+// validateEppOptions mirrors the swagger's Endpoint Picker bounds and its
+// LB-EPP-NO-PD relation; LB-EPP-FULLPROXY is the fullproxy check every option
+// in lbAIRequested gets. The other three fields are accepted without an
+// endpoint, where the gateway keeps them inert, and whether the address is a
+// host:port is the gateway's 400.
+func validateEppOptions(o *CreateLoadBalancerOptions) error {
+	switch o.EppFailureMode {
+	case "", "FailOpen", "FailClose":
+	default:
+		return fmt.Errorf("--epp-failure-mode must be one of FailOpen|FailClose")
+	}
+	if o.EppTimeoutMs < 0 || o.EppTimeoutMs > eppTimeoutMsMax {
+		return fmt.Errorf("--epp-timeout-ms must be within 0..%d", eppTimeoutMsMax)
+	}
+	if len(o.EppEndpoint) > eppEndpointMaxBytes {
+		return fmt.Errorf("--epp-endpoint must be at most %d bytes", eppEndpointMaxBytes)
+	}
+	if o.EppEndpoint != "" && o.PdDisaggMode {
+		return fmt.Errorf("--epp-endpoint must not be used with --pd-disagg: an Endpoint Picker rule must not enable loxilb's own P/D orchestration")
+	}
+	return nil
 }
 
 // validateFcQueueOptions mirrors the gateway's admission-queue bounds so a
@@ -1040,6 +1083,11 @@ func requireLBFeatures(restOptions *api.RESTOptions, o *CreateLoadBalancerOption
 	}
 	if o.AiObjectiveStrictSet {
 		if err := featuregate.Require(restOptions, featuregate.Objectives, "create lb", stderr); err != nil {
+			return err
+		}
+	}
+	if o.EppEndpoint != "" {
+		if err := featuregate.RequireAdvertised(restOptions, featuregate.EPP, "create lb"); err != nil {
 			return err
 		}
 	}
@@ -1253,6 +1301,11 @@ func applyAIServiceOptions(s *api.LoadBalancerService, o *CreateLoadBalancerOpti
 	s.MaxStreamDurationSec = o.MaxStreamDurationSec
 	s.BackendKeepaliveSec = o.BackendKeepaliveSec
 	s.CbEnable = o.CbEnable
+	// Endpoint Picker.
+	s.EppEndpoint = o.EppEndpoint
+	s.EppFailureMode = o.EppFailureMode
+	s.EppTimeoutMs = o.EppTimeoutMs
+	s.EppPlaintext = o.EppPlaintext
 	// CHWBL.
 	s.ChwblPrefixHashLevel = o.ChwblPrefixHashLevel
 	s.ChwblPrefixHashFlags = o.ChwblPrefixHashFlags

@@ -204,6 +204,7 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 		headersCell := fcHeadersCell(lbrule.Service.FcEffective)
 		backendTLSCell := backendTLSCell(lbrule.Service.BackendTLSEffective)
 		bandsCell := fcBandsCell(lbrule.Service.FcEffective)
+		eppCell := eppCell(&lbrule.Service)
 		if o.PrintOption == "wide" {
 			table.SetHeader(LOADBALANCER_WIDE_TITLE)
 			secIPs := ""
@@ -227,13 +228,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell, eppCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell, eppCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", "", "", "", "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), eps.State, eps.Counter, "", "", "", "", "", "", "", ""})
 					}
 				}
 			} else {
@@ -241,13 +242,13 @@ func PrintGetLbResult(resp *http.Response, o api.RESTOptions) {
 					if i == 0 {
 						if lbrule.Service.PortMax == 0 {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d", lbrule.Service.Port), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell, eppCell})
 						} else {
 							data = append(data, []string{lbrule.Service.ExternalIP, secIPs, sources, lbrule.Service.Host, fmt.Sprintf("%d-%d", lbrule.Service.Port, lbrule.Service.PortMax), protocolStr, lbrule.Service.Name, fmt.Sprintf("%d", lbrule.Service.Block), NumToSelect(int(lbrule.Service.Sel)), NumToMode(int(lbrule.Service.Mode), lbrule.Service.PpV2, lbrule.Service.Egress),
-								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell})
+								eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, gateCell, maxOutCell, adaptCell, tenantCell, headersCell, backendTLSCell, bandsCell, eppCell})
 						}
 					} else {
-						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", "", "", "", "", ""})
+						data = append(data, []string{"", "", "", "", "", "", "", "", "", "", eps.EndpointIP, fmt.Sprintf("%d", eps.TargetPort), fmt.Sprintf("%d", eps.Weight), "-", eps.Counter, "", "", "", "", "", "", "", ""})
 					}
 				}
 			}
@@ -478,6 +479,18 @@ func backendTLSCell(eff *api.BackendTLSEffective) string {
 		policy += ", name"
 	}
 	return eff.Status + ": " + policy
+}
+
+// eppCell renders the rule's Endpoint Picker for the wide view: the address
+// and what a request does when the picker cannot answer, "-" without one.
+func eppCell(s *api.LoadBalancerService) string {
+	if s.EppEndpoint == "" {
+		return "-"
+	}
+	if s.EppFailureMode == "" {
+		return s.EppEndpoint
+	}
+	return s.EppEndpoint + " (" + s.EppFailureMode + ")"
 }
 
 // fcBandsCell renders the priority bands' wake policy for the wide view: as
