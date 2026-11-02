@@ -10,7 +10,7 @@ SHELL := /bin/bash
 # (cmd.Version); a release build takes the version from the git tag instead
 # (.github/workflows/release.yml).
 #   make build VERSION=v0.9.8.7
-VERSION ?= v0.9.8.6
+VERSION ?= v0.9.9.1
 BUILDINFO = $(shell date '+%Y_%m_%d')-$(shell git branch --show-current)-$(shell git show --pretty=format:%h --no-patch)
 # Build identity for `loxicmd version -o json` (cmd/buildinfo.go). The full
 # source revision and the consumed gateway-contract digest come from the tree

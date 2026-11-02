@@ -16,6 +16,8 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
 
 ## [Unreleased]
 
+## [v0.9.9.1] - 2026-11-02
+
 ### Added
 - Initial CLI, derived from [loxicmd](https://github.com/loxilb-io/loxicmd) and retargeted as the command-line
   interface for [loxilb-inference-gateway](https://github.com/loxilb-io/loxilb-inference-gateway).
@@ -143,8 +145,15 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
     gateway that does not advertise the feature's token gets one stderr
     warning and the request is sent, since gateways up to 7a58e59 advertise
     only `api_key_auth` and `jwt_auth_profile`.
+- Gateway sync with loxilb-inference-gateway 55523449 (the consumed contract is pinned to it): <!-- OWNER REVIEW PENDING -->
+  - `create apikey --client-op-id` makes a retry converge on one key per tenant and id; the answer's `reused` is printed, and `get apikey -o wide` shows the id. <!-- OWNER REVIEW PENDING -->
+  - `create lb` takes the Endpoint Picker: `--epp-endpoint`, `--epp-failure-mode`, `--epp-timeout-ms`, `--epp-plaintext`; `get lb -o wide` has an EPP column and `-o json` carries all four. <!-- OWNER REVIEW PENDING -->
 
 ### Changed
+- HTTP `504` from the gateway now exits `8` `PARTIAL` instead of `7` `FAILED`, in either error envelope: the store may still apply the write, so read the resource back before retrying. <!-- OWNER REVIEW PENDING -->
+- `create apikey` prints a `409` with the gateway's body as received, so the `key_id` in `api_key_already_delivered` is shown. <!-- OWNER REVIEW PENDING -->
+- `create lb --epp-endpoint` exits `9` `FEATURE_UNAVAILABLE` and sends nothing when the gateway does not advertise `epp`, since such a gateway would ignore the field and install the rule without its picker. <!-- OWNER REVIEW PENDING -->
+- `get apikey -o wide` gains a `Client Op ID` column and `get lb -o wide` an `EPP` column; `create apikey -o json` gains `reused`. <!-- OWNER REVIEW PENDING -->
 - `create lb`, `create apikey`, `set apikey`, `set ratelimit` and the
   objective, netidentity and jwtauthprofile commands print a 400 with the gateway's body as
   received, so the field it names and the reason it gives are shown, not only
