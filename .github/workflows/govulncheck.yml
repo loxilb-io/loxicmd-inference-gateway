@@ -5,6 +5,11 @@ name: Govulncheck
 # upstream fix (see .github/scripts/govulncheck-gate.py). Advisories with no
 # fix yet — typically standard-library ones awaiting a Go patch — are reported
 # but do not block, so the gate never goes falsely red on un-actionable CVEs.
+#
+# Two jobs: `govulncheck` scans the source under the latest stable Go;
+# `release-binary` builds the linux binaries with the exact Go version that
+# release.yml pins and scans them in binary mode, so a release toolchain that
+# falls behind on standard-library fixes turns this red before a tag is cut.
 
 on:
   pull_request:
@@ -52,4 +57,78 @@ jobs:
         with:
           name: govulncheck-json
           path: govulncheck.json
+          if-no-files-found: ignore
+
+  release-binary:
+    name: govulncheck (release binary)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Read the release toolchain from release.yml
+        id: rel
+        # release.yml is the single place the release Go version is set: its
+        # setup-go go-version and its GOVERSION check must name the same
+        # exact X.Y.Z release, and this job uses that version.
+        run: |
+          WF=.github/workflows/release.yml
+          SETUP="$(sed -nE "s/^ +go-version: '([0-9]+\.[0-9]+\.[0-9]+)'\s*$/\1/p" "$WF")"
+          CHECK="$(sed -nE 's/^ +test "\$\(go env GOVERSION\)" = "go([0-9]+\.[0-9]+\.[0-9]+)"\s*$/\1/p' "$WF")"
+          if [ -z "$SETUP" ] || [ "$(printf '%s\n' "$SETUP" | wc -l)" -ne 1 ] || [ "$SETUP" != "$CHECK" ]; then
+            echo "::error::release.yml must pin one exact Go version in setup-go and in its GOVERSION check (setup-go='${SETUP}' check='${CHECK}')"
+            exit 1
+          fi
+          echo "go=${SETUP}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: ${{ steps.rel.outputs.go }}
+          cache: true
+
+      - name: Verify toolchain
+        env:
+          WANT: go${{ steps.rel.outputs.go }}
+        run: |
+          go version
+          test "$(go env GOVERSION)" = "$WANT"
+
+      - name: Build the release binaries
+        # Same target and flags as release.yml. The version stamps differ,
+        # which does not change what standard library is linked in.
+        env:
+          CGO_ENABLED: 0
+        run: |
+          for arch in amd64 arm64; do
+            GOOS=linux GOARCH="$arch" go build -trimpath -buildvcs=false \
+              -ldflags "-buildid=" -o "loxicmd_${arch}"
+          done
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+      - name: Run govulncheck -mode=binary (fixable-gate)
+        run: |
+          rc_all=0
+          for arch in amd64 arm64; do
+            report="govulncheck-binary_${arch}.json"
+            set +e
+            "$(go env GOPATH)/bin/govulncheck" -mode=binary -format json \
+              "loxicmd_${arch}" > "$report" 2> "${report}.err"
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              echo "govulncheck failed to run on linux/${arch} (exit $rc):"; cat "${report}.err"; exit 1
+            fi
+            echo "linux/${arch}:"
+            python3 .github/scripts/govulncheck-gate.py "$report" || rc_all=1
+          done
+          exit "$rc_all"
+
+      - name: Upload govulncheck report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: govulncheck-binary-json
+          path: govulncheck-binary_*.json
           if-no-files-found: ignore

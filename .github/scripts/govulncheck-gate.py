@@ -2,6 +2,13 @@
 """Gate govulncheck (-format json) output: fail CI only on vulnerabilities that
 are reachable from this module AND have an available upstream fix.
 
+Reachable depends on the scan mode the output records in its config message:
+  source  a trace frame is a function in this module (a call path from our
+          code reaches the vulnerable symbol)
+  binary  the vulnerable symbol is in the binary; a binary carries no call
+          paths, so a symbol-level finding is the binary-mode equivalent.
+          Package- and module-level findings do not count in either mode.
+
 Advisories with no fixed version (govulncheck reports "Fixed in: N/A") are printed
 for visibility but do NOT fail the build — there is nothing to bump to. Standard
 library advisories are typically in this category until a Go patch ships.
@@ -50,6 +57,15 @@ def main():
               file=sys.stderr)
         return 2
 
+    modes = {(obj.get("config") or {}).get("scan_mode") for obj in objs
+             if obj.get("config")}
+    modes.discard(None)
+    if len(modes) != 1 or not modes <= {"source", "binary"}:
+        print("govulncheck-gate: cannot determine scan mode from the config "
+              f"message (got {sorted(modes) or 'none'})", file=sys.stderr)
+        return 2
+    binary = modes == {"binary"}
+
     fixable = {}       # osv -> fixed_version
     nofix = set()      # osv reachable but with no upstream fix
     for obj in objs:
@@ -60,11 +76,15 @@ def main():
         if not osv:
             continue
         trace = fd.get("trace") or []
-        # Reachable from our code: some trace frame is a function in this module.
-        reachable = any(
-            fr.get("function") and (fr.get("module") or "").startswith(MODULE)
-            for fr in trace
-        )
+        if binary:
+            # Symbol-level finding: the vulnerable function is linked in.
+            reachable = any(fr.get("function") for fr in trace)
+        else:
+            # Some trace frame is a function in this module.
+            reachable = any(
+                fr.get("function") and (fr.get("module") or "").startswith(MODULE)
+                for fr in trace
+            )
         if not reachable:
             continue
         fv = fd.get("fixed_version") or ""
@@ -82,7 +102,8 @@ def main():
         for osv, fv in sorted(fixable.items()):
             print(f"  {osv}  -> fixed in {fv}")
         return 1
-    print("govulncheck-gate: OK - no reachable, fixable vulnerabilities"
+    print(f"govulncheck-gate: OK ({'binary' if binary else 'source'} mode) - "
+          "no reachable, fixable vulnerabilities"
           + (f" ({len(nofix)} unfixable advisory ignored)" if nofix else ""))
     return 0
 

@@ -16,6 +16,25 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
 
 ## [Unreleased]
 
+## [v0.9.9.2] - 2026-11-03
+
+A toolchain rebuild of v0.9.9.1: the same source and dependencies, built with
+Go 1.26.10. It ships against loxilb-inference-gateway v0.9.9.1 (and the
+OAM and UI v0.9.9.1); the lockstep holds at `0.9.9`, and only the BUILD
+component moves. <!-- OWNER REVIEW PENDING -->
+
+### Security
+- The v0.9.9.1 binaries were built with Go 1.25.0 and carry reachable
+  standard-library vulnerabilities (incl. GO-2026-6809 / CVE-2026-111943);
+  v0.9.9.2 is the same source rebuilt with Go 1.26.10. Use v0.9.9.2 instead
+  of v0.9.9.1. <!-- OWNER REVIEW PENDING -->
+- The release workflow scans the binaries it is about to publish with
+  `govulncheck -mode=binary` and fails on any vulnerability whose symbol is in
+  the binary and that has an available fix. The Govulncheck workflow gains a
+  job that does the same on every pull request and weekly, with the Go version
+  `release.yml` pins; the source scan under the latest stable Go could not see
+  the standard library a release links in. <!-- OWNER REVIEW PENDING -->
+
 ## [v0.9.9.1] - 2026-11-02
 
 ### Added
