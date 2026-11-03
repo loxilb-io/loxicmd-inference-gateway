@@ -21,19 +21,19 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
 A toolchain rebuild of v0.9.9.1: the same source and dependencies, built with
 Go 1.26.10. It ships against loxilb-inference-gateway v0.9.9.1 (and the
 OAM and UI v0.9.9.1); the lockstep holds at `0.9.9`, and only the BUILD
-component moves. <!-- OWNER REVIEW PENDING -->
+component moves.
 
 ### Security
 - The v0.9.9.1 binaries were built with Go 1.25.0 and carry reachable
   standard-library vulnerabilities (incl. GO-2026-6809 / CVE-2026-111943);
   v0.9.9.2 is the same source rebuilt with Go 1.26.10. Use v0.9.9.2 instead
-  of v0.9.9.1. <!-- OWNER REVIEW PENDING -->
+  of v0.9.9.1.
 - The release workflow scans the binaries it is about to publish with
   `govulncheck -mode=binary` and fails on any vulnerability whose symbol is in
   the binary and that has an available fix. The Govulncheck workflow gains a
   job that does the same on every pull request and weekly, with the Go version
   `release.yml` pins; the source scan under the latest stable Go could not see
-  the standard library a release links in. <!-- OWNER REVIEW PENDING -->
+  the standard library a release links in.
 
 ## [v0.9.9.1] - 2026-11-02
 
@@ -164,15 +164,15 @@ component moves. <!-- OWNER REVIEW PENDING -->
     gateway that does not advertise the feature's token gets one stderr
     warning and the request is sent, since gateways up to 7a58e59 advertise
     only `api_key_auth` and `jwt_auth_profile`.
-- Gateway sync with loxilb-inference-gateway 55523449 (the consumed contract is pinned to it): <!-- OWNER REVIEW PENDING -->
-  - `create apikey --client-op-id` makes a retry converge on one key per tenant and id; the answer's `reused` is printed, and `get apikey -o wide` shows the id. <!-- OWNER REVIEW PENDING -->
-  - `create lb` takes the Endpoint Picker: `--epp-endpoint`, `--epp-failure-mode`, `--epp-timeout-ms`, `--epp-plaintext`; `get lb -o wide` has an EPP column and `-o json` carries all four. <!-- OWNER REVIEW PENDING -->
+- Gateway sync with loxilb-inference-gateway 55523449 (the consumed contract is pinned to it):
+  - `create apikey --client-op-id` makes a retry converge on one key per tenant and id; the answer's `reused` is printed, and `get apikey -o wide` shows the id.
+  - `create lb` takes the Endpoint Picker: `--epp-endpoint`, `--epp-failure-mode`, `--epp-timeout-ms`, `--epp-plaintext`; `get lb -o wide` has an EPP column and `-o json` carries all four.
 
 ### Changed
-- HTTP `504` from the gateway now exits `8` `PARTIAL` instead of `7` `FAILED`, in either error envelope: the store may still apply the write, so read the resource back before retrying. <!-- OWNER REVIEW PENDING -->
-- `create apikey` prints a `409` with the gateway's body as received, so the `key_id` in `api_key_already_delivered` is shown. <!-- OWNER REVIEW PENDING -->
-- `create lb --epp-endpoint` exits `9` `FEATURE_UNAVAILABLE` and sends nothing when the gateway does not advertise `epp`, since such a gateway would ignore the field and install the rule without its picker. <!-- OWNER REVIEW PENDING -->
-- `get apikey -o wide` gains a `Client Op ID` column and `get lb -o wide` an `EPP` column; `create apikey -o json` gains `reused`. <!-- OWNER REVIEW PENDING -->
+- HTTP `504` from the gateway now exits `8` `PARTIAL` instead of `7` `FAILED`, in either error envelope: the store may still apply the write, so read the resource back before retrying.
+- `create apikey` prints a `409` with the gateway's body as received, so the `key_id` in `api_key_already_delivered` is shown.
+- `create lb --epp-endpoint` exits `9` `FEATURE_UNAVAILABLE` and sends nothing when the gateway does not advertise `epp`, since such a gateway would ignore the field and install the rule without its picker.
+- `get apikey -o wide` gains a `Client Op ID` column and `get lb -o wide` an `EPP` column; `create apikey -o json` gains `reused`.
 - `create lb`, `create apikey`, `set apikey`, `set ratelimit` and the
   objective, netidentity and jwtauthprofile commands print a 400 with the gateway's body as
   received, so the field it names and the reason it gives are shown, not only
