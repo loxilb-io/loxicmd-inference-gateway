@@ -12,7 +12,9 @@ func TestEppFlagsOnTheWire(t *testing.T) {
 	})
 	t.Run("given is sent under the swagger names", func(t *testing.T) {
 		m := serviceMap(t, &CreateLoadBalancerOptions{ExternalIP: "192.0.2.52", Select: "rr",
-			EppEndpoint: "epp.example.svc:9002", EppFailureMode: "FailOpen", EppTimeoutMs: 500, EppPlaintext: true})
+			PdDisaggMode: true, EppEndpoint: "epp.example.svc:9002",
+			EppFailureMode: "FailOpen", EppTimeoutMs: 500, EppPlaintext: true})
+		assertKey(t, m, "pd_disagg_mode", true)
 		assertKey(t, m, "eppEndpoint", "epp.example.svc:9002")
 		assertKey(t, m, "eppFailureMode", "FailOpen")
 		assertKey(t, m, "eppTimeoutMs", 500)
@@ -22,6 +24,7 @@ func TestEppFlagsOnTheWire(t *testing.T) {
 
 func TestValidateEppOptions(t *testing.T) {
 	const ep = "epp.example.svc:9002"
+	pdRoles := []string{"prefill", "decode"}
 	for _, c := range []struct {
 		name string
 		o    CreateLoadBalancerOptions
@@ -30,7 +33,9 @@ func TestValidateEppOptions(t *testing.T) {
 		{"a fullproxy rule", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppFailureMode: "FailClose", EppTimeoutMs: 600000}, ""},
 		{"inert fields without an endpoint", CreateLoadBalancerOptions{Mode: "onearm", EppFailureMode: "FailOpen", EppTimeoutMs: 5, EppPlaintext: true}, ""},
 		{"LB-EPP-FULLPROXY", CreateLoadBalancerOptions{Mode: "onearm", EppEndpoint: ep}, "AI features require '--mode fullproxy'"},
-		{"LB-EPP-NO-PD", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true}, "must not be used with --pd-disagg"},
+		{"P/D with FailOpen", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true, EpRoles: pdRoles, EppFailureMode: "FailOpen"}, ""},
+		{"P/D with FailClose", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true, EpRoles: pdRoles, EppFailureMode: "FailClose"}, "requires --epp-failure-mode FailOpen"},
+		{"P/D with no failure mode", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true, EpRoles: pdRoles}, "requires --epp-failure-mode FailOpen"},
 		{"an unknown failure mode", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppFailureMode: "failopen"}, "--epp-failure-mode must be one of FailOpen|FailClose"},
 		{"a timeout over the ceiling", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppTimeoutMs: 600001}, "--epp-timeout-ms must be within 0..600000"},
 		{"a negative timeout", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppTimeoutMs: -1}, "--epp-timeout-ms must be within 0..600000"},

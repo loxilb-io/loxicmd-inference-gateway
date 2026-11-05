@@ -604,7 +604,7 @@ ex)
 	createLbCmd.Flags().IntVar(&o.ChwblReplication, "chwbl-replication", 0, "CHWBL virtual nodes per endpoint 1-1024 (default 100)")
 	createLbCmd.Flags().BoolVar(&o.ChwblEnableCacheSalt, "chwbl-cache-salt", false, "Require cache_salt in requests for tenant isolation")
 	// Endpoint Picker.
-	createLbCmd.Flags().StringVar(&o.EppEndpoint, "epp-endpoint", "", "gRPC address (host:port) of a Gateway API Inference Extension Endpoint Picker (EPP) that chooses the backend for every request of this fullproxy rule; at most 255 bytes; not with --pd-disagg")
+	createLbCmd.Flags().StringVar(&o.EppEndpoint, "epp-endpoint", "", "gRPC address (host:port) of a Gateway API Inference Extension Endpoint Picker (EPP) that chooses the backend for every request of this fullproxy rule; at most 255 bytes; with --pd-disagg, requires --epp-failure-mode FailOpen")
 	createLbCmd.Flags().StringVar(&o.EppFailureMode, "epp-failure-mode", "", "What a request does when the EPP cannot answer: FailClose answers 503 (default), FailOpen falls back to the rule's own selection; only meaningful with --epp-endpoint")
 	createLbCmd.Flags().Int64Var(&o.EppTimeoutMs, "epp-timeout-ms", 0, "Longest wait in milliseconds for the EPP's decision, 0..600000 (0 resolves to 3000); only meaningful with --epp-endpoint")
 	createLbCmd.Flags().BoolVar(&o.EppPlaintext, "epp-plaintext", false, "Connect to the EPP without TLS (default: TLS without certificate verification); only meaningful with --epp-endpoint")
@@ -916,7 +916,7 @@ const (
 )
 
 // validateEppOptions mirrors the swagger's Endpoint Picker bounds and its
-// LB-EPP-NO-PD relation; LB-EPP-FULLPROXY is the fullproxy check every option
+// LB-EPP-PD-FAILOPEN relation; LB-EPP-FULLPROXY is the fullproxy check every option
 // in lbAIRequested gets. The other three fields are accepted without an
 // endpoint, where the gateway keeps them inert, and whether the address is a
 // host:port is the gateway's 400.
@@ -932,8 +932,8 @@ func validateEppOptions(o *CreateLoadBalancerOptions) error {
 	if len(o.EppEndpoint) > eppEndpointMaxBytes {
 		return fmt.Errorf("--epp-endpoint must be at most %d bytes", eppEndpointMaxBytes)
 	}
-	if o.EppEndpoint != "" && o.PdDisaggMode {
-		return fmt.Errorf("--epp-endpoint must not be used with --pd-disagg: an Endpoint Picker rule must not enable loxilb's own P/D orchestration")
+	if o.EppEndpoint != "" && o.PdDisaggMode && o.EppFailureMode != "FailOpen" {
+		return fmt.Errorf("--epp-endpoint with --pd-disagg requires --epp-failure-mode FailOpen")
 	}
 	return nil
 }
