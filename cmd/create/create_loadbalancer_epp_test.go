@@ -36,6 +36,7 @@ func TestValidateEppOptions(t *testing.T) {
 		{"P/D with FailOpen", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true, EpRoles: pdRoles, EppFailureMode: "FailOpen"}, ""},
 		{"P/D with FailClose", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true, EpRoles: pdRoles, EppFailureMode: "FailClose"}, "requires --epp-failure-mode FailOpen"},
 		{"P/D with no failure mode", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, PdDisaggMode: true, EpRoles: pdRoles}, "requires --epp-failure-mode FailOpen"},
+		{"native P/D without EPP", CreateLoadBalancerOptions{Mode: "fullproxy", PdDisaggMode: true, EpRoles: pdRoles, EppFailureMode: "FailClose"}, ""},
 		{"an unknown failure mode", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppFailureMode: "failopen"}, "--epp-failure-mode must be one of FailOpen|FailClose"},
 		{"a timeout over the ceiling", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppTimeoutMs: 600001}, "--epp-timeout-ms must be within 0..600000"},
 		{"a negative timeout", CreateLoadBalancerOptions{Mode: "fullproxy", EppEndpoint: ep, EppTimeoutMs: -1}, "--epp-timeout-ms must be within 0..600000"},
