@@ -16,6 +16,13 @@ git tag; a local `make build` stamps the Makefile's `VERSION` (see
 
 ## [Unreleased]
 
+### Fixed
+
+- `create lb` accepts an Endpoint Picker together with `--pd-disagg` when
+  `--epp-failure-mode=FailOpen` is explicit, matching the Gateway's
+  `LB-EPP-PD-FAILOPEN` contract. FailClose and an omitted mode are rejected
+  with the required mode named. Native P/D without EPP is unchanged. (#87)
+
 ## [v0.9.9.2] - 2026-11-03
 
 A toolchain rebuild of v0.9.9.1: the same source and dependencies, built with

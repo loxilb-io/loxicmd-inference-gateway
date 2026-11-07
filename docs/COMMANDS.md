@@ -168,13 +168,16 @@ loxicmd create lb 192.0.2.31 --tcp=2020:8000 --mode=fullproxy \
   --fc-mode=enforce --fc-max-outstanding=8 --fc-expose-headers=on \
   --endpoints=203.0.113.1:1
 
-# The Endpoint Picker (gateway 55523449; swagger eppEndpoint, eppFailureMode,
+# The Endpoint Picker (gateway contract LB-EPP-PD-FAILOPEN; swagger eppEndpoint, eppFailureMode,
 # eppTimeoutMs, eppPlaintext). --epp-endpoint host:port hands the backend choice of
-# every request of a fullproxy rule to a Gateway API Inference Extension EPP; not with
-# --pd-disagg. --epp-failure-mode FailClose (default: 503) or FailOpen (the rule's own
+# every request of a fullproxy rule to a Gateway API Inference Extension EPP. With
+# --pd-disagg, explicitly set --epp-failure-mode=FailOpen; FailClose and omission
+# are refused. Without P/D, --epp-failure-mode FailClose (default: 503) or FailOpen (the rule's own
 # selection); --epp-timeout-ms 0..600000 (0 resolves to 3000); --epp-plaintext drops
 # TLS (the default is TLS without certificate verification). get lb -o wide shows it
-# in the EPP column; -o json carries all four.
+# in the EPP column; -o json carries all four. An explicit EPP pick uses the
+# picked endpoint directly. On a P/D rule, EPP FailOpen runs the configured
+# native P/D legs.
 loxicmd create lb 192.0.2.32 --tcp=2020:8000 --mode=fullproxy \
   --epp-endpoint=epp.example.svc:9002 --epp-failure-mode=FailOpen \
   --endpoints=203.0.113.1:1
